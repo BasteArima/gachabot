@@ -90,21 +90,66 @@ func (s *GachaService) RollCard(userID int64, username string) (*RollResult, err
 		return nil, fmt.Errorf("ошибка получения редкостей: %w", err)
 	}
 
-	target := rand.Float64() * 100
-	var currentSum float64
+	// Получаем текущие счетчики юзера
+	userPities, err := s.repo.GetUserPities(userID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения гарантов: %w", err)
+	}
+
 	var selectedRarityID, selectedRarityReward int
 	var rarityName string
+	var isPityHit bool
 
-	for _, v := range rarities {
-		currentSum += v.DropChance
-		if target <= currentSum {
-			selectedRarityID = v.ID
-			rarityName = v.Name
-			selectedRarityReward = v.BaseReward
-			break
+	// 4.1 ПРОВЕРЯЕМ ГАРАНТЫ (Идем с конца, от самых крутых к обычным)
+	for i := len(rarities) - 1; i >= 0; i-- {
+		rarity := rarities[i]
+		if rarity.PityThreshold > 0 {
+			currentCount := userPities[rarity.ID]
+			// Если счетчик равен порог минус 1 (т.к. эта крутка станет решающей)
+			if currentCount >= rarity.PityThreshold-1 {
+				selectedRarityID = rarity.ID
+				rarityName = rarity.Name
+				selectedRarityReward = rarity.BaseReward
+				isPityHit = true
+				break // Нашли сработавший гарант, прерываем цикл!
+			}
 		}
 	}
 
+	// 4.2 ЕСЛИ ГАРАНТ НЕ СРАБОТАЛ - крутим обычную рулетку
+	if !isPityHit {
+		target := rand.Float64() * 100
+		var currentSum float64
+		for _, v := range rarities {
+			currentSum += v.DropChance
+			if target <= currentSum {
+				selectedRarityID = v.ID
+				rarityName = v.Name
+				selectedRarityReward = v.BaseReward
+				break
+			}
+		}
+	}
+
+	// 4.3 ОБНОВЛЯЕМ СЧЕТЧИК ГАРАНТОВ ПОСЛЕ ВЫПАДЕНИЯ
+	for _, rarity := range rarities {
+		if rarity.PityThreshold > 0 {
+			// Если выпавшая редкость круче или равна текущей — сбрасываем её гарант
+			if selectedRarityID >= rarity.ID {
+				userPities[rarity.ID] = 0
+			} else {
+				// Иначе (выпал мусор) — увеличиваем счетчик на 1
+				userPities[rarity.ID]++
+			}
+		}
+	}
+
+	// Сохраняем обновленные счетчики в БД
+	if err := s.repo.UpdateUserPities(userID, userPities); err != nil {
+		return nil, fmt.Errorf("ошибка сохранения гарантов: %w", err)
+	}
+
+	// 5. Достаем саму карту (как и было)
 	card, err := s.repo.GetRandomCard(selectedRarityID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения карты: %w", err)
@@ -181,4 +226,35 @@ func (s *GachaService) GetUserProfile(userID int64) (*models.UserProfile, error)
 		UniqueCardsCount: uniqueCards,
 		TotalCardsCount:  totalCards,
 	}, nil
+}
+
+// Возвращает карточку по индексу и общее количество уникальных карт
+func (s *GachaService) GetUserCardPagination(userID int64, offset int) (*models.UserCardView, int, error) {
+	total, err := s.repo.GetUserUniqueCardsCount(userID)
+	if err != nil || total == 0 {
+		return nil, 0, err // Карт нет
+	}
+
+	// Защита от выхода за пределы
+	if offset >= total {
+		offset = total - 1
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	card, err := s.repo.GetUserCard(userID, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return card, total, nil
+}
+
+func (s *GachaService) TrackChat(userID int64, chatID int64) {
+	_ = s.repo.TrackUserChat(userID, chatID)
+}
+
+func (s *GachaService) GetLeaderboard(criteria string, chatID int64) ([]models.LeaderboardEntry, error) {
+	return s.repo.GetLeaderboard(criteria, chatID)
 }

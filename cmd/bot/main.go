@@ -41,12 +41,24 @@ func main() {
 	}
 
 	repo := repository.NewPostgresRepo(db)
-	service := service.NewGachaService(repo)
-	h := telegram.NewHandler(repo, service)
+	gachaService := service.NewGachaService(repo)
+	duelService := service.NewDuelService(repo)
+	h := telegram.NewHandler(repo, gachaService, duelService)
 
 	bot.Handle("/start", h.HandleStart)
 	bot.Handle("/roll", h.HandleRoll)
 	bot.Handle("/profile", h.HandleProfile)
+	// \f означает, что мы ловим Callback (нажатие кнопки), у которой ID = cards_nav
+	bot.Handle("\fcards_nav", h.HandleCardsNav)
+	bot.Handle("\fback_profile", h.HandleBackToProfile)
+	bot.Handle("/top", h.HandleLocalTop)
+	bot.Handle("/globaltop", h.HandleGlobalTop)
+	bot.Handle("\ftop_btn", h.HandleTopCallback) // \f ловит нажатия Inline кнопок
+	bot.Handle("/help", h.HandleHelp)
+	bot.Handle("\fhelp_nav", h.HandleHelpCallback)
+	bot.Handle("/duel", h.HandleDuel)
+	bot.Handle("\fduel_accept", h.HandleDuelCallback)
+	bot.Handle("\fduel_cancel", h.HandleDuelCallback)
 
 	log.Println("Бот запущен...")
 	bot.Start()
