@@ -36,9 +36,9 @@ type RollResult struct {
 }
 
 // RollCard делает всю "грязную работу"
-func (s *GachaService) RollCard(userID int64, username string) (*RollResult, error) {
+func (s *GachaService) RollCard(userID int64, username, firstName, lastName string) (*RollResult, error) {
 	// 1. Создаем или находим юзера
-	if err := s.repo.CreateUserIfNotExist(userID, username); err != nil {
+	if err := s.repo.CreateUserIfNotExist(userID, username, firstName, lastName); err != nil {
 		return nil, fmt.Errorf("ошибка регистрации: %w", err)
 	}
 
@@ -220,11 +220,14 @@ func (s *GachaService) GetUserProfile(userID int64) (*models.UserProfile, error)
 		return nil, fmt.Errorf("ошибка подсчета инвентаря: %w", err)
 	}
 
+	duplicates, _ := s.repo.GetTotalDuplicatesCount(userID)
+
 	return &models.UserProfile{
 		Balance:          user.Balance,
 		StreakDays:       user.StreakDays,
 		UniqueCardsCount: uniqueCards,
 		TotalCardsCount:  totalCards,
+		DuplicatesCount:  duplicates,
 	}, nil
 }
 
@@ -257,4 +260,61 @@ func (s *GachaService) TrackChat(userID int64, chatID int64) {
 
 func (s *GachaService) GetLeaderboard(criteria string, chatID int64) ([]models.LeaderboardEntry, error) {
 	return s.repo.GetLeaderboard(criteria, chatID)
+}
+
+func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
+	// 1. Ищем, есть ли 5 дубликатов любой редкости
+	sourceRarityID, err := s.repo.GetRarityWithDuplicates(userID, 5)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("у тебя нет 5 дубликатов одной редкости")
+		}
+		return nil, err
+	}
+
+	// 2. Определяем целевую редкость (максимум — Эпохальная, допустим ID=6)
+	targetRarityID := sourceRarityID + 1
+	if targetRarityID > 6 {
+		return nil, fmt.Errorf("ты не можешь крафтить из Эпохальных карт")
+	}
+
+	// 3. Сжигаем дубликаты
+	if err := s.repo.ConsumeDuplicates(userID, sourceRarityID, 5); err != nil {
+		return nil, err
+	}
+
+	// 4. Генерируем награду (новую карту)
+	rarities, _ := s.repo.GetRarities()
+	var rarityName string
+	for _, r := range rarities {
+		if r.ID == targetRarityID {
+			rarityName = r.Name
+		}
+	}
+
+	card, err := s.repo.GetRandomCard(targetRarityID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. Выдаем карту (или осколки, если это UR)
+	result := &RollResult{
+		Card:       card,
+		RarityName: rarityName,
+	}
+
+	if card.RarityID == 6 {
+		result.IsFragment = true
+		currentFragments, _ := s.repo.AddFragment(userID, card.ID)
+		result.FragmentsCount = currentFragments
+		if currentFragments >= 10 {
+			result.CardAssembled = true
+			_ = s.repo.ClearFragments(userID, card.ID)
+			_ = s.repo.AddCardToInventory(userID, card.ID)
+		}
+	} else {
+		_ = s.repo.AddCardToInventory(userID, card.ID)
+	}
+
+	return result, nil
 }

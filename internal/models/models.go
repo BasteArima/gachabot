@@ -14,6 +14,9 @@ type Card struct {
 
 type User struct { // Переименовал UserDB в просто User
 	TgID           int64
+	Username       string
+	FirstName      string // Новое
+	LastName       string // Новое
 	Balance        int
 	StreakDays     int
 	LastRollTime   sql.NullTime
@@ -33,6 +36,7 @@ type UserProfile struct {
 	StreakDays       int
 	UniqueCardsCount int
 	TotalCardsCount  int
+	DuplicatesCount  int
 }
 
 type UserCardView struct {
@@ -43,6 +47,6 @@ type UserCardView struct {
 }
 
 type LeaderboardEntry struct {
-	Username string
-	Value    int // Сюда положим баланс, стрик или кол-во карт в зависимости от фильтра
+	DisplayName string
+	Value       int // Сюда положим баланс, стрик или кол-во карт в зависимости от фильтра
 }

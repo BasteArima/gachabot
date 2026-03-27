@@ -18,9 +18,12 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 
 func (r *PostgresRepo) GetUser(tgID int64) (*models.User, error) {
 	user := &models.User{}
-	query := "SELECT tg_id, balance, streak_days, last_roll_time, last_streak_date FROM users WHERE tg_id=$1 LIMIT 1"
+	query := "SELECT tg_id, username, first_name, last_name, balance, streak_days, last_roll_time, last_streak_date FROM users WHERE tg_id=$1 LIMIT 1"
 	err := r.db.QueryRow(query, tgID).Scan(
 		&user.TgID,
+		&user.Username,
+		&user.FirstName,
+		&user.LastName,
 		&user.Balance,
 		&user.StreakDays,
 		&user.LastRollTime,
@@ -32,12 +35,15 @@ func (r *PostgresRepo) GetUser(tgID int64) (*models.User, error) {
 	return user, nil
 }
 
-func (r *PostgresRepo) CreateUserIfNotExist(tgID int64, username string) error {
+func (r *PostgresRepo) CreateUserIfNotExist(tgID int64, username, firstName, lastName string) error {
 	query := `
-        INSERT INTO users (tg_id, username) VALUES ($1, $2) 
-        ON CONFLICT (tg_id) DO UPDATE SET username = EXCLUDED.username
+        INSERT INTO users (tg_id, username, first_name, last_name) VALUES ($1, $2, $3, $4) 
+        ON CONFLICT (tg_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name
     `
-	_, err := r.db.Exec(query, tgID, username)
+	_, err := r.db.Exec(query, tgID, username, firstName, lastName)
 	return err
 }
 
@@ -214,7 +220,6 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 	var query string
 	var args []interface{}
 
-	// Базовая часть запроса (JOIN с user_chats нужен только для локального топа)
 	joinChat := ""
 	whereChat := ""
 	if chatID != 0 {
@@ -223,21 +228,25 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 		args = append(args, chatID)
 	}
 
-	// Формируем запрос в зависимости от критерия
+	// Склеиваем имя и фамилию
+	//nameFormat := "TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, ''))"
+	nameFormat := "COALESCE(u.first_name)"
+	// ORDER BY: сначала по основному показателю (DESC),
+	// затем по времени последнего ролла (ASC) — кто раньше крутил, тот выше при равенстве.
 	switch criteria {
 	case "balance":
-		query = fmt.Sprintf(`SELECT u.username, u.balance FROM users u %s %s ORDER BY u.balance DESC LIMIT 10`, joinChat, whereChat)
+		query = fmt.Sprintf(`SELECT %s, u.balance FROM users u %s %s ORDER BY u.balance DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	case "streak":
-		query = fmt.Sprintf(`SELECT u.username, u.streak_days FROM users u %s %s ORDER BY u.streak_days DESC LIMIT 10`, joinChat, whereChat)
+		query = fmt.Sprintf(`SELECT %s, u.streak_days FROM users u %s %s ORDER BY u.streak_days DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	case "cards":
 		query = fmt.Sprintf(`
-			SELECT u.username, COUNT(DISTINCT ui.card_id) as val 
-			FROM users u 
-			%s 
-			JOIN user_inventory ui ON u.tg_id = ui.user_id 
-			%s 
-			GROUP BY u.tg_id, u.username 
-			ORDER BY val DESC LIMIT 10`, joinChat, whereChat)
+          SELECT %s, COUNT(DISTINCT ui.card_id) as val 
+          FROM users u 
+          %s 
+          JOIN user_inventory ui ON u.tg_id = ui.user_id 
+          %s 
+          GROUP BY u.tg_id, u.first_name, u.last_name 
+          ORDER BY val DESC, MIN(u.last_roll_time) ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	default:
 		return nil, fmt.Errorf("неизвестный критерий топа")
 	}
@@ -251,7 +260,7 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 	var board []models.LeaderboardEntry
 	for rows.Next() {
 		var entry models.LeaderboardEntry
-		if err := rows.Scan(&entry.Username, &entry.Value); err != nil {
+		if err := rows.Scan(&entry.DisplayName, &entry.Value); err != nil {
 			return nil, err
 		}
 		board = append(board, entry)
@@ -285,4 +294,60 @@ func (r *PostgresRepo) GetRandomUserCard(userID int64) (*models.Card, error) {
 		&card.ID, &card.Name, &card.RarityID, &card.ImageURL, &card.PowerLevel,
 	)
 	return card, err
+}
+
+// Находит первую попавшуюся редкость, у которой у юзера есть 5+ дубликатов (quantity > 1)
+func (r *PostgresRepo) GetRarityWithDuplicates(userID int64, required int) (int, error) {
+	var rarityID int
+	query := `
+		SELECT c.rarity_id 
+		FROM user_inventory ui
+		JOIN cards c ON ui.card_id = c.id
+		WHERE ui.user_id = $1 AND ui.quantity > 1
+		GROUP BY c.rarity_id
+		HAVING SUM(ui.quantity - 1) >= $2
+		LIMIT 1
+	`
+	err := r.db.QueryRow(query, userID, required).Scan(&rarityID)
+	return rarityID, err
+}
+
+// "Сжигает" 5 лишних копий карт определенной редкости
+func (r *PostgresRepo) ConsumeDuplicates(userID int64, rarityID int, amount int) error {
+	// Достаем список карт этой редкости, где количество > 1
+	rows, err := r.db.Query(`
+		SELECT card_id, quantity FROM user_inventory ui
+		JOIN cards c ON ui.card_id = c.id
+		WHERE ui.user_id = $1 AND c.rarity_id = $2 AND ui.quantity > 1
+	`, userID, rarityID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	toBurn := amount
+	for rows.Next() && toBurn > 0 {
+		var cardID, quantity int
+		rows.Scan(&cardID, &quantity)
+
+		canTake := quantity - 1 // Оставляем всегда 1 оригинал
+		if canTake > toBurn {
+			canTake = toBurn
+		}
+
+		_, _ = r.db.Exec("UPDATE user_inventory SET quantity = quantity - $1 WHERE user_id = $2 AND card_id = $3",
+			canTake, userID, cardID)
+
+		toBurn -= canTake
+	}
+	return nil
+}
+
+// Получаем общее количество дубликатов (все копии минус 1 для каждой карты)
+func (r *PostgresRepo) GetTotalDuplicatesCount(userID int64) (int, error) {
+	var count int
+	// Суммируем (количество - 1) для всех записей, где больше 1 карты
+	query := "SELECT COALESCE(SUM(quantity - 1), 0) FROM user_inventory WHERE user_id = $1 AND quantity > 1"
+	err := r.db.QueryRow(query, userID).Scan(&count)
+	return count, err
 }

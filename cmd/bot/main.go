@@ -59,6 +59,7 @@ func main() {
 	bot.Handle("/duel", h.HandleDuel)
 	bot.Handle("\fduel_accept", h.HandleDuelCallback)
 	bot.Handle("\fduel_cancel", h.HandleDuelCallback)
+	bot.Handle("/craft", h.HandleCraft)
 
 	log.Println("Бот запущен...")
 	bot.Start()

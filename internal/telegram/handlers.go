@@ -50,7 +50,7 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 	user := ctx.Sender()
 	h.service.TrackChat(user.ID, ctx.Chat().ID)
 	// 1. Вызываем наш умный сервис
-	result, err := h.service.RollCard(user.ID, user.Username)
+	result, err := h.service.RollCard(user.ID, user.Username, user.FirstName, user.LastName)
 	if err != nil {
 		log.Printf("Ошибка RollCard для юзера %d: %v", user.ID, err)
 		return ctx.Send("🔧 Произошла техническая ошибка. База данных отдыхает, попробуйте позже.")
@@ -101,11 +101,11 @@ func (h *Handler) HandleProfile(ctx tele.Context) error {
 		return ctx.Send("❌ Не удалось загрузить профиль.")
 	}
 
-	// 2. Формируем красивый текст (как на твоем скрине)
-	// Ты можешь поменять ID эмодзи на те, которые нравятся тебе
+	// 2. Формируем красивый текст
 	caption := fmt.Sprintf(`<blockquote>👤 Ты - %s %s
 
 <tg-emoji emoji-id="5368324170671202286">🃏</tg-emoji> У тебя %d из %d карточек
+♻️ Дубликаты для крафта: <b>%d</b>
 <tg-emoji emoji-id="4918300654197277832">🪙</tg-emoji> У тебя %d очков
 
 <tg-emoji emoji-id="5368324170671202286">🔥</tg-emoji> Твой стрик составляет %d дней</blockquote>`,
@@ -113,6 +113,7 @@ func (h *Handler) HandleProfile(ctx tele.Context) error {
 		user.LastName,
 		profile.UniqueCardsCount,
 		profile.TotalCardsCount,
+		profile.DuplicatesCount,
 		profile.Balance,
 		profile.StreakDays,
 	)
@@ -255,7 +256,7 @@ func (h *Handler) buildTopMessage(criteria string, scope string, chatID int64) (
 			} else if i == 2 {
 				medal = "🥉"
 			}
-			text += fmt.Sprintf("%s <b>%s</b> — %d %s\n", medal, entry.Username, entry.Value, emoji)
+			text += fmt.Sprintf("%s <b>%s</b> — %d %s\n", medal, entry.DisplayName, entry.Value, emoji)
 		}
 	}
 	text += "</blockquote>"
@@ -336,20 +337,21 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 	btnRarities := menu.Data("✨ Редкости", "help_nav", "rarities")
 	btnStreaks := menu.Data("🔥 Стрики", "help_nav", "streaks")
 	btnPity := menu.Data("🛡 Гарант", "help_nav", "pity")
-	btnDuel := menu.Data("⚔️ Дуэли", "help_nav", "duel") // <-- НОВАЯ КНОПКА
+	btnDuel := menu.Data("⚔️ Дуэли", "help_nav", "duel")
+	btnCraft := menu.Data("⚒ Крафт", "help_nav", "craft") // <-- НОВАЯ КНОПКА
 
-	// Сетка кнопок (3 ряда)
+	// Формируем сетку кнопок
 	if section == "main" {
 		menu.Inline(
 			menu.Row(btnCards, btnRarities),
 			menu.Row(btnStreaks, btnPity),
-			menu.Row(btnDuel),
+			menu.Row(btnDuel, btnCraft), // Поместили Дуэли и Крафт в один ряд
 		)
 	} else {
 		menu.Inline(
 			menu.Row(btnCards, btnRarities),
 			menu.Row(btnStreaks, btnPity),
-			menu.Row(btnDuel),
+			menu.Row(btnDuel, btnCraft),
 			menu.Row(btnMain),
 		)
 	}
@@ -362,10 +364,11 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 Добро пожаловать в нашу Гачу! Здесь ты можешь собирать уникальные карточки, копить очки и соревноваться с друзьями.
 
 <b>Основные команды:</b>
-/roll — получить новую карточку (раз в 3 часа)
+/roll — получить новую карточку
 /profile — твой инвентарь и баланс
-/top — локальный топ чата
-/duel @user сумма — вызвать на бой
+/top — лидерборды игроков
+/duel @user ставка — вызвать на бой
+/craft — переплавить дубликаты
 
 <i>Выбери раздел ниже, чтобы узнать больше.</i></blockquote>`
 
@@ -382,7 +385,7 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 ⚪️ <b>Обычная</b>
 🟢 <b>Необычная</b>
 🔵 <b>Редкая</b>
-🟣 <b>Сверхредкая</b>
+🟣 <b>Эпическая</b>
 🟡 <b>Легендарная</b>
 🔴 <b>Эпохальная</b> (Крафт)
 
@@ -397,20 +400,33 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 	case "pity":
 		text = `<blockquote>🛡 <b>Система Гаранта</b>
 
-У нас честная игра! Если тебе долго не везет, включается <b>Гарант</b>. У каждой редкой категории есть свой счетчик: когда он заполнится, редкая карта выпадет <b>со 100% шансом</b>. После выпадения счетчик сбрасывается.</blockquote>`
+Если тебе долго не везет, включается <b>Гарант</b>. У каждой редкой категории есть свой счетчик: когда он заполнится, редкая карта выпадет <b>со 100% шансом</b>.</blockquote>`
 
 	case "duel":
 		text = `<blockquote>⚔️ <b>Дуэли на очки</b>
 
-Хочешь быстро разбогатеть или проучить друга? Используй команду:
-<code>/duel @юзернейм ставка</code>
+Используй команду: <code>/duel @юзернейм ставка</code>
 
 <b>Как это работает:</b>
 1. Бот выбирает по одной <b>случайной</b> карте из вашего инвентаря.
 2. Шанс победы зависит от <b>Силы</b> выбранных карт.
-3. Победитель забирает ставку проигравшего.
+3. Победитель забирает ставку проигравшего.</blockquote>`
 
-<i>Помни: даже слабая карта имеет мизерный шанс победить гиганта!</i></blockquote>`
+	case "craft": // <-- НОВЫЙ РАЗДЕЛ
+		text = `<blockquote>⚒ <b>Крафт из дубликатов</b>
+
+Не знаешь куда девать лишние дубликаты? Используй команду:
+/craft
+
+<b>Как это работает:</b>
+1. Бот ищет в твоем инвентаре <b>5 дубликатов</b> одной редкости.
+2. Если они есть — они переплавляются в 1 случайную карту <b>следующей</b> редкости.
+
+<i>Пример: 5 лишних Обычных карт превратятся в 1 Необычную.</i>
+
+⚠️ <b>Важно:</b>
+- Оригинал карты (1 шт.) всегда остается у тебя, сгорают только лишние копии.
+- Крафт из Эпохальных карт невозможен.</blockquote>`
 
 	default:
 		text = "Раздел не найден."
@@ -549,4 +565,29 @@ func (h *Handler) HandleDuelCallback(ctx tele.Context) error {
 	}
 
 	return nil
+}
+
+func (h *Handler) HandleCraft(ctx tele.Context) error {
+	user := ctx.Sender()
+
+	result, err := h.service.CraftCard(user.ID)
+	if err != nil {
+		// Выводим пользователю причину (мало карт или макс. уровень)
+		return ctx.Send("⚒ <b>Алхимия не удалась:</b> "+err.Error(), tele.ModeHTML)
+	}
+
+	caption := fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил 5 дубликатов и получил:\n🃏 Карта: <b>%s</b>\n✨ Редкость: <b>%s</b></blockquote>",
+		result.Card.Name, result.RarityName)
+
+	if result.IsFragment && !result.CardAssembled {
+		caption = fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы получил осколок Эпохальной карты:\n🔮 <b>%s</b>\n📦 Собрано: <b>%d / 10</b></blockquote>",
+			result.Card.Name, result.FragmentsCount)
+	}
+
+	photo := &tele.Photo{
+		File:    tele.FromURL(result.Card.ImageURL),
+		Caption: caption,
+	}
+
+	return ctx.Send(photo, tele.ModeHTML)
 }
