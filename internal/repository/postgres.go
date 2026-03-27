@@ -18,16 +18,12 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 
 func (r *PostgresRepo) GetUser(tgID int64) (*models.User, error) {
 	user := &models.User{}
-	query := "SELECT tg_id, username, first_name, last_name, balance, streak_days, last_roll_time, last_streak_date FROM users WHERE tg_id=$1 LIMIT 1"
+	// ДОБАВЛЕН premium_rolls В SELECT
+	query := "SELECT tg_id, username, first_name, last_name, balance, streak_days, last_roll_time, last_streak_date, premium_rolls FROM users WHERE tg_id=$1 LIMIT 1"
 	err := r.db.QueryRow(query, tgID).Scan(
-		&user.TgID,
-		&user.Username,
-		&user.FirstName,
-		&user.LastName,
-		&user.Balance,
-		&user.StreakDays,
-		&user.LastRollTime,
-		&user.LastStreakDate,
+		&user.TgID, &user.Username, &user.FirstName, &user.LastName,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate,
+		&user.PremiumRolls, // <--- ДОБАВЛЕНО
 	)
 	if err != nil {
 		return nil, err
@@ -128,11 +124,11 @@ func (r *PostgresRepo) UpdateUserAfterRoll(user *models.User) error {
 		SET balance = $1, 
 		    streak_days = $2, 
 		    last_roll_time = $3, 
-		    last_streak_date = $4
-		WHERE tg_id = $5
+		    last_streak_date = $4,
+		    premium_rolls = $5 
+		WHERE tg_id = $6
 	`
-	// Данные берем напрямую из структуры, которую передадим из бизнес-логики
-	_, err := r.db.Exec(query, user.Balance, user.StreakDays, user.LastRollTime, user.LastStreakDate, user.TgID)
+	_, err := r.db.Exec(query, user.Balance, user.StreakDays, user.LastRollTime, user.LastStreakDate, user.PremiumRolls, user.TgID)
 	return err
 }
 
@@ -361,4 +357,10 @@ func (r *PostgresRepo) GetTotalDuplicatesCount(userID int64) (int, error) {
 	query := "SELECT COALESCE(SUM(quantity - 1), 0) FROM user_inventory WHERE user_id = $1 AND quantity > 1"
 	err := r.db.QueryRow(query, userID).Scan(&count)
 	return count, err
+}
+
+// Добавляем премиум-крутки после доната
+func (r *PostgresRepo) AddPremiumRolls(userID int64, amount int) error {
+	_, err := r.db.Exec("UPDATE users SET premium_rolls = premium_rolls + $1 WHERE tg_id = $2", amount, userID)
+	return err
 }

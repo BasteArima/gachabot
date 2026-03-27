@@ -84,6 +84,13 @@ func main() {
 	bot.Handle("\fduel_accept", h.HandleDuelCallback)
 	bot.Handle("\fduel_cancel", h.HandleDuelCallback)
 	bot.Handle("/craft", h.HandleCraft)
+	bot.Handle("/shop", h.HandleDonate)
+	// Добавь эти строки туда, где у тебя bot.Handle(...)
+	// Магазин и донаты
+	bot.Handle("\fshop_rolls_menu", h.HandleShopMenu)
+	bot.Handle("\fbuy_invoice", h.HandleSendInvoice)
+	bot.Handle(tele.OnCheckout, h.HandlePreCheckout)
+	bot.Handle(tele.OnPayment, h.HandlePayment)
 
 	log.Println("Бот запущен...")
 	bot.Start()

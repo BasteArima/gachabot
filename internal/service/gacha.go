@@ -11,7 +11,7 @@ import (
 	"gachabot/internal/repository"
 )
 
-const adminId int64 = 348389728
+const adminId int64 = 1
 
 type GachaService struct {
 	repo *repository.PostgresRepo
@@ -49,8 +49,13 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		return nil, fmt.Errorf("ошибка получения юзера: %w", err)
 	}
 
-	// 2. Проверяем кулдаун
-	if userDb.LastRollTime.Valid {
+	// 2. Проверка кулдауна и использования Premium крутки
+	usedPremium := false
+
+	if userDb.PremiumRolls > 0 {
+		usedPremium = true
+	} else if userDb.LastRollTime.Valid {
+		// Обычная логика кулдауна, если нет премиум-круток
 		timePassed := time.Since(userDb.LastRollTime.Time)
 		cooldown := 3 * time.Hour
 
@@ -65,7 +70,6 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 			} else {
 				timeStr = fmt.Sprintf("%dм", minutes)
 			}
-			// Возвращаем результат со статусом кулдауна (без ошибки!)
 			return &RollResult{OnCooldown: true, CooldownTimeLeft: timeStr}, nil
 		}
 	}
@@ -201,8 +205,14 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 	userDb.Balance += finalReward
 	userDb.StreakDays = newStreak
 
-	// ВАЖНО: сохраняем именно наше московское время (now) и дату (today)
-	userDb.LastRollTime = sql.NullTime{Time: now, Valid: true}
+	if usedPremium {
+		userDb.PremiumRolls--
+		// Если использовали премиум, мы НЕ перезаписываем LastRollTime,
+		// чтобы не сбить таймер бесплатной крутки!
+	} else {
+		userDb.LastRollTime = sql.NullTime{Time: now, Valid: true}
+	}
+
 	userDb.LastStreakDate = sql.NullTime{Time: today, Valid: true}
 
 	if err := s.repo.UpdateUserAfterRoll(userDb); err != nil {
@@ -243,6 +253,7 @@ func (s *GachaService) GetUserProfile(userID int64) (*models.UserProfile, error)
 		UniqueCardsCount: uniqueCards,
 		TotalCardsCount:  totalCards,
 		DuplicatesCount:  duplicates,
+		PremiumRolls:     user.PremiumRolls,
 	}, nil
 }
 

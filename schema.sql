@@ -26,7 +26,8 @@ CREATE TABLE users (
                        streak_days INTEGER NOT NULL DEFAULT 0,
                        last_roll_time TIMESTAMP WITH TIME ZONE,
                        last_streak_date DATE,
-                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                       premium_rolls INTEGER NOT NULL DEFAULT 0 -- Добавлено для доната
 );
 
 -- 4. Таблица Инвентаря (Связь Игроков и Карточек)

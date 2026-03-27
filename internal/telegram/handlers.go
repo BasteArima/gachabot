@@ -60,7 +60,13 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 
 	if result.OnCooldown {
 		msg := fmt.Sprintf("<blockquote>⏳ Следующую карточку можно будет получить через: <b>%s</b></blockquote>", result.CooldownTimeLeft)
-		return ctx.Send(msg, &tele.SendOptions{ReplyTo: ctx.Message(), ParseMode: tele.ModeHTML})
+
+		menu := &tele.ReplyMarkup{}
+		// Перенаправляем на новое меню магазина
+		btnBuy := menu.Data("⭐️ Купить роллы", "shop_rolls_menu")
+		menu.Inline(menu.Row(btnBuy))
+
+		return ctx.Send(msg, &tele.SendOptions{ReplyTo: ctx.Message(), ParseMode: tele.ModeHTML, ReplyMarkup: menu})
 	}
 
 	var caption string
@@ -547,4 +553,187 @@ func (h *Handler) HandleCraft(ctx tele.Context) error {
 	}
 
 	return ctx.Send(photo, tele.ModeHTML)
+}
+
+// 1. Отправляем счет (Invoice) при нажатии на кнопку
+func (h *Handler) HandleBuyRollInvoice(ctx tele.Context) error {
+	_ = ctx.Respond()
+
+	// Настройки счета
+	invoice := &tele.Invoice{
+		Title:       "Мгновенный Ролл",
+		Description: "Сбрось кулдаун и получи новую карточку прямо сейчас! Таймер бесплатной крутки при этом не обнулится.",
+		Payload:     "buy_premium_roll_1", // Полезная нагрузка (чтобы знать, за что платят)
+		Currency:    "XTR",                // XTR — это валюта Telegram Stars
+		Prices:      []tele.Price{{Label: "Мгновенный Ролл", Amount: 15}},
+	}
+
+	// Отправляем счет в чат
+	_, err := ctx.Bot().Send(ctx.Sender(), invoice)
+	return err
+}
+
+// --- МАГАЗИН И ДОНАТЫ ---
+
+// 1. Показываем меню выбора пакетов
+// --- МАГАЗИН И ДОНАТЫ ---
+
+// Вспомогательная функция для сборки текста и кнопок магазина
+func (h *Handler) buildShopMenu() (string, *tele.ReplyMarkup) {
+	menu := &tele.ReplyMarkup{}
+
+	btn1 := menu.Data("x1 Ролл — 15 ⭐️", "buy_invoice", "1")
+	btn5 := menu.Data("x5 Роллов — 65 ⭐️", "buy_invoice", "5")
+	btn25 := menu.Data("x25 Роллов — 290 ⭐️", "buy_invoice", "25")
+	btn100 := menu.Data("x100 Роллов + Эпик Осколок — 999 ⭐️", "buy_invoice", "100")
+
+	menu.Inline(
+		menu.Row(btn1),
+		menu.Row(btn5),
+		menu.Row(btn25),
+		menu.Row(btn100),
+	)
+
+	text := "<blockquote>🛒 <b>Магазин круток</b>\n\nВыбери нужный пакет. Премиум-крутки игнорируют таймер ожидания и <b>не сбрасывают</b> время бесплатной крутки!</blockquote>"
+
+	return text, menu
+}
+
+// 1. Обработчик команды /donate (Отправляет новое сообщение)
+func (h *Handler) HandleDonate(ctx tele.Context) error {
+	text, menu := h.buildShopMenu()
+	return ctx.Send(text, tele.ModeHTML, menu)
+}
+
+// 2. Обработчик нажатия на кнопку "Купить роллы" из /roll (Изменяет текущее сообщение)
+func (h *Handler) HandleShopMenu(ctx tele.Context) error {
+	_ = ctx.Respond() // Убираем "часики" загрузки
+	text, menu := h.buildShopMenu()
+	return ctx.Edit(text, tele.ModeHTML, menu)
+}
+
+// 2. Формируем и отправляем счет (Invoice)
+func (h *Handler) HandleSendInvoice(ctx tele.Context) error {
+	_ = ctx.Respond()
+
+	packageType := ctx.Callback().Data // Получаем "1", "5", "25" или "100"
+
+	var title, description, payload string
+	var price int
+
+	switch packageType {
+	case "1":
+		title = "x1 Премиум Ролл"
+		description = "1 мгновенная крутка без ожидания."
+		payload = "buy_rolls_1"
+		price = 15
+	case "5":
+		title = "x5 Премиум Роллов"
+		description = "5 мгновенных круток. Выгода ~13%!"
+		payload = "buy_rolls_5"
+		price = 65
+	case "25":
+		title = "x25 Премиум Роллов"
+		description = "25 мгновенных круток. Отличный запас!"
+		payload = "buy_rolls_25"
+		price = 290
+	case "100":
+		title = "x100 Роллов + Эпик Осколок"
+		description = "100 круток и гарантированный осколок случайной Эпической карты!"
+		payload = "buy_rolls_100"
+		price = 999
+	default:
+		return nil
+	}
+
+	invoice := &tele.Invoice{
+		Title:       title,
+		Description: description,
+		Payload:     payload,
+		Currency:    "XTR",
+		Prices:      []tele.Price{{Label: title, Amount: price}},
+	}
+
+	// Отправляем счет в чат новым сообщением
+	_, err := ctx.Bot().Send(ctx.Sender(), invoice)
+	return err
+}
+
+// 3. Подтверждение от телеграма
+func (h *Handler) HandlePreCheckout(ctx tele.Context) error {
+	checkout := ctx.PreCheckoutQuery()
+	// Если это наша оплата круток — разрешаем
+	if strings.HasPrefix(checkout.Payload, "buy_rolls_") {
+		return ctx.Accept()
+	}
+	return ctx.Accept()
+}
+
+// 4. Успешная оплата и выдача бонусов
+func (h *Handler) HandlePayment(ctx tele.Context) error {
+	payment := ctx.Message().Payment
+	user := ctx.Sender()
+
+	var rollsToAdd int
+	var isEpicFragment bool
+
+	// Определяем, что именно купил юзер
+	switch payment.Payload {
+	case "buy_rolls_1":
+		rollsToAdd = 1
+	case "buy_rolls_5":
+		rollsToAdd = 5
+	case "buy_rolls_25":
+		rollsToAdd = 25
+	case "buy_rolls_100":
+		rollsToAdd = 100
+		isEpicFragment = true
+	default:
+		return nil
+	}
+
+	// Начисляем крутки
+	err := h.repo.AddPremiumRolls(user.ID, rollsToAdd)
+	if err != nil {
+		log.Printf("Ошибка начисления роллов %d: %v", user.ID, err)
+		return ctx.Send("⚠️ Оплата прошла, но произошла ошибка БД. Обратись к админу!")
+	}
+
+	bonusText := ""
+
+	// Логика выдачи Эпического осколка за пакет х100
+	if isEpicFragment {
+		// 4 - это ID редкости "Эпическая" (Epic)
+		epicCard, err := h.repo.GetRandomCard(4)
+		if err == nil {
+			fragCount, _ := h.repo.AddFragment(user.ID, epicCard.ID)
+			bonusText = fmt.Sprintf("\n\n🎁 <b>БОНУС!</b> Выдан осколок Эпической карты: <b>%s</b>\n📦 Собрано: %d / 10", epicCard.Name, fragCount)
+
+			// Если вдруг этот осколок стал 10-м, собираем карту!
+			if fragCount >= 10 {
+				_ = h.repo.ClearFragments(user.ID, epicCard.ID)
+				_ = h.repo.AddCardToInventory(user.ID, epicCard.ID)
+				bonusText += "\n🔥 <b>Осколки собраны! Карта добавлена в инвентарь!</b>"
+			}
+		} else {
+			log.Printf("Не удалось выдать эпик осколок: %v", err)
+		}
+	}
+
+	// 🛠 ТЕСТОВЫЙ ВОЗВРАТ (Только для твоего ID)
+	if user.ID == 348389728 {
+		params := map[string]interface{}{
+			"user_id":                    user.ID,
+			"telegram_payment_charge_id": payment.TelegramChargeID,
+		}
+		_, refundErr := ctx.Bot().Raw("refundStarPayment", params)
+		if refundErr == nil {
+			bonusText += "\n\n<i>🛠 ТЕСТ: Оплата успешна. Звезды возвращены админу!</i>"
+		}
+	}
+
+	// Финальное сообщение
+	successMsg := fmt.Sprintf("<blockquote>✅ <b>Оплата успешно завершена!</b>\n\nТебе начислено Премиум-круток: <b>%d</b> ⭐️%s\n\nИспользуй /roll, чтобы крутить прямо сейчас!</blockquote>", rollsToAdd, bonusText)
+
+	return ctx.Send(successMsg, tele.ModeHTML)
 }

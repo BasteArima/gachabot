@@ -21,6 +21,7 @@ type User struct { // Переименовал UserDB в просто User
 	StreakDays     int
 	LastRollTime   sql.NullTime
 	LastStreakDate sql.NullTime
+	PremiumRolls   int
 }
 
 type Rarity struct {
@@ -37,6 +38,7 @@ type UserProfile struct {
 	UniqueCardsCount int
 	TotalCardsCount  int
 	DuplicatesCount  int
+	PremiumRolls     int
 }
 
 type UserCardView struct {
