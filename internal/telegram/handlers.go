@@ -49,26 +49,24 @@ func (h *Handler) HandleStart(ctx tele.Context) error {
 func (h *Handler) HandleRoll(ctx tele.Context) error {
 	user := ctx.Sender()
 	h.service.TrackChat(user.ID, ctx.Chat().ID)
-	// 1. Вызываем наш умный сервис
+
 	result, err := h.service.RollCard(user.ID, user.Username, user.FirstName, user.LastName)
 	if err != nil {
-		log.Printf("Ошибка RollCard для юзера %d: %v", user.ID, err)
+		log.Printf("[ROLL ERROR] Ошибка сервиса для %d (%s): %v", user.ID, user.Username, err)
 		return ctx.Send("🔧 Произошла техническая ошибка. База данных отдыхает, попробуйте позже.")
 	}
 
-	// 2. Обрабатываем кулдаун
 	if result.OnCooldown {
 		msg := fmt.Sprintf("<blockquote>⏳ Следующую карточку можно будет получить через: <b>%s</b></blockquote>", result.CooldownTimeLeft)
 		return ctx.Send(msg, &tele.SendOptions{ReplyTo: ctx.Message(), ParseMode: tele.ModeHTML})
 	}
 
-	// 3. Формируем текст в зависимости от того, что выпало
 	var caption string
 	if result.IsFragment {
 		if result.CardAssembled {
-			caption = fmt.Sprintf("<blockquote>🔥 <b>ЭПИЧЕСКАЯ УДАЧА!</b> Вы собрали 10 осколков воедино!\n\nПолучена Мифическая карта: <b>%s</b>\n🪙 Очки: <b>+%d</b></blockquote>", result.Card.Name, result.Reward)
+			caption = fmt.Sprintf("<blockquote>🔥 <b>ЭПИЧЕСКАЯ УДАЧА!</b> Вы собрали 10 осколков воедино!\n\nПолучена Мифическая карта: <b>%s</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Очки: <b>+%d</b></blockquote>", result.Card.Name, result.Reward)
 		} else {
-			caption = fmt.Sprintf("<blockquote>🔮 Вы нашли осколок Мифической карты: <b>%s</b>!\n\nСобрано осколков: <b>%d / 10</b>\n🪙 Очки: <b>+%d</b></blockquote>", result.Card.Name, result.FragmentsCount, result.Reward)
+			caption = fmt.Sprintf("<blockquote>🔮 Вы нашли осколок Мифической карты: <b>%s</b>!\n\nСобрано осколков: <b>%d / 10</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Очки: <b>+%d</b></blockquote>", result.Card.Name, result.FragmentsCount, result.Reward)
 		}
 	} else {
 		caption = fmt.Sprintf("<blockquote>"+
@@ -79,16 +77,26 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 			result.Card.Name, result.RarityName, result.Reward)
 	}
 
-	// 4. Отправляем фото
+	// --- ЛОГИРОВАНИЕ ПЕРЕД ОТПРАВКОЙ ---
+	//log.Printf("[ROLL ATTEMPT] User: %s (%d) | Card: %s | Rarity: %s | URL: %s", user.Username, user.ID, result.Card.Name, result.RarityName, result.Card.ImageURL)
+
 	photo := &tele.Photo{
 		File:    tele.FromURL(result.Card.ImageURL),
 		Caption: caption,
 	}
 
-	return ctx.Send(photo, &tele.SendOptions{
+	err = ctx.Send(photo, &tele.SendOptions{
 		ParseMode: tele.ModeHTML,
 		ReplyTo:   ctx.Message(),
 	})
+
+	if err != nil {
+		log.Printf("[TELEGRAM ERROR] Не удалось отправить фото! URL: %s | Ошибка: %v", result.Card.ImageURL, err)
+		// Если фото не ушло, попробуем отправить хотя бы текст, чтобы юзер не ждал зря
+		return ctx.Send(caption+"\n\n⚠️ (Ошибка загрузки изображения)", tele.ModeHTML)
+	}
+
+	return nil
 }
 
 func (h *Handler) HandleProfile(ctx tele.Context) error {
@@ -235,7 +243,7 @@ func (h *Handler) buildTopMessage(criteria string, scope string, chatID int64) (
 	critName, emoji := "", ""
 	switch criteria {
 	case "balance":
-		critName, emoji = "По очкам", "🪙"
+		critName, emoji = "По очкам", "<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>"
 	case "cards":
 		critName, emoji = "По Уникальным Картам", "🃏"
 	case "streak":
@@ -375,7 +383,7 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 	case "cards":
 		text = `<blockquote>🎴 <b>Как работают карточки?</b>
 
-Раз в <b>3 часа</b> ты можешь крутить /roll. Бот выдает случайную карту и 🪙 <b>Очки</b>.
+Раз в <b>3 часа</b> ты можешь крутить /roll. Бот выдает случайную карту и <tg-emoji emoji-id="4918300654197277832">🪙</tg-emoji> <b>Очки</b>.
 
 🌟 <b>Осколки:</b> Эпохальные карты падают Осколками. Собери 10 штук, чтобы получить целую карту в инвентарь!</blockquote>`
 
@@ -394,8 +402,8 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 	case "streaks":
 		text = `<blockquote>🔥 <b>Стрики</b>
 
-Заходи в бота каждый день и используй /roll. С каждым днем твой Стрик растет, а вместе с ним и бонусные 🪙 <b>Очки</b> за каждую крутку.
-Если пропустишь день — огонек погаснет и стрик обнулится.</blockquote>`
+Заходи в бота каждый день и используй /roll. С каждым днем твой Стрик растет, а вместе с ним и бонусные <tg-emoji emoji-id="4918300654197277832">🪙</tg-emoji> <b>Очки</b> за каждую крутку.
+Если пропустишь день — стрик обнулится.</blockquote>`
 
 	case "pity":
 		text = `<blockquote>🛡 <b>Система Гаранта</b>
