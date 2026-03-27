@@ -33,6 +33,8 @@ type RollResult struct {
 	IsFragment     bool
 	FragmentsCount int
 	CardAssembled  bool
+
+	CraftCost int
 }
 
 // RollCard делает всю "грязную работу"
@@ -263,27 +265,48 @@ func (s *GachaService) GetLeaderboard(criteria string, chatID int64) ([]models.L
 }
 
 func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
-	// 1. Ищем, есть ли 5 дубликатов любой редкости
-	sourceRarityID, err := s.repo.GetRarityWithDuplicates(userID, 5)
+	// 1. Получаем все дубликаты юзера
+	dupCounts, err := s.repo.GetAvailableCrafts(userID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("у тебя нет 5 дубликатов одной редкости")
+		return nil, err
+	}
+
+	// 2. ПРАЙС-ЛИСТ КРАФТА
+	// Ключ: ID исходной редкости, Значение: сколько дубликатов нужно сжечь
+	craftCosts := map[int]int{
+		1: 5,  // Обычная (1) -> Необычная (2)
+		2: 5,  // Необычная (2) -> Редкая (3)
+		3: 5,  // Редкая (3) -> Эпическая (4)
+		4: 5,  // Эпическая (4) -> Легендарная (5)
+		5: 15, // Легендарная (5) -> Эпохальная (6) (ОСКОЛОК) - КАСТОМНАЯ ЦЕНА
+	}
+
+	var sourceRarityID int
+	var cost int
+
+	// Ищем, на что хватает дубликатов. Идем от самых дешевых (1) к дорогим (5).
+	// Так игрок сначала будет избавляться от мусора.
+	for rID := 1; rID <= 5; rID++ {
+		required := craftCosts[rID]
+		if count, exists := dupCounts[rID]; exists && count >= required {
+			sourceRarityID = rID
+			cost = required
+			break
 		}
-		return nil, err
 	}
 
-	// 2. Определяем целевую редкость (максимум — Эпохальная, допустим ID=6)
+	if sourceRarityID == 0 {
+		return nil, fmt.Errorf("не хватает дубликатов. Нужно 5 обычных или 15 легендарных карт.")
+	}
+
 	targetRarityID := sourceRarityID + 1
-	if targetRarityID > 6 {
-		return nil, fmt.Errorf("ты не можешь крафтить из Эпохальных карт")
-	}
 
-	// 3. Сжигаем дубликаты
-	if err := s.repo.ConsumeDuplicates(userID, sourceRarityID, 5); err != nil {
+	// 3. Сжигаем нужное количество дубликатов
+	if err := s.repo.ConsumeDuplicates(userID, sourceRarityID, cost); err != nil {
 		return nil, err
 	}
 
-	// 4. Генерируем награду (новую карту)
+	// 4. Генерируем награду
 	rarities, _ := s.repo.GetRarities()
 	var rarityName string
 	for _, r := range rarities {
@@ -297,10 +320,11 @@ func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
 		return nil, err
 	}
 
-	// 5. Выдаем карту (или осколки, если это UR)
+	// 5. Выдаем карту (или осколки)
 	result := &RollResult{
 		Card:       card,
 		RarityName: rarityName,
+		CraftCost:  cost, // Записываем, сколько потратили
 	}
 
 	if card.RarityID == 6 {

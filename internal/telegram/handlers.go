@@ -346,14 +346,13 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 	btnStreaks := menu.Data("🔥 Стрики", "help_nav", "streaks")
 	btnPity := menu.Data("🛡 Гарант", "help_nav", "pity")
 	btnDuel := menu.Data("⚔️ Дуэли", "help_nav", "duel")
-	btnCraft := menu.Data("⚒ Крафт", "help_nav", "craft") // <-- НОВАЯ КНОПКА
+	btnCraft := menu.Data("⚒ Крафт", "help_nav", "craft")
 
-	// Формируем сетку кнопок
 	if section == "main" {
 		menu.Inline(
 			menu.Row(btnCards, btnRarities),
 			menu.Row(btnStreaks, btnPity),
-			menu.Row(btnDuel, btnCraft), // Поместили Дуэли и Крафт в один ряд
+			menu.Row(btnDuel, btnCraft),
 		)
 	} else {
 		menu.Inline(
@@ -364,79 +363,8 @@ func (h *Handler) buildHelpMessage(section string) (string, *tele.ReplyMarkup) {
 		)
 	}
 
-	var text string
-	switch section {
-	case "main":
-		text = `<blockquote>📖 <b>Справка по боту</b>
-
-Добро пожаловать в нашу Гачу! Здесь ты можешь собирать уникальные карточки, копить очки и соревноваться с друзьями.
-
-<b>Основные команды:</b>
-/roll — получить новую карточку
-/profile — твой инвентарь и баланс
-/top — лидерборды игроков
-/duel @user ставка — вызвать на бой
-/craft — переплавить дубликаты
-
-<i>Выбери раздел ниже, чтобы узнать больше.</i></blockquote>`
-
-	case "cards":
-		text = `<blockquote>🎴 <b>Как работают карточки?</b>
-
-Раз в <b>3 часа</b> ты можешь крутить /roll. Бот выдает случайную карту и <tg-emoji emoji-id="4918300654197277832">🪙</tg-emoji> <b>Очки</b>.
-
-🌟 <b>Осколки:</b> Эпохальные карты падают Осколками. Собери 10 штук, чтобы получить целую карту в инвентарь!</blockquote>`
-
-	case "rarities":
-		text = `<blockquote>✨ <b>Редкости карт</b>
-
-⚪️ <b>Обычная</b>
-🟢 <b>Необычная</b>
-🔵 <b>Редкая</b>
-🟣 <b>Эпическая</b>
-🟡 <b>Легендарная</b>
-🔴 <b>Эпохальная</b> (Крафт)
-
-Чем выше редкость, тем выше <b>Сила</b> карты, которая пригодится тебе в дуэлях!</blockquote>`
-
-	case "streaks":
-		text = `<blockquote>🔥 <b>Стрики</b>
-
-Заходи в бота каждый день и используй /roll. С каждым днем твой Стрик растет, а вместе с ним и бонусные <tg-emoji emoji-id="4918300654197277832">🪙</tg-emoji> <b>Очки</b> за каждую крутку.
-Если пропустишь день — стрик обнулится.</blockquote>`
-
-	case "pity":
-		text = `<blockquote>🛡 <b>Система Гаранта</b>
-
-Если тебе долго не везет, включается <b>Гарант</b>. У каждой редкой категории есть свой счетчик: когда он заполнится, редкая карта выпадет <b>со 100% шансом</b>.</blockquote>`
-
-	case "duel":
-		text = `<blockquote>⚔️ <b>Дуэли на очки</b>
-
-Используй команду: <code>/duel @юзернейм ставка</code>
-
-<b>Как это работает:</b>
-1. Бот выбирает по одной <b>случайной</b> карте из вашего инвентаря.
-2. Шанс победы зависит от <b>Силы</b> выбранных карт.
-3. Победитель забирает ставку проигравшего.</blockquote>`
-
-	case "craft": // <-- НОВЫЙ РАЗДЕЛ
-		text = `<blockquote>⚒ <b>Крафт из дубликатов</b>
-
-Не знаешь куда девать лишние дубликаты? Используй команду:
-/craft
-
-<b>Как это работает:</b>
-1. Бот ищет в твоем инвентаре <b>5 дубликатов</b> одной редкости.
-2. Если они есть — они переплавляются в 1 случайную карту <b>следующей</b> редкости.
-
-<i>Пример: 5 лишних Обычных карт превратятся в 1 Необычную.</i>
-
-⚠️ <b>Важно:</b>
-- Оригинал карты (1 шт.) всегда остается у тебя, сгорают только лишние копии.
-- Крафт из Эпохальных карт невозможен.</blockquote>`
-
-	default:
+	text, exists := HelpMessages[section]
+	if !exists {
 		text = "Раздел не найден."
 	}
 
@@ -580,16 +508,21 @@ func (h *Handler) HandleCraft(ctx tele.Context) error {
 
 	result, err := h.service.CraftCard(user.ID)
 	if err != nil {
-		// Выводим пользователю причину (мало карт или макс. уровень)
 		return ctx.Send("⚒ <b>Алхимия не удалась:</b> "+err.Error(), tele.ModeHTML)
 	}
 
-	caption := fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил 5 дубликатов и получил:\n🃏 Карта: <b>%s</b>\n✨ Редкость: <b>%s</b></blockquote>",
-		result.Card.Name, result.RarityName)
+	// Подставляем result.CraftCost
+	caption := fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и получил:\n🃏 Карта: <b>%s</b>\n✨ Редкость: <b>%s</b></blockquote>",
+		result.CraftCost, result.Card.Name, result.RarityName)
 
-	if result.IsFragment && !result.CardAssembled {
-		caption = fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы получил осколок Эпохальной карты:\n🔮 <b>%s</b>\n📦 Собрано: <b>%d / 10</b></blockquote>",
-			result.Card.Name, result.FragmentsCount)
+	if result.IsFragment {
+		if !result.CardAssembled {
+			caption = fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d легендарных дубликатов и получил осколок Эпохальной карты:\n🔮 <b>%s</b>\n📦 Собрано: <b>%d / 10</b></blockquote>",
+				result.CraftCost, result.Card.Name, result.FragmentsCount)
+		} else {
+			caption = fmt.Sprintf("<blockquote>⚒ <b>ЭПОХАЛЬНЫЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и собрал последний осколок!\n🔥 Получена Эпохальная карта: <b>%s</b></blockquote>",
+				result.CraftCost, result.Card.Name)
+		}
 	}
 
 	photo := &tele.Photo{

@@ -296,20 +296,29 @@ func (r *PostgresRepo) GetRandomUserCard(userID int64) (*models.Card, error) {
 	return card, err
 }
 
-// Находит первую попавшуюся редкость, у которой у юзера есть 5+ дубликатов (quantity > 1)
-func (r *PostgresRepo) GetRarityWithDuplicates(userID int64, required int) (int, error) {
-	var rarityID int
+// Получает количество доступных дубликатов для каждой редкости
+func (r *PostgresRepo) GetAvailableCrafts(userID int64) (map[int]int, error) {
+	counts := make(map[int]int)
 	query := `
-		SELECT c.rarity_id 
-		FROM user_inventory ui
-		JOIN cards c ON ui.card_id = c.id
-		WHERE ui.user_id = $1 AND ui.quantity > 1
-		GROUP BY c.rarity_id
-		HAVING SUM(ui.quantity - 1) >= $2
-		LIMIT 1
-	`
-	err := r.db.QueryRow(query, userID, required).Scan(&rarityID)
-	return rarityID, err
+       SELECT c.rarity_id, SUM(ui.quantity - 1) 
+       FROM user_inventory ui
+       JOIN cards c ON ui.card_id = c.id
+       WHERE ui.user_id = $1 AND ui.quantity > 1
+       GROUP BY c.rarity_id
+    `
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var rarityID, dupCount int
+		if err := rows.Scan(&rarityID, &dupCount); err == nil {
+			counts[rarityID] = dupCount
+		}
+	}
+	return counts, nil
 }
 
 // "Сжигает" 5 лишних копий карт определенной редкости
