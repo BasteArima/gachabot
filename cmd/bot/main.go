@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"gachabot/internal/repository"
 	"gachabot/internal/service"
 	"gachabot/internal/telegram"
@@ -9,20 +10,37 @@ import (
 	"os"
 	"time"
 
-	// Подключаем драйвер анонимно (через _), чтобы инициализировать его под капотом
-	_ "github.com/lib/pq"
-	// Импортируем скачанную библиотеку и даем ей удобное имя "tele"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	tele "gopkg.in/telebot.v3"
 )
 
 func main() {
-	_ = godotenv.Load() // Читаем .env
+	// Пытаемся загрузить .env файл.
+	// Если его нет (например, переменные уже заданы в системе или в Docker), игнорируем ошибку.
+	_ = godotenv.Load()
 
-	connStr := "postgres://root:secretpassword@localhost:5432/gachabot?sslmode=disable"
+	// 1. Собираем строку подключения к БД из переменных окружения
+	dbUser := os.Getenv("POSTGRES_USER")
+	dbPass := os.Getenv("POSTGRES_PASSWORD")
+	dbHost := os.Getenv("POSTGRES_HOST")
+	dbPort := os.Getenv("POSTGRES_PORT")
+	dbName := os.Getenv("POSTGRES_DB")
+
+	// Если хост или порт не заданы, ставим дефолтные значения (полезно для локальной разработки)
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		dbUser, dbPass, dbHost, dbPort, dbName)
+
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Ошибка инициализации БД:", err)
 	}
 	defer db.Close()
 
@@ -31,29 +49,35 @@ func main() {
 	}
 
 	// 2. Настраиваем бота
+	token := os.Getenv("BOT_TOKEN")
+	if token == "" {
+		log.Fatal("BOT_TOKEN не задан в переменных окружения")
+	}
+
 	pref := tele.Settings{
-		Token:  os.Getenv("BOT_TOKEN"),
+		Token:  token,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
 	}
 	bot, err := tele.NewBot(pref)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Ошибка создания бота:", err)
 	}
 
+	// Инициализация слоев
 	repo := repository.NewPostgresRepo(db)
 	gachaService := service.NewGachaService(repo)
 	duelService := service.NewDuelService(repo)
 	h := telegram.NewHandler(repo, gachaService, duelService)
 
+	// Роутинг
 	bot.Handle("/start", h.HandleStart)
 	bot.Handle("/roll", h.HandleRoll)
 	bot.Handle("/profile", h.HandleProfile)
-	// \f означает, что мы ловим Callback (нажатие кнопки), у которой ID = cards_nav
 	bot.Handle("\fcards_nav", h.HandleCardsNav)
 	bot.Handle("\fback_profile", h.HandleBackToProfile)
 	bot.Handle("/top", h.HandleLocalTop)
 	bot.Handle("/globaltop", h.HandleGlobalTop)
-	bot.Handle("\ftop_btn", h.HandleTopCallback) // \f ловит нажатия Inline кнопок
+	bot.Handle("\ftop_btn", h.HandleTopCallback)
 	bot.Handle("/help", h.HandleHelp)
 	bot.Handle("\fhelp_nav", h.HandleHelpCallback)
 	bot.Handle("/duel", h.HandleDuel)
