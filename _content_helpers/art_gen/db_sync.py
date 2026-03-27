@@ -10,7 +10,7 @@ RARITY_CONFIG = {
     "Rare":     (3, 150),
     "Epic":  (4, 400),
     "Legendary": (5, 800),
-    "Epochal": (6, 2000)
+    "Mythical": (6, 2000)
 }
 
 # --- АВТО-ПУТИ ---

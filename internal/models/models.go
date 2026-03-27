@@ -44,6 +44,7 @@ type UserCardView struct {
 	RarityName string
 	ImageURL   string
 	Quantity   int
+	PowerLevel int
 }
 
 type LeaderboardEntry struct {

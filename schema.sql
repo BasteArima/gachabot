@@ -37,7 +37,7 @@ CREATE TABLE user_inventory (
                                 PRIMARY KEY (user_id, card_id)
 );
 
--- 5. Таблица Осколков (Для крафта Эпохальных карт)
+-- 5. Таблица Осколков (Для крафта Мифических карт)
 CREATE TABLE user_fragments (
                                 user_id BIGINT NOT NULL REFERENCES users(tg_id) ON DELETE CASCADE,
                                 card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,

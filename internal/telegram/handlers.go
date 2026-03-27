@@ -41,6 +41,8 @@ func (h *Handler) HandleStart(ctx tele.Context) error {
 	msgText := "👋 Привет! Тут ты можешь собирать уникальные карточки и соревноваться с другими игроками\n\n" +
 		"Как получить карточки?\n" +
 		"<blockquote>отправь команду \"/roll\"</blockquote>\n\n" +
+		"Нужна помощь по функциям бота?\n" +
+		"<blockquote>отправь команду \"/help\"</blockquote>\n\n" +
 		"Узнать все функции можно по команде /help"
 
 	return ctx.Send(msgText, tele.ModeHTML, menu)
@@ -64,17 +66,21 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 	var caption string
 	if result.IsFragment {
 		if result.CardAssembled {
-			caption = fmt.Sprintf("<blockquote>🔥 <b>ЭПИЧЕСКАЯ УДАЧА!</b> Вы собрали 10 осколков воедино!\n\nПолучена Мифическая карта: <b>%s</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Очки: <b>+%d</b></blockquote>", result.Card.Name, result.Reward)
+			caption = fmt.Sprintf("<blockquote>🔥 <b>ЭПИЧЕСКАЯ УДАЧА!</b> Вы собрали 10 осколков воедино!\n\nПолучена Мифическая карта: <b>%s</b>\n⚔️ Сила: <b>%d</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Очки: <b>+%d</b></blockquote>",
+				result.Card.Name, result.Card.PowerLevel, result.Reward)
 		} else {
-			caption = fmt.Sprintf("<blockquote>🔮 Вы нашли осколок Мифической карты: <b>%s</b>!\n\nСобрано осколков: <b>%d / 10</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Очки: <b>+%d</b></blockquote>", result.Card.Name, result.FragmentsCount, result.Reward)
+			// Осколку силу не пишем, так как это еще не целая карта
+			caption = fmt.Sprintf("<blockquote>🔮 Вы нашли осколок Мифической карты: <b>%s</b>!\n\nСобрано осколков: <b>%d / 10</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Очки: <b>+%d</b></blockquote>",
+				result.Card.Name, result.FragmentsCount, result.Reward)
 		}
 	} else {
 		caption = fmt.Sprintf("<blockquote>"+
 			"<tg-emoji emoji-id=\"4996755833950831347\">🎉</tg-emoji>Поздравляем! Вы получили карточку: <b>%s</b>\n\n"+
 			"<tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji>Редкость: <b>%s</b>\n"+
+			"⚔️ Сила: <b>%d</b>\n"+
 			"<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>Очки: <b>+%d</b>"+
 			"</blockquote>",
-			result.Card.Name, result.RarityName, result.Reward)
+			result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
 	}
 
 	// --- ЛОГИРОВАНИЕ ПЕРЕД ОТПРАВКОЙ ---
@@ -168,9 +174,9 @@ func (h *Handler) HandleCardsNav(ctx tele.Context) error {
 		return ctx.Send("Не удалось загрузить карточки.")
 	}
 
-	// Красивый текст карточки
-	caption := fmt.Sprintf("<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>%s</b>\n\n✨ Редкость: <b>%s</b>\n📦 У вас: <b>%d шт.</b>\n\n<i>Карточка %d из %d</i></blockquote>",
-		card.CardName, card.RarityName, card.Quantity, offset+1, total)
+	// Красивый текст карточки с добавлением Силы
+	caption := fmt.Sprintf("<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>%s</b>\n\n✨ Редкость: <b>%s</b>\n⚔️ Сила: <b>%d</b>\n📦 У вас: <b>%d шт.</b>\n\n<i>Карточка %d из %d</i></blockquote>",
+		card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 
 	// Строим кнопки навигации
 	menu := &tele.ReplyMarkup{}
@@ -511,16 +517,26 @@ func (h *Handler) HandleCraft(ctx tele.Context) error {
 		return ctx.Send("⚒ <b>Алхимия не удалась:</b> "+err.Error(), tele.ModeHTML)
 	}
 
-	// Подставляем result.CraftCost
-	caption := fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и получил:\n🃏 Карта: <b>%s</b>\n✨ Редкость: <b>%s</b></blockquote>",
-		result.CraftCost, result.Card.Name, result.RarityName)
+	// Подставляем result.CraftCost и Силу
+	caption := fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и получил:\n🃏 Карта: <b>%s</b>\n✨ Редкость: <b>%s</b>\n⚔️ Сила: <b>%d</b></blockquote>",
+		result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
 
 	if result.IsFragment {
 		if !result.CardAssembled {
-			caption = fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d легендарных дубликатов и получил осколок Эпохальной карты:\n🔮 <b>%s</b>\n📦 Собрано: <b>%d / 10</b></blockquote>",
+			caption = fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d легендарных дубликатов и получил осколок Мифической карты:\n🔮 <b>%s</b>\n📦 Собрано: <b>%d / 10</b></blockquote>",
 				result.CraftCost, result.Card.Name, result.FragmentsCount)
 		} else {
-			caption = fmt.Sprintf("<blockquote>⚒ <b>ЭПОХАЛЬНЫЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и собрал последний осколок!\n🔥 Получена Эпохальная карта: <b>%s</b></blockquote>",
+			caption = fmt.Sprintf("<blockquote>⚒ <b>МИФИЧЕСКИЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и собрал последний осколок!\n🔥 Получена Мифическая карта: <b>%s</b>\n⚔️ Сила: <b>%d</b></blockquote>",
+				result.CraftCost, result.Card.Name, result.Card.PowerLevel)
+		}
+	}
+
+	if result.IsFragment {
+		if !result.CardAssembled {
+			caption = fmt.Sprintf("<blockquote>⚒ <b>УДАЧНЫЙ КРАФТ!</b>\n\nТы переплавил %d легендарных дубликатов и получил осколок Мифической карты:\n🔮 <b>%s</b>\n📦 Собрано: <b>%d / 10</b></blockquote>",
+				result.CraftCost, result.Card.Name, result.FragmentsCount)
+		} else {
+			caption = fmt.Sprintf("<blockquote>⚒ <b>МИФИЧЕСКИЙ КРАФТ!</b>\n\nТы переплавил %d дубликатов и собрал последний осколок!\n🔥 Получена Мифическая карта: <b>%s</b></blockquote>",
 				result.CraftCost, result.Card.Name)
 		}
 	}

@@ -152,11 +152,12 @@ func (r *PostgresRepo) GetUserUniqueCardsCount(userID int64) (int, error) {
 }
 
 // Получаем одну карточку пользователя с учетом сдвига (пагинация)
+// Получаем одну карточку пользователя с учетом сдвига (пагинация)
 func (r *PostgresRepo) GetUserCard(userID int64, offset int) (*models.UserCardView, error) {
 	card := &models.UserCardView{}
-	// Магия SQL: объединяем (JOIN) три таблицы, чтобы получить и имя карты, и название редкости
+	// ДОБАВЛЕН c.power_level В SELECT
 	query := `
-		SELECT c.name, r.name, c.image_url, ui.quantity 
+		SELECT c.name, r.name, c.image_url, ui.quantity, c.power_level 
 		FROM user_inventory ui
 		JOIN cards c ON ui.card_id = c.id
 		JOIN rarities r ON c.rarity_id = r.id
@@ -164,8 +165,9 @@ func (r *PostgresRepo) GetUserCard(userID int64, offset int) (*models.UserCardVi
 		ORDER BY r.id DESC, c.id ASC
 		OFFSET $2 LIMIT 1
 	`
+	// ДОБАВЛЕН &card.PowerLevel В Scan
 	err := r.db.QueryRow(query, userID, offset).Scan(
-		&card.CardName, &card.RarityName, &card.ImageURL, &card.Quantity,
+		&card.CardName, &card.RarityName, &card.ImageURL, &card.Quantity, &card.PowerLevel,
 	)
 	return card, err
 }

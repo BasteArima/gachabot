@@ -70,16 +70,27 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		}
 	}
 
-	// 3. Считаем стрик
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	// 3. Считаем стрик (ЖЕСТКАЯ ПРИВЯЗКА К МОСКВЕ)
+	// Создаем зону UTC+3 (3 часа * 60 минут * 60 секунд)
+	loc := time.FixedZone("MSK", 3*60*60)
+	now := time.Now().In(loc) // Текущее время по Москве
+
+	// Начало "сегодняшнего" дня по Москве (00:00:00)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	newStreak := userDb.StreakDays
 
 	if userDb.LastStreakDate.Valid {
-		lastDate := userDb.LastStreakDate.Time
-		if today.Sub(lastDate) == 24*time.Hour {
+		dbDate := userDb.LastStreakDate.Time
+
+		// Собираем вчерашнюю дату из БД в том же самом московском поясе
+		lastDate := time.Date(dbDate.Year(), dbDate.Month(), dbDate.Day(), 0, 0, 0, 0, loc)
+
+		// Считаем разницу
+		hoursDiff := today.Sub(lastDate).Hours()
+
+		if hoursDiff == 24 { // Если разница ровно 1 сутки
 			newStreak++
-		} else if today.Sub(lastDate) > 24*time.Hour {
+		} else if hoursDiff > 24 { // Если прошло больше 1 суток
 			newStreak = 1
 		}
 	} else {
@@ -189,7 +200,9 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 	// 8. Сохраняем прогресс юзера
 	userDb.Balance += finalReward
 	userDb.StreakDays = newStreak
-	userDb.LastRollTime = sql.NullTime{Time: time.Now(), Valid: true}
+
+	// ВАЖНО: сохраняем именно наше московское время (now) и дату (today)
+	userDb.LastRollTime = sql.NullTime{Time: now, Valid: true}
 	userDb.LastStreakDate = sql.NullTime{Time: today, Valid: true}
 
 	if err := s.repo.UpdateUserAfterRoll(userDb); err != nil {
@@ -278,7 +291,7 @@ func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
 		2: 5,  // Необычная (2) -> Редкая (3)
 		3: 5,  // Редкая (3) -> Эпическая (4)
 		4: 5,  // Эпическая (4) -> Легендарная (5)
-		5: 15, // Легендарная (5) -> Эпохальная (6) (ОСКОЛОК) - КАСТОМНАЯ ЦЕНА
+		5: 15, // Легендарная (5) -> Мифическая (6) (ОСКОЛОК) - КАСТОМНАЯ ЦЕНА
 	}
 
 	var sourceRarityID int
