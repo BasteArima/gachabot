@@ -97,9 +97,14 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 		Caption: caption,
 	}
 
+	menu := &tele.ReplyMarkup{}
+	btnRoll := menu.Data("🎲 Крутить еще", "roll_again")
+	menu.Inline(menu.Row(btnRoll))
+
 	err = ctx.Send(photo, &tele.SendOptions{
-		ParseMode: tele.ModeHTML,
-		ReplyTo:   ctx.Message(),
+		ParseMode:   tele.ModeHTML,
+		ReplyTo:     ctx.Message(), // Ответит либо на команду юзера, либо выстроит цепочку
+		ReplyMarkup: menu,          // Прикрепляем кнопку!
 	})
 
 	if err != nil {
@@ -109,6 +114,12 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 	}
 
 	return nil
+}
+
+// Перехватываем нажатие кнопки и просто вызываем ту же функцию ролла
+func (h *Handler) HandleRollAgainCallback(ctx tele.Context) error {
+	_ = ctx.Respond() // Убираем часики на кнопке
+	return h.HandleRoll(ctx)
 }
 
 func (h *Handler) HandleProfile(ctx tele.Context) error {
@@ -144,11 +155,17 @@ func (h *Handler) HandleProfile(ctx tele.Context) error {
 
 	// Добавляем клавиатуру, ЕСЛИ у юзера есть хотя бы 1 карта
 	menu := &tele.ReplyMarkup{}
+	var rows []tele.Row
 	if profile.UniqueCardsCount > 0 {
 		// Создаем кнопку. "cards_nav" — это внутренний ID кнопки, "0" — передаваемые данные (отступ)
 		btnMyCards := menu.Data(fmt.Sprintf("🎴 Мои карточки [%d]", profile.UniqueCardsCount), "cards_nav", "0")
-		menu.Inline(menu.Row(btnMyCards))
+		rows = append(rows, menu.Row(btnMyCards))
 	}
+
+	btnAddGroup := menu.URL("👥 Добавить бота в свою группу", "https://t.me/HentaiCard_bot?startgroup=true")
+	rows = append(rows, menu.Row(btnAddGroup))
+
+	menu.Inline(rows...)
 
 	// Если нет ошибки и у юзера есть хотя бы одно фото профиля
 	if err == nil && len(photos) > 0 {
@@ -178,6 +195,13 @@ func (h *Handler) HandleCardsNav(ctx tele.Context) error {
 	card, total, err := h.service.GetUserCardPagination(user.ID, offset)
 	if err != nil {
 		return ctx.Send("Не удалось загрузить карточки.")
+	}
+
+	// ---> НОВАЯ ЗАЩИТА ОТ КРАША <---
+	if card == nil {
+		// Если это нажатие на старую кнопку, а инвентарь уже пуст
+		_ = ctx.Delete()
+		return ctx.Send("Упс! Твой инвентарь пуст. Используй /roll, чтобы получить карточки!")
 	}
 
 	// Красивый текст карточки с добавлением Силы
@@ -299,7 +323,10 @@ func (h *Handler) HandleLocalTop(ctx tele.Context) error {
 	h.service.TrackChat(ctx.Sender().ID, ctx.Chat().ID)
 
 	if ctx.Chat().Type == tele.ChatPrivate {
-		return ctx.Send("❌ Локальный топ работает только в группах. Используйте /globaltop")
+		menu := &tele.ReplyMarkup{}
+		btnAdd := menu.URL("👥 Добавить в группу", "https://t.me/HentaiCard_bot?startgroup=true")
+		menu.Inline(menu.Row(btnAdd))
+		return ctx.Send("❌ Локальный топ работает только в группах. Добавь меня в свой чат, чтобы соревноваться с друзьями!", menu)
 	}
 
 	text, menu, err := h.buildTopMessage("balance", "local", ctx.Chat().ID)

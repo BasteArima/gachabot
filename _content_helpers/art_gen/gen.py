@@ -13,7 +13,14 @@ OUT_DIR = os.path.join(BASE_DIR, 'out')
 
 # ВНИМАНИЕ: Проверь, чтобы названия в этом списке В ТОЧНОСТИ (включая регистр) 
 # совпадали с названиями твоих папок в raw_art
-RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical"]
+RARITIES = [
+    #"Common", 
+    "Uncommon", 
+    #"Rare", 
+    #"Epic", 
+    #"Legendary",
+    #"Mythical"
+    ]
 
 def process_image(img_path, frame_path, save_path):
     try:

@@ -89,6 +89,7 @@ func main() {
 	// Магазин и донаты
 	bot.Handle("\fshop_rolls_menu", h.HandleShopMenu)
 	bot.Handle("\fbuy_invoice", h.HandleSendInvoice)
+	bot.Handle("\froll_again", h.HandleRollAgainCallback)
 	bot.Handle(tele.OnCheckout, h.HandlePreCheckout)
 	bot.Handle(tele.OnPayment, h.HandlePayment)
 

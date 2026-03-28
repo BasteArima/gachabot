@@ -11,7 +11,7 @@ import (
 	"gachabot/internal/repository"
 )
 
-const adminId int64 = 1
+const adminId int64 = 348389728
 
 type GachaService struct {
 	repo *repository.PostgresRepo

@@ -20,13 +20,13 @@ CREATE TABLE cards (
 CREATE TABLE users (
                        tg_id BIGINT PRIMARY KEY,
                        username VARCHAR(100),
-                       first_name TEXT,
-                       last_name TEXT,
                        balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
                        streak_days INTEGER NOT NULL DEFAULT 0,
                        last_roll_time TIMESTAMP WITH TIME ZONE,
                        last_streak_date DATE,
                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                       first_name TEXT,
+                       last_name TEXT,
                        premium_rolls INTEGER NOT NULL DEFAULT 0 -- Добавлено для доната
 );
 
