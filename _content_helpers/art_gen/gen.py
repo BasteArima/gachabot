@@ -2,7 +2,7 @@ import os
 import sys
 from PIL import Image
 
-TARGET_SIZE = (1000, 1400)
+TARGET_SIZE = (1000, 1316)
 # Получаем путь к папке, в которой лежит сам gen.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -14,11 +14,11 @@ OUT_DIR = os.path.join(BASE_DIR, 'out')
 # ВНИМАНИЕ: Проверь, чтобы названия в этом списке В ТОЧНОСТИ (включая регистр) 
 # совпадали с названиями твоих папок в raw_art
 RARITIES = [
-    #"Common", 
+    "Common", 
     "Uncommon", 
-    #"Rare", 
-    #"Epic", 
-    #"Legendary",
+    "Rare", 
+    "Epic", 
+    "Legendary",
     #"Mythical"
     ]
 

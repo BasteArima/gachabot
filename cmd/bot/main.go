@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"gachabot/internal/i18n"
 	"gachabot/internal/repository"
 	"gachabot/internal/service"
 	"gachabot/internal/telegram"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	_ "gachabot/internal/i18n"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	tele "gopkg.in/telebot.v3"
@@ -63,11 +65,17 @@ func main() {
 		log.Fatal("Ошибка создания бота:", err)
 	}
 
+	// Инициализация локализатора (указываем папку и язык по умолчанию)
+	loc, err := i18n.NewLocalizer("locales", "ru")
+	if err != nil {
+		log.Fatal("Ошибка загрузки переводов:", err)
+	}
+
 	// Инициализация слоев
 	repo := repository.NewPostgresRepo(db)
 	gachaService := service.NewGachaService(repo)
 	duelService := service.NewDuelService(repo)
-	h := telegram.NewHandler(repo, gachaService, duelService)
+	h := telegram.NewHandler(repo, gachaService, duelService, loc)
 
 	// Роутинг
 	bot.Handle("/start", h.HandleStart)
