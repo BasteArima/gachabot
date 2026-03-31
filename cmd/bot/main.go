@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"gachabot/internal/delivery/discord"
 	"log"
 	"os"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"gachabot/internal/repository"
 	"gachabot/internal/service"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	tele "gopkg.in/telebot.v3"
@@ -128,6 +130,76 @@ func main() {
 
 	bot.Handle("/link", h.HandleLinkStart)
 
+	// discord
+	// --- НАСТРОЙКА DISCORD ---
+	dsToken := os.Getenv("DISCORD_TOKEN")
+	if dsToken == "" {
+		log.Println("[DISCORD] Пропуск запуска: DISCORD_TOKEN не найден")
+	} else {
+		dg, err := discordgo.New("Bot " + dsToken)
+		if err != nil {
+			log.Fatal("[DISCORD ERROR] Ошибка создания сессии:", err)
+		}
+		dg.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessages
+		// Инициализация слоев для Дискорда
+		discordLoc, _ := i18n.NewLocalizer("locales/discord", "ru")
+		// h — это твой telegram.Handler, который мы создали выше
+		dsHandler := discord.NewHandler(repo, gachaService, duelService, discordLoc, h)
+		dg.AddHandler(dsHandler.HandleInteraction)
+		dg.AddHandler(dsHandler.HandleComponentInteraction)
+
+		// Открываем соединение
+		err = dg.Open()
+		if err != nil {
+			log.Fatal("[DISCORD ERROR] Ошибка подключения:", err)
+		}
+		defer dg.Close()
+		log.Println("[DISCORD] Бот успешно подключен к шлюзу!")
+
+		// Регистрация команд (Bulk Overwrite)
+		commands := []*discordgo.ApplicationCommand{
+			{Name: "roll", Description: "Получить карточку"},
+			{Name: "profile", Description: "Твой профиль"},
+			{Name: "link", Description: "Связать с Telegram",
+				Options: []*discordgo.ApplicationCommandOption{
+					{Type: discordgo.ApplicationCommandOptionString, Name: "code", Description: "Код", Required: true},
+				},
+			},
+			{Name: "help", Description: "Помощь по игре"},
+			{Name: "top", Description: "Топ сервера по балансу"},
+			{Name: "globaltop", Description: "Мировой топ"},
+			{Name: "craft", Description: "Создать карту из дубликатов"},
+			{
+				Name:        "duel",
+				Description: "Вызвать игрока на дуэль",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionUser,
+						Name:        "user",
+						Description: "Кого вызываем?",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionInteger,
+						Name:        "amount",
+						Description: "Ставка",
+						Required:    true,
+					},
+				},
+			},
+		}
+
+		// И не забудь добавить обработчик компонентов (для Select Menu)
+
+		_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
+		if err != nil {
+			log.Printf("[DISCORD ERROR] Ошибка регистрации команд: %v", err)
+		} else {
+			log.Println("[DISCORD] Слэш-команды зарегистрированы!")
+		}
+	}
+
+	// --- ФИНАЛЬНЫЙ ЗАПУСК ТЕЛЕГРАМА ---
 	log.Println("Telegram-бот успешно запущен и готов к работе!")
-	bot.Start()
+	bot.Start() // <--- Эта строчка всегда должна быть ПОСЛЕДНЕЙ в main()
 }

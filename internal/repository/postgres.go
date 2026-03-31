@@ -20,8 +20,11 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 func (r *PostgresRepo) GetUserByID(internalID int64) (*models.User, error) {
 	user := &models.User{}
 	query := `
-		SELECT id, telegram_id, discord_id, username, first_name, last_name, 
-		       balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '') 
+		SELECT id, telegram_id, discord_id, username, 
+           COALESCE(first_name, '') as first_name, 
+           COALESCE(last_name, '') as last_name, 
+           balance, streak_days, last_roll_time, last_streak_date, 
+           premium_rolls, COALESCE(language_code, '')
 		FROM users WHERE id=$1 LIMIT 1
 	`
 	err := r.db.QueryRow(query, internalID).Scan(
@@ -35,8 +38,11 @@ func (r *PostgresRepo) GetUserByID(internalID int64) (*models.User, error) {
 func (r *PostgresRepo) GetUserByTelegramID(tgID int64) (*models.User, error) {
 	user := &models.User{}
 	query := `
-		SELECT id, telegram_id, discord_id, username, first_name, last_name, 
-		       balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '') 
+		SELECT id, telegram_id, discord_id, username, 
+           COALESCE(first_name, '') as first_name, 
+           COALESCE(last_name, '') as last_name, 
+           balance, streak_days, last_roll_time, last_streak_date, 
+           premium_rolls, COALESCE(language_code, '')
 		FROM users WHERE telegram_id=$1 LIMIT 1
 	`
 	err := r.db.QueryRow(query, tgID).Scan(
@@ -59,8 +65,11 @@ func (r *PostgresRepo) GetOrCreateUserByTelegramID(tgID int64, username, firstNa
 			username = EXCLUDED.username,
 			first_name = EXCLUDED.first_name,
 			last_name = EXCLUDED.last_name
-		RETURNING id, telegram_id, discord_id, username, first_name, last_name, 
-		          balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '')
+		RETURNING id, telegram_id, discord_id, username,
+		COALESCE(first_name, '') as first_name, 
+		          COALESCE(last_name, '') as last_name, 
+		          balance, streak_days, last_roll_time, last_streak_date, 
+		          premium_rolls, COALESCE(language_code, '')
 	`
 	err := r.db.QueryRow(query, tgID, username, firstName, lastName).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
@@ -271,29 +280,31 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 	joinChat := ""
 	whereChat := ""
 	if chatID != 0 {
-		joinChat = "JOIN user_chats uc ON u.tg_id = uc.user_id"
+		// ИСПРАВЛЕНО: соединяем по внутреннему id (u.id), а не по tg_id
+		joinChat = "JOIN user_chats uc ON u.id = uc.user_id"
 		whereChat = "WHERE uc.chat_id = $1"
 		args = append(args, chatID)
 	}
 
-	// Склеиваем имя и фамилию
-	//nameFormat := "TRIM(COALESCE(u.first_name, '') || ' ' || COALESCE(u.last_name, ''))"
-	nameFormat := "COALESCE(u.first_name)"
-	// ORDER BY: сначала по основному показателю (DESC),
-	// затем по времени последнего ролла (ASC) — кто раньше крутил, тот выше при равенстве.
+	// ИСПРАВЛЕНО: для Дискорд-юзеров first_name может быть пустым,
+	// поэтому берем username как запасной вариант
+	nameFormat := "COALESCE(NULLIF(u.first_name, ''), u.username)"
+
 	switch criteria {
 	case "balance":
 		query = fmt.Sprintf(`SELECT %s, u.balance FROM users u %s %s ORDER BY u.balance DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	case "streak":
 		query = fmt.Sprintf(`SELECT %s, u.streak_days FROM users u %s %s ORDER BY u.streak_days DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	case "cards":
+		// Если есть chatID ($1), он должен быть передан в Query.
+		// В блоке ниже важно сохранить порядок аргументов.
 		query = fmt.Sprintf(`
           SELECT %s, COUNT(DISTINCT ui.card_id) as val 
           FROM users u 
           %s 
           JOIN user_inventory ui ON u.id = ui.user_id 
           %s 
-          GROUP BY u.id, u.first_name, u.last_name 
+          GROUP BY u.id, u.first_name, u.username 
           ORDER BY val DESC, MIN(u.last_roll_time) ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	default:
 		return nil, fmt.Errorf("неизвестный критерий топа")
@@ -301,6 +312,7 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
+		log.Printf("[DB ERROR] Leaderboard query failed: %v", err) // Поможет увидеть ошибку в консоли
 		return nil, err
 	}
 	defer rows.Close()
@@ -416,8 +428,11 @@ func (r *PostgresRepo) GetOrCreateUserByDiscordID(discordID int64, username stri
 		VALUES ($1, $2) 
 		ON CONFLICT (discord_id) DO UPDATE SET
 			username = EXCLUDED.username
-		RETURNING id, telegram_id, discord_id, username, first_name, last_name, 
-		          balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '')
+		RETURNING id, telegram_id, discord_id, username,
+		COALESCE(first_name, '') as first_name, 
+		          COALESCE(last_name, '') as last_name, 
+		          balance, streak_days, last_roll_time, last_streak_date, 
+		          premium_rolls, COALESCE(language_code, '')
 	`
 	err := r.db.QueryRow(query, discordID, username).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,

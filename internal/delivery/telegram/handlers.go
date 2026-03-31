@@ -572,12 +572,26 @@ func (h *Handler) HandleDuelCallback(ctx tele.Context) error {
 			return ctx.Edit(h.loc.T(lang, "err_duel_exec", err.Error()))
 		}
 
+		// 1. Формируем текст результата (тот же, что был, или чуть красивее)
 		resText := h.loc.T(lang, "duel_result",
 			duel.ChallengerName, result.CardChallenger.Name, result.CardChallenger.PowerLevel, result.ChanceChallenger,
 			duel.TargetName, result.CardTarget.Name, result.CardTarget.PowerLevel, result.ChanceTarget,
 			result.Roll, result.WinnerName, result.AmountWon*2)
 
-		return ctx.Edit(resText, tele.ModeHTML)
+		// 2. Создаем альбом из двух фото
+		photo1 := &tele.Photo{
+			File:    tele.FromURL(result.CardChallenger.ImageURL),
+			Caption: resText, // Текст результата привязываем к первому фото
+		}
+		photo2 := &tele.Photo{
+			File: tele.FromURL(result.CardTarget.ImageURL),
+		}
+
+		album := tele.Album{photo1, photo2}
+
+		// 3. Удаляем сообщение с кнопками и отправляем результат альбомом
+		_ = ctx.Delete()
+		return ctx.SendAlbum(album, tele.ModeHTML)
 	}
 
 	return nil
@@ -963,4 +977,22 @@ func (h *Handler) HandleLanguageSetCallback(ctx tele.Context) error {
 
 	text, menu := h.buildHelpMessage("language", targetLang)
 	return ctx.Edit(text, tele.ModeHTML, menu)
+}
+
+// Реализация интерфейса LinkProvider для Дискорда
+func (h *Handler) GetIDByCode(code string) (int64, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	id, exists := h.linkCodes[code]
+
+	// Если код найден, сразу удаляем его (он одноразовый)
+	if exists {
+		h.mu.RUnlock() // Переключаемся на обычную блокировку для удаления
+		h.mu.Lock()
+		delete(h.linkCodes, code)
+		h.mu.Unlock()
+		h.mu.RLock()
+	}
+
+	return id, exists
 }

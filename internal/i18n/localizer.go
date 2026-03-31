@@ -14,6 +14,7 @@ type Localizer struct {
 
 // NewLocalizer читает все .json файлы из папки localesDir
 func NewLocalizer(localesDir string, defaultLang string) (*Localizer, error) {
+
 	loc := &Localizer{
 		texts:       make(map[string]map[string]string),
 		defaultLang: defaultLang,
