@@ -3,15 +3,14 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"gachabot/internal/i18n"
-	"gachabot/internal/repository"
-	"gachabot/internal/service"
-	"gachabot/internal/telegram"
 	"log"
 	"os"
 	"time"
 
-	_ "gachabot/internal/i18n"
+	"gachabot/internal/delivery/telegram"
+	"gachabot/internal/i18n"
+	"gachabot/internal/repository"
+	"gachabot/internal/service"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -19,18 +18,16 @@ import (
 )
 
 func main() {
-	// Пытаемся загрузить .env файл.
-	// Если его нет (например, переменные уже заданы в системе или в Docker), игнорируем ошибку.
+	// 1. Пытаемся загрузить .env файл
 	_ = godotenv.Load()
 
-	// 1. Собираем строку подключения к БД из переменных окружения
+	// 2. Собираем строку подключения к БД
 	dbUser := os.Getenv("POSTGRES_USER")
 	dbPass := os.Getenv("POSTGRES_PASSWORD")
 	dbHost := os.Getenv("POSTGRES_HOST")
 	dbPort := os.Getenv("POSTGRES_PORT")
 	dbName := os.Getenv("POSTGRES_DB")
 
-	// Если хост или порт не заданы, ставим дефолтные значения (полезно для локальной разработки)
 	if dbHost == "" {
 		dbHost = "localhost"
 	}
@@ -51,7 +48,7 @@ func main() {
 		log.Fatal("Нет связи с БД:", err)
 	}
 
-	// 2. Настраиваем бота
+	// 3. Настраиваем Telegram бота
 	token := os.Getenv("BOT_TOKEN")
 	if token == "" {
 		log.Fatal("BOT_TOKEN не задан в переменных окружения")
@@ -66,36 +63,46 @@ func main() {
 		log.Fatal("Ошибка создания бота:", err)
 	}
 
-	// Инициализация локализатора (указываем папку и язык по умолчанию)
-	loc, err := i18n.NewLocalizer("locales", "ru")
+	// 4. ИНИЦИАЛИЗАЦИЯ ЛОКАЛИЗАТОРА ДЛЯ ТЕЛЕГРАМА (Правильный путь!)
+	telegramLoc, err := i18n.NewLocalizer("locales/telegram", "ru")
 	if err != nil {
-		log.Fatal("Ошибка загрузки переводов:", err)
+		log.Fatal("Ошибка загрузки переводов Telegram:", err)
 	}
 
-	// Инициализация слоев
+	// 5. Инициализация общих слоев (Бизнес-логика)
 	repo := repository.NewPostgresRepo(db)
 	gachaService := service.NewGachaService(repo)
 	duelService := service.NewDuelService(repo)
-	h := telegram.NewHandler(repo, gachaService, duelService, loc)
 
-	// Роутинг
+	// 6. Инициализация слоя Delivery (Транспорт для Телеграма)
+	h := telegram.NewHandler(repo, gachaService, duelService, telegramLoc)
+
+	// 7. Роутинг команд
 	bot.Handle("/start", h.HandleStart)
 	bot.Handle("/roll", h.HandleRoll)
 	bot.Handle("/profile", h.HandleProfile)
 	bot.Handle("\fcards_nav", h.HandleCardsNav)
 	bot.Handle("\fback_profile", h.HandleBackToProfile)
+
+	// Топы
 	bot.Handle("/top", h.HandleLocalTop)
 	bot.Handle("/globaltop", h.HandleGlobalTop)
 	bot.Handle("\ftop_btn", h.HandleTopCallback)
+
+	// Помощь и язык
 	bot.Handle("/help", h.HandleHelp)
 	bot.Handle("\fhelp_nav", h.HandleHelpCallback)
+	bot.Handle("/locale", h.HandleLocale)
+	bot.Handle("\flang_set", h.HandleLanguageSetCallback)
+
+	// Дуэли
 	bot.Handle("/duel", h.HandleDuel)
 	bot.Handle("\fduel_accept", h.HandleDuelCallback)
 	bot.Handle("\fduel_cancel", h.HandleDuelCallback)
+
+	// Крафт и донат
 	bot.Handle("/craft", h.HandleCraft)
 	bot.Handle("/shop", h.HandleDonate)
-	// Добавь эти строки туда, где у тебя bot.Handle(...)
-	// Магазин и донаты
 	bot.Handle("\fshop_rolls_menu", h.HandleShopMenu)
 	bot.Handle("\fbuy_invoice", h.HandleSendInvoice)
 	bot.Handle("\froll_again", h.HandleRollAgainCallback)
@@ -119,10 +126,8 @@ func main() {
 	bot.Handle(tele.OnDocument, h.HandleMediaSuggest)
 	bot.Handle(tele.OnText, h.HandleTextFallback) // Защита от дурака
 
-	// Язык
-	bot.Handle("/locale", h.HandleLocale)
-	bot.Handle("\flang_set", h.HandleLanguageSetCallback)
+	bot.Handle("/link", h.HandleLinkStart)
 
-	log.Println("Бот запущен...")
+	log.Println("Telegram-бот успешно запущен и готов к работе!")
 	bot.Start()
 }

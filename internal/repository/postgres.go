@@ -16,6 +16,21 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 	return &PostgresRepo{db: db}
 }
 
+// Получаем пользователя по ВНУТРЕННЕМУ ID
+func (r *PostgresRepo) GetUserByID(internalID int64) (*models.User, error) {
+	user := &models.User{}
+	query := `
+		SELECT id, telegram_id, discord_id, username, first_name, last_name, 
+		       balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '') 
+		FROM users WHERE id=$1 LIMIT 1
+	`
+	err := r.db.QueryRow(query, internalID).Scan(
+		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+	)
+	return user, err
+}
+
 // 1. Получаем пользователя по Telegram ID
 func (r *PostgresRepo) GetUserByTelegramID(tgID int64) (*models.User, error) {
 	user := &models.User{}
@@ -384,7 +399,135 @@ func (r *PostgresRepo) GetTotalDuplicatesCount(userID int64) (int, error) {
 }
 
 // Добавляем премиум-крутки после доната
-func (r *PostgresRepo) AddPremiumRolls(userID int64, amount int) error {
-	_, err := r.db.Exec("UPDATE users SET premium_rolls = premium_rolls + $1 WHERE tg_id = $2", amount, userID)
+func (r *PostgresRepo) AddPremiumRolls(internalID int64, amount int) error {
+	_, err := r.db.Exec("UPDATE users SET premium_rolls = premium_rolls + $1 WHERE id = $2", amount, internalID)
 	return err
+}
+
+// --- DISCORD И ПРИВЯЗКА АККАУНТОВ ---
+
+// Получаем или создаем юзера по Discord ID
+func (r *PostgresRepo) GetOrCreateUserByDiscordID(discordID int64, username string) (*models.User, error) {
+	user := &models.User{}
+
+	// Точно такая же логика, как для ТГ, но для discord_id
+	query := `
+		INSERT INTO users (discord_id, username) 
+		VALUES ($1, $2) 
+		ON CONFLICT (discord_id) DO UPDATE SET
+			username = EXCLUDED.username
+		RETURNING id, telegram_id, discord_id, username, first_name, last_name, 
+		          balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '')
+	`
+	err := r.db.QueryRow(query, discordID, username).Scan(
+		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+	)
+
+	return user, err
+}
+
+// Привязка Discord к существующему внутреннему ID
+func (r *PostgresRepo) LinkDiscordAccount(internalUserID int64, discordID int64) error {
+	// Проверяем, не привязан ли уже этот discordID к кому-то еще
+	var existingID int64
+	err := r.db.QueryRow("SELECT id FROM users WHERE discord_id = $1", discordID).Scan(&existingID)
+	if err == nil && existingID != internalUserID {
+		return fmt.Errorf("этот Discord аккаунт уже привязан к другому профилю")
+	}
+
+	// Если всё ок, обновляем запись
+	_, err = r.db.Exec("UPDATE users SET discord_id = $1 WHERE id = $2", discordID, internalUserID)
+	return err
+}
+
+// MergeAccounts объединяет два аккаунта: переносит весь прогресс с secondaryID на primaryID и удаляет secondaryID
+func (r *PostgresRepo) MergeAccounts(primaryID int64, secondaryID int64) error {
+	// 1. Начинаем транзакцию
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	// Если мы не сделаем tx.Commit(), все изменения откатятся. Это спасает базу от поломок.
+	defer tx.Rollback()
+
+	// 2. Блокируем и читаем данные вторичного аккаунта
+	var secTgID, secDsID sql.NullInt64
+	var secBal, secPrem, secStreak int
+	err = tx.QueryRow(`
+		SELECT telegram_id, discord_id, balance, premium_rolls, streak_days 
+		FROM users WHERE id = $1 FOR UPDATE
+	`, secondaryID).Scan(&secTgID, &secDsID, &secBal, &secPrem, &secStreak)
+	if err != nil {
+		return fmt.Errorf("ошибка чтения вторичного аккаунта: %w", err)
+	}
+
+	// 3. Блокируем первичный аккаунт
+	_, err = tx.Exec("SELECT id FROM users WHERE id = $1 FOR UPDATE", primaryID)
+	if err != nil {
+		return fmt.Errorf("ошибка блокировки первичного аккаунта: %w", err)
+	}
+
+	// 4. ВАЖНО: "Освобождаем" уникальные ID у вторичного аккаунта, чтобы избежать ошибки UNIQUE
+	_, err = tx.Exec("UPDATE users SET telegram_id = NULL, discord_id = NULL WHERE id = $1", secondaryID)
+	if err != nil {
+		return fmt.Errorf("ошибка освобождения ID: %w", err)
+	}
+
+	// 5. Обновляем первичный аккаунт (плюсуем баланс, берем бОльший стрик, забираем привязки)
+	updatePrimary := `
+		UPDATE users 
+		SET balance = balance + $1,
+		    premium_rolls = premium_rolls + $2,
+		    streak_days = GREATEST(streak_days, $3),
+		    telegram_id = COALESCE(telegram_id, $4),
+		    discord_id = COALESCE(discord_id, $5)
+		WHERE id = $6
+	`
+	_, err = tx.Exec(updatePrimary, secBal, secPrem, secStreak, secTgID, secDsID, primaryID)
+	if err != nil {
+		return fmt.Errorf("ошибка обновления первичного аккаунта: %w", err)
+	}
+
+	// 6. СЛИВАЕМ ИНВЕНТАРЬ (Если карта есть у обоих - суммируем количество)
+	mergeInv := `
+		INSERT INTO user_inventory (user_id, card_id, quantity)
+		SELECT $1, card_id, quantity FROM user_inventory WHERE user_id = $2
+		ON CONFLICT (user_id, card_id) 
+		DO UPDATE SET quantity = user_inventory.quantity + EXCLUDED.quantity
+	`
+	if _, err = tx.Exec(mergeInv, primaryID, secondaryID); err != nil {
+		return fmt.Errorf("ошибка слияния инвентаря: %w", err)
+	}
+
+	// 7. СЛИВАЕМ ОСКОЛКИ
+	mergeFrag := `
+		INSERT INTO user_fragments (user_id, card_id, quantity)
+		SELECT $1, card_id, quantity FROM user_fragments WHERE user_id = $2
+		ON CONFLICT (user_id, card_id) 
+		DO UPDATE SET quantity = user_fragments.quantity + EXCLUDED.quantity
+	`
+	if _, err = tx.Exec(mergeFrag, primaryID, secondaryID); err != nil {
+		return fmt.Errorf("ошибка слияния осколков: %w", err)
+	}
+
+	// 8. СЛИВАЕМ ГАРАНТЫ (Берем максимальный счетчик для каждой редкости)
+	mergePity := `
+		INSERT INTO user_pity (user_id, rarity_id, counter)
+		SELECT $1, rarity_id, counter FROM user_pity WHERE user_id = $2
+		ON CONFLICT (user_id, rarity_id) 
+		DO UPDATE SET counter = GREATEST(user_pity.counter, EXCLUDED.counter)
+	`
+	if _, err = tx.Exec(mergePity, primaryID, secondaryID); err != nil {
+		return fmt.Errorf("ошибка слияния гарантов: %w", err)
+	}
+
+	// 9. Удаляем вторичный аккаунт-пустышку
+	_, err = tx.Exec("DELETE FROM users WHERE id = $1", secondaryID)
+	if err != nil {
+		return fmt.Errorf("ошибка удаления старого аккаунта: %w", err)
+	}
+
+	// 10. Сохраняем все изменения!
+	return tx.Commit()
 }

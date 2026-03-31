@@ -11,7 +11,7 @@ import (
 	"gachabot/internal/repository"
 )
 
-const adminId int64 = 1
+const adminId int64 = 348389728
 
 type GachaService struct {
 	repo *repository.PostgresRepo
@@ -40,19 +40,14 @@ type RollResult struct {
 	StreakUpdated bool
 }
 
-// RollCard делает всю "грязную работу"
-func (s *GachaService) RollCard(userID int64, username, firstName, lastName string) (*RollResult, error) {
-	// 1. Создаем или находим юзера
-	if err := s.repo.CreateUserIfNotExist(userID, username, firstName, lastName); err != nil {
-		return nil, fmt.Errorf("ошибка регистрации: %w", err)
-	}
-
-	userDb, err := s.repo.GetUser(userID)
+// RollCard делает всю "грязную работу", принимая только ВНУТРЕННИЙ ID
+func (s *GachaService) RollCard(internalUserID int64) (*RollResult, error) {
+	userDb, err := s.repo.GetUserByID(internalUserID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения юзера: %w", err)
 	}
 
-	// 2. СЧИТАЕМ СТРИК ДО ПРОВЕРКИ КУЛДАУНА
+	// 1. СЧИТАЕМ СТРИК ДО ПРОВЕРКИ КУЛДАУНА
 	loc := time.FixedZone("MSK", 3*60*60)
 	now := time.Now().In(loc)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
@@ -77,13 +72,13 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		streakUpdated = true
 	}
 
-	// Если стрик обновился, сразу фиксируем его в объекте
+	// Если стрик обновился, сразу фиксируем его
 	if streakUpdated {
 		userDb.StreakDays = newStreak
 		userDb.LastStreakDate = sql.NullTime{Time: today, Valid: true}
 	}
 
-	// 3. Проверка кулдауна и использования Premium крутки
+	// 2. Проверка кулдауна и использования Premium крутки
 	usedPremium := false
 
 	if userDb.PremiumRolls > 0 {
@@ -92,7 +87,13 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		timePassed := time.Since(userDb.LastRollTime.Time)
 		cooldown := 3 * time.Hour
 
-		if timePassed < cooldown && userID != adminId {
+		// Проверка на админа для сброса КД
+		bypassCooldown := false
+		if userDb.TelegramID.Valid && userDb.TelegramID.Int64 == adminId {
+			bypassCooldown = true
+		}
+
+		if timePassed < cooldown && !bypassCooldown {
 			// !!! МЫ В ОТКАТЕ !!!
 			// Но если стрик сегодня обновился, обязательно сохраняем его в базу!
 			if streakUpdated {
@@ -112,20 +113,20 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 			return &RollResult{
 				OnCooldown:       true,
 				CooldownTimeLeft: timeStr,
-				StreakDays:       newStreak,     // Отдаем обновленный стрик в хэндлер
-				StreakUpdated:    streakUpdated, // Отдаем флаг
+				StreakDays:       newStreak,
+				StreakUpdated:    streakUpdated,
 			}, nil
 		}
 	}
 
-	// 4. Крутим рандом (Гача)
+	// 3. Крутим рандом (Гача)
 	rarities, err := s.repo.GetRarities()
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения редкостей: %w", err)
 	}
 
 	// Получаем текущие счетчики юзера
-	userPities, err := s.repo.GetUserPities(userID)
+	userPities, err := s.repo.GetUserPities(internalUserID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения гарантов: %w", err)
 	}
@@ -134,12 +135,11 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 	var rarityName string
 	var isPityHit bool
 
-	// 4.1 ПРОВЕРЯЕМ ГАРАНТЫ (Идем с конца, от самых крутых к обычным)
+	// 3.1 ПРОВЕРЯЕМ ГАРАНТЫ
 	for i := len(rarities) - 1; i >= 0; i-- {
 		rarity := rarities[i]
 		if rarity.PityThreshold > 0 {
 			currentCount := userPities[rarity.ID]
-			// Если счетчик равен порог минус 1 (т.к. эта крутка станет решающей)
 			if currentCount >= rarity.PityThreshold-1 {
 				selectedRarityID = rarity.ID
 				rarityName = rarity.Name
@@ -150,7 +150,7 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		}
 	}
 
-	// 4.2 ЕСЛИ ГАРАНТ НЕ СРАБОТАЛ - крутим обычную рулетку
+	// 3.2 ЕСЛИ ГАРАНТ НЕ СРАБОТАЛ - крутим обычную рулетку
 	if !isPityHit {
 		target := rand.Float64() * 100
 		var currentSum float64
@@ -165,25 +165,22 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		}
 	}
 
-	// 4.3 ОБНОВЛЯЕМ СЧЕТЧИК ГАРАНТОВ ПОСЛЕ ВЫПАДЕНИЯ
+	// 3.3 ОБНОВЛЯЕМ СЧЕТЧИК ГАРАНТОВ ПОСЛЕ ВЫПАДЕНИЯ
 	for _, rarity := range rarities {
 		if rarity.PityThreshold > 0 {
-			// Если выпавшая редкость круче или равна текущей — сбрасываем её гарант
 			if selectedRarityID >= rarity.ID {
 				userPities[rarity.ID] = 0
 			} else {
-				// Иначе (выпал мусор) — увеличиваем счетчик на 1
 				userPities[rarity.ID]++
 			}
 		}
 	}
 
-	// Сохраняем обновленные счетчики в БД
-	if err := s.repo.UpdateUserPities(userID, userPities); err != nil {
+	if err := s.repo.UpdateUserPities(internalUserID, userPities); err != nil {
 		return nil, fmt.Errorf("ошибка сохранения гарантов: %w", err)
 	}
 
-	// 5. Достаем саму карту (как и было)
+	// 4. Достаем саму карту
 	card, err := s.repo.GetRandomCard(selectedRarityID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения карты: %w", err)
@@ -194,19 +191,18 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 	finalReward := selectedRarityReward + bonus
 
 	// 6. Формируем базовый ответ
-	// 6. Формируем базовый ответ
 	result := &RollResult{
 		Card:          card,
 		RarityName:    rarityName,
 		Reward:        finalReward,
-		StreakDays:    newStreak,     // <--- ПЕРЕДАЕМ СТРИК
-		StreakUpdated: streakUpdated, // <--- ПЕРЕДАЕМ ФЛАГ ОБНОВЛЕНИЯ
+		StreakDays:    newStreak,
+		StreakUpdated: streakUpdated,
 	}
 
 	// 7. Логика выдачи (Осколки или Карта)
 	if card.RarityID == 6 {
 		result.IsFragment = true
-		currentFragments, err := s.repo.AddFragment(userID, card.ID)
+		currentFragments, err := s.repo.AddFragment(internalUserID, card.ID)
 		if err != nil {
 			return nil, fmt.Errorf("ошибка добавления осколка: %w", err)
 		}
@@ -214,11 +210,11 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 
 		if currentFragments >= 10 {
 			result.CardAssembled = true
-			_ = s.repo.ClearFragments(userID, card.ID)
-			_ = s.repo.AddCardToInventory(userID, card.ID)
+			_ = s.repo.ClearFragments(internalUserID, card.ID)
+			_ = s.repo.AddCardToInventory(internalUserID, card.ID)
 		}
 	} else {
-		_ = s.repo.AddCardToInventory(userID, card.ID)
+		_ = s.repo.AddCardToInventory(internalUserID, card.ID)
 	}
 
 	// 8. Сохраняем прогресс юзера
@@ -227,8 +223,6 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 
 	if usedPremium {
 		userDb.PremiumRolls--
-		// Если использовали премиум, мы НЕ перезаписываем LastRollTime,
-		// чтобы не сбить таймер бесплатной крутки!
 	} else {
 		userDb.LastRollTime = sql.NullTime{Time: now, Valid: true}
 	}
@@ -242,30 +236,26 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 	return result, nil
 }
 
-func (s *GachaService) GetUserProfile(userID int64) (*models.UserProfile, error) {
-	// 1. Берем данные юзера (баланс, стрик)
-	user, err := s.repo.GetUser(userID)
+func (s *GachaService) GetUserProfile(internalUserID int64) (*models.UserProfile, error) {
+	user, err := s.repo.GetUserByID(internalUserID)
 	if err != nil {
-		// Если юзера нет в базе (еще ни разу не играл), вернем пустой профиль
 		if err == sql.ErrNoRows {
 			return &models.UserProfile{}, nil
 		}
 		return nil, fmt.Errorf("ошибка получения юзера: %w", err)
 	}
 
-	// 2. Берем общее количество карт в игре
 	totalCards, err := s.repo.GetTotalCardsCount()
 	if err != nil {
 		return nil, fmt.Errorf("ошибка подсчета всех карт: %w", err)
 	}
 
-	// 3. Берем количество собранных карт юзера
-	uniqueCards, err := s.repo.GetUserUniqueCardsCount(userID)
+	uniqueCards, err := s.repo.GetUserUniqueCardsCount(internalUserID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка подсчета инвентаря: %w", err)
 	}
 
-	duplicates, _ := s.repo.GetTotalDuplicatesCount(userID)
+	duplicates, _ := s.repo.GetTotalDuplicatesCount(internalUserID)
 
 	return &models.UserProfile{
 		Balance:          user.Balance,
@@ -277,14 +267,12 @@ func (s *GachaService) GetUserProfile(userID int64) (*models.UserProfile, error)
 	}, nil
 }
 
-// Возвращает карточку по индексу и общее количество уникальных карт
-func (s *GachaService) GetUserCardPagination(userID int64, offset int) (*models.UserCardView, int, error) {
-	total, err := s.repo.GetUserUniqueCardsCount(userID)
+func (s *GachaService) GetUserCardPagination(internalUserID int64, offset int) (*models.UserCardView, int, error) {
+	total, err := s.repo.GetUserUniqueCardsCount(internalUserID)
 	if err != nil || total == 0 {
 		return nil, 0, err // Карт нет
 	}
 
-	// Защита от выхода за пределы
 	if offset >= total {
 		offset = total - 1
 	}
@@ -292,7 +280,7 @@ func (s *GachaService) GetUserCardPagination(userID int64, offset int) (*models.
 		offset = 0
 	}
 
-	card, err := s.repo.GetUserCard(userID, offset)
+	card, err := s.repo.GetUserCard(internalUserID, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -300,36 +288,31 @@ func (s *GachaService) GetUserCardPagination(userID int64, offset int) (*models.
 	return card, total, nil
 }
 
-func (s *GachaService) TrackChat(userID int64, chatID int64) {
-	_ = s.repo.TrackUserChat(userID, chatID)
+func (s *GachaService) TrackChat(internalUserID int64, chatID int64) {
+	_ = s.repo.TrackUserChat(internalUserID, chatID)
 }
 
 func (s *GachaService) GetLeaderboard(criteria string, chatID int64) ([]models.LeaderboardEntry, error) {
 	return s.repo.GetLeaderboard(criteria, chatID)
 }
 
-func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
-	// 1. Получаем все дубликаты юзера
-	dupCounts, err := s.repo.GetAvailableCrafts(userID)
+func (s *GachaService) CraftCard(internalUserID int64) (*RollResult, error) {
+	dupCounts, err := s.repo.GetAvailableCrafts(internalUserID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. ПРАЙС-ЛИСТ КРАФТА
-	// Ключ: ID исходной редкости, Значение: сколько дубликатов нужно сжечь
 	craftCosts := map[int]int{
-		1: 5,  // Обычная (1) -> Необычная (2)
-		2: 5,  // Необычная (2) -> Редкая (3)
-		3: 5,  // Редкая (3) -> Эпическая (4)
-		4: 5,  // Эпическая (4) -> Легендарная (5)
-		5: 15, // Легендарная (5) -> Мифическая (6) (ОСКОЛОК) - КАСТОМНАЯ ЦЕНА
+		1: 5,  // Обычная -> Необычная
+		2: 5,  // Необычная -> Редкая
+		3: 5,  // Редкая -> Эпическая
+		4: 5,  // Эпическая -> Легендарная
+		5: 15, // Легендарная -> Мифическая
 	}
 
 	var sourceRarityID int
 	var cost int
 
-	// Ищем, на что хватает дубликатов. Идем от самых дешевых (1) к дорогим (5).
-	// Так игрок сначала будет избавляться от мусора.
 	for rID := 1; rID <= 5; rID++ {
 		required := craftCosts[rID]
 		if count, exists := dupCounts[rID]; exists && count >= required {
@@ -345,12 +328,10 @@ func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
 
 	targetRarityID := sourceRarityID + 1
 
-	// 3. Сжигаем нужное количество дубликатов
-	if err := s.repo.ConsumeDuplicates(userID, sourceRarityID, cost); err != nil {
+	if err := s.repo.ConsumeDuplicates(internalUserID, sourceRarityID, cost); err != nil {
 		return nil, err
 	}
 
-	// 4. Генерируем награду
 	rarities, _ := s.repo.GetRarities()
 	var rarityName string
 	for _, r := range rarities {
@@ -364,24 +345,23 @@ func (s *GachaService) CraftCard(userID int64) (*RollResult, error) {
 		return nil, err
 	}
 
-	// 5. Выдаем карту (или осколки)
 	result := &RollResult{
 		Card:       card,
 		RarityName: rarityName,
-		CraftCost:  cost, // Записываем, сколько потратили
+		CraftCost:  cost,
 	}
 
 	if card.RarityID == 6 {
 		result.IsFragment = true
-		currentFragments, _ := s.repo.AddFragment(userID, card.ID)
+		currentFragments, _ := s.repo.AddFragment(internalUserID, card.ID)
 		result.FragmentsCount = currentFragments
 		if currentFragments >= 10 {
 			result.CardAssembled = true
-			_ = s.repo.ClearFragments(userID, card.ID)
-			_ = s.repo.AddCardToInventory(userID, card.ID)
+			_ = s.repo.ClearFragments(internalUserID, card.ID)
+			_ = s.repo.AddCardToInventory(internalUserID, card.ID)
 		}
 	} else {
-		_ = s.repo.AddCardToInventory(userID, card.ID)
+		_ = s.repo.AddCardToInventory(internalUserID, card.ID)
 	}
 
 	return result, nil

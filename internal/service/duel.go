@@ -43,9 +43,9 @@ func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerNa
 
 	req := &DuelRequest{
 		ID:             duelID,
-		ChallengerID:   challengerID,
+		ChallengerID:   challengerID, // Теперь это ВНУТРЕННИЙ ID
 		ChallengerName: challengerName,
-		TargetID:       targetID,
+		TargetID:       targetID, // Теперь это ВНУТРЕННИЙ ID
 		TargetName:     targetName,
 		Amount:         amount,
 	}
@@ -90,8 +90,9 @@ type DuelResult struct {
 
 func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*DuelResult, error) {
 	// 1. Проверяем балансы
-	userA, errA := s.repo.GetUser(duel.ChallengerID)
-	userB, errB := s.repo.GetUser(duel.TargetID)
+	// ИЗМЕНЕНО: Используем GetUserByID вместо GetUser
+	userA, errA := s.repo.GetUserByID(duel.ChallengerID)
+	userB, errB := s.repo.GetUserByID(duel.TargetID)
 	if errA != nil || errB != nil {
 		return nil, fmt.Errorf("ошибка доступа к данным игроков")
 	}
@@ -100,6 +101,7 @@ func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*DuelResult, error) {
 	}
 
 	// 2. Случайные карты
+	// GetRandomUserCard уже работает по внутреннему user_id из таблицы user_inventory
 	cardA, errA := s.repo.GetRandomUserCard(duel.ChallengerID)
 	cardB, errB := s.repo.GetRandomUserCard(duel.TargetID)
 	if errA != nil || errB != nil {

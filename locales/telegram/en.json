@@ -136,5 +136,8 @@
 
   "streak_started": "🔥 <b>Success! You started a streak</b>\n\n<blockquote>Use /roll daily — the streak grows even on cooldown.\nYou will get bonuses for keeping the streak.</blockquote>\n\nCurrent streak: <b>1 day</b>",
   "streak_continued": "🔥 <b>Success! You continued your streak</b>\n\n<blockquote>Points: <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>+%d</b>\nCurrent streak: <b>%d days</b></blockquote>",
-  "streak_kept_alive": "🔥 <b>Streak saved!</b>\nCurrent streak extended to: <b>%d days</b>"
+  "streak_kept_alive": "🔥 <b>Streak saved!</b>\nCurrent streak extended to: <b>%d days</b>",
+
+  "link_code_msg": "🔗 <b>Discord Account Linking</b>\n\nYour one-time code is: <code>%s</code>\n\n<i>⏳ The code is valid for 5 minutes. Open our Discord bot and send the following command:</i>\n<code>/link %s</code>",
+  "link_already_done": "✅ Your account is already linked to Discord!"
 }
