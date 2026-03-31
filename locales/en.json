@@ -107,7 +107,7 @@
   "suggest_q2": "<b>Question 2/3:</b>\n\nI have a really cool card. If I suggest it, will you 100% add it to the bot?",
   "btn_q2_yes": "✅ Yes, of course",
   "btn_q2_no": "⛔️ No, but the chance is high",
-
+ 
   "suggest_q3": "<b>Question 3/3:</b>\n\nWhat is the preferred aspect ratio for the photo?",
   "btn_q3_43": "4:3 (Horizontal)",
   "btn_q3_34": "3:4 (Vertical)",
@@ -134,7 +134,7 @@
   "lang_changed": "✅ <b>Language successfully changed to English!</b>",
   "lang_changed_toast": "🇬🇧 Language changed!",
 
-  "streak_started": "🔥 <b>Success! You started a fire streak</b>\n\n<blockquote>Use /roll daily — the streak grows even on cooldown.\nYou will get bonuses for keeping the fire alive.</blockquote>\n\nCurrent streak: <b>1 day</b>",
-  "streak_continued": "🔥 <b>Success! You continued your fire streak</b>\n\n<blockquote>Points: <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>+%d</b>\nCurrent streak: <b>%d days</b></blockquote>",
+  "streak_started": "🔥 <b>Success! You started a streak</b>\n\n<blockquote>Use /roll daily — the streak grows even on cooldown.\nYou will get bonuses for keeping the streak.</blockquote>\n\nCurrent streak: <b>1 day</b>",
+  "streak_continued": "🔥 <b>Success! You continued your streak</b>\n\n<blockquote>Points: <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>+%d</b>\nCurrent streak: <b>%d days</b></blockquote>",
   "streak_kept_alive": "🔥 <b>Streak saved!</b>\nCurrent streak extended to: <b>%d days</b>"
 }

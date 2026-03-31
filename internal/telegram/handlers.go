@@ -115,22 +115,25 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 	// ---> НОВАЯ ЛОГИКА СТРИКОВ <---
 	// Если карточка успешно отправилась и стрик обновился именно сейчас
 	if err == nil && result.StreakUpdated {
-		log.Printf("[DEBUG STREAK] Стрик обновился! Текущий день: %d\n", result.StreakDays)
+		//log.Printf("[DEBUG STREAK] Стрик обновился! Текущий день: %d\n", result.StreakDays)
 
 		if result.StreakDays == 1 {
 			// Первый день — пробуем отправить MP4 как гифку (Animation)
-			gif := &tele.Animation{
-				File:    tele.FromURL("https://api.baste.ru/cards/streak.mp4"), // <-- ВСТАВЬ ССЫЛКУ СЮДА
-				Caption: h.loc.T(lang, "streak_started"),
-			}
+			/*			gif := &tele.Animation{
+									File:    tele.FromURL("https://api.baste.ru/cards/streak.mp4"), // <-- ВСТАВЬ ССЫЛКУ СЮДА
+									Caption: h.loc.T(lang, "streak_started"),
+								}
 
-			errGif := ctx.Send(gif, tele.ModeHTML)
-			if errGif != nil {
-				log.Printf("[STREAK ERROR] Ошибка отправки гифки по URL: %v\n", errGif)
-				_ = ctx.Send("🔥 "+h.loc.T(lang, "streak_started"), tele.ModeHTML)
-			} else {
-				//log.Println("[DEBUG STREAK] Гифка успешно отправлена!")
-			}
+						errGif := ctx.Send(gif, tele.ModeHTML)
+						if errGif != nil {
+							log.Printf("[STREAK ERROR] Ошибка отправки гифки по URL: %v\n", errGif)
+							_ = ctx.Send("🔥 "+h.loc.T(lang, "streak_started"), tele.ModeHTML)
+						} else {
+							//log.Println("[DEBUG STREAK] Гифка успешно отправлена!")
+						}*/
+
+			_ = ctx.Send(`<tg-emoji emoji-id="4956499161319998529">🔥</tg-emoji>`, tele.ModeHTML)
+			_ = ctx.Send(h.loc.T(lang, "streak_started"), tele.ModeHTML)
 
 		} else {
 			// Продление стрика (2+ день) — отправляем просто текст
@@ -138,8 +141,6 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 			errMsg := ctx.Send(msg, tele.ModeHTML)
 			if errMsg != nil {
 				log.Printf("[STREAK ERROR] Ошибка отправки текста продления стрика: %v\n", errMsg)
-			} else {
-				//log.Println("[DEBUG STREAK] Текст продления стрика успешно отправлен!")
 			}
 		}
 	}
