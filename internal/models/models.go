@@ -12,11 +12,13 @@ type Card struct {
 	PowerLevel int
 }
 
-type User struct { // Переименовал UserDB в просто User
-	TgID           int64
+type User struct {
+	ID             int64         // Единый внутренний ID бота
+	TelegramID     sql.NullInt64 // Уникальный ID из Telegram
+	DiscordID      sql.NullInt64 // Уникальный ID из Discord
 	Username       string
-	FirstName      string // Новое
-	LastName       string // Новое
+	FirstName      string
+	LastName       string
 	Balance        int
 	StreakDays     int
 	LastRollTime   sql.NullTime

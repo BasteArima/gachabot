@@ -16,45 +16,80 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 	return &PostgresRepo{db: db}
 }
 
-func (r *PostgresRepo) GetUser(tgID int64) (*models.User, error) {
+// 1. Получаем пользователя по Telegram ID
+func (r *PostgresRepo) GetUserByTelegramID(tgID int64) (*models.User, error) {
 	user := &models.User{}
-	// ИСПОЛЬЗУЕМ COALESCE, чтобы если язык не задан, возвращалась пустая строка, а не NULL
-	query := "SELECT tg_id, username, first_name, last_name, balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '') FROM users WHERE tg_id=$1 LIMIT 1"
+	query := `
+		SELECT id, telegram_id, discord_id, username, first_name, last_name, 
+		       balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '') 
+		FROM users WHERE telegram_id=$1 LIMIT 1
+	`
 	err := r.db.QueryRow(query, tgID).Scan(
-		&user.TgID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate,
-		&user.PremiumRolls, &user.LanguageCode,
+		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
 	)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+	return user, err
 }
 
-// НОВЫЙ МЕТОД ДЛЯ СОХРАНЕНИЯ ЯЗЫКА
-func (r *PostgresRepo) SetUserLanguage(tgID int64, username, firstName, lastName, langCode string) error {
+// 2. Умная функция: ищет юзера по ТГ, а если нет — создает и возвращает полный профиль с внутренним ID
+func (r *PostgresRepo) GetOrCreateUserByTelegramID(tgID int64, username, firstName, lastName string) (*models.User, error) {
+	user := &models.User{}
+
+	// Пытаемся вставить, если конфликтует по telegram_id - обновляем ники
+	// RETURNING возвращает нам все поля, включая свежесгенерированный внутренний id!
 	query := `
-        INSERT INTO users (tg_id, username, first_name, last_name, language_code) 
-        VALUES ($1, $2, $3, $4, $5) 
-        ON CONFLICT (tg_id) DO UPDATE SET
-            username = EXCLUDED.username,
-            first_name = EXCLUDED.first_name,
-            last_name = EXCLUDED.last_name,
-            language_code = EXCLUDED.language_code
-    `
-	_, err := r.db.Exec(query, tgID, username, firstName, lastName, langCode)
+		INSERT INTO users (telegram_id, username, first_name, last_name) 
+		VALUES ($1, $2, $3, $4) 
+		ON CONFLICT (telegram_id) DO UPDATE SET
+			username = EXCLUDED.username,
+			first_name = EXCLUDED.first_name,
+			last_name = EXCLUDED.last_name
+		RETURNING id, telegram_id, discord_id, username, first_name, last_name, 
+		          balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '')
+	`
+	err := r.db.QueryRow(query, tgID, username, firstName, lastName).Scan(
+		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+	)
+
+	return user, err
+}
+
+// 3. Сохранение языка теперь привязано к внутреннему ID
+func (r *PostgresRepo) SetUserLanguage(internalID int64, langCode string) error {
+	query := `UPDATE users SET language_code = $1 WHERE id = $2`
+	_, err := r.db.Exec(query, langCode, internalID)
 	return err
 }
 
-func (r *PostgresRepo) CreateUserIfNotExist(tgID int64, username, firstName, lastName string) error {
+// 4. Обновление прогресса теперь ИСКЛЮЧИТЕЛЬНО по внутреннему ID
+func (r *PostgresRepo) UpdateUserAfterRoll(user *models.User) error {
 	query := `
-        INSERT INTO users (tg_id, username, first_name, last_name) VALUES ($1, $2, $3, $4) 
-        ON CONFLICT (tg_id) DO UPDATE SET
-            username = EXCLUDED.username,
-            first_name = EXCLUDED.first_name,
-            last_name = EXCLUDED.last_name
+       UPDATE users 
+       SET balance = $1, 
+           streak_days = $2, 
+           last_roll_time = $3, 
+           last_streak_date = $4,
+           premium_rolls = $5 
+       WHERE id = $6 -- <--- ИСПОЛЬЗУЕМ ВНУТРЕННИЙ ID
     `
-	_, err := r.db.Exec(query, tgID, username, firstName, lastName)
+	_, err := r.db.Exec(query, user.Balance, user.StreakDays, user.LastRollTime, user.LastStreakDate, user.PremiumRolls, user.ID)
+	return err
+}
+
+// 5. Поиск по юзернейму (для дуэлей). Теперь тоже достает внутренний ID
+func (r *PostgresRepo) GetUserByUsername(username string) (*models.User, error) {
+	user := &models.User{}
+	query := "SELECT id, telegram_id, discord_id, balance, streak_days, last_roll_time, last_streak_date FROM users WHERE username ILIKE $1 LIMIT 1"
+	err := r.db.QueryRow(query, username).Scan(
+		&user.ID, &user.TelegramID, &user.DiscordID, &user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate,
+	)
+	return user, err
+}
+
+// 6. Выдача доната из ТГ
+func (r *PostgresRepo) AddPremiumRollsByTelegramID(tgID int64, amount int) error {
+	_, err := r.db.Exec("UPDATE users SET premium_rolls = premium_rolls + $1 WHERE telegram_id = $2", amount, tgID)
 	return err
 }
 
@@ -129,21 +164,6 @@ func (r *PostgresRepo) AddFragment(userID int64, cardID int) (int, error) {
 func (r *PostgresRepo) ClearFragments(userID int64, cardID int) error {
 	query := "DELETE FROM user_fragments WHERE user_id=$1 AND card_id=$2"
 	_, err := r.db.Exec(query, userID, cardID)
-	return err
-}
-
-// UpdateUserAfterRoll сохраняет обновленные данные пользователя одним запросом
-func (r *PostgresRepo) UpdateUserAfterRoll(user *models.User) error {
-	query := `
-		UPDATE users 
-		SET balance = $1, 
-		    streak_days = $2, 
-		    last_roll_time = $3, 
-		    last_streak_date = $4,
-		    premium_rolls = $5 
-		WHERE tg_id = $6
-	`
-	_, err := r.db.Exec(query, user.Balance, user.StreakDays, user.LastRollTime, user.LastStreakDate, user.PremiumRolls, user.TgID)
 	return err
 }
 
@@ -256,9 +276,9 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
           SELECT %s, COUNT(DISTINCT ui.card_id) as val 
           FROM users u 
           %s 
-          JOIN user_inventory ui ON u.tg_id = ui.user_id 
+          JOIN user_inventory ui ON u.id = ui.user_id 
           %s 
-          GROUP BY u.tg_id, u.first_name, u.last_name 
+          GROUP BY u.id, u.first_name, u.last_name 
           ORDER BY val DESC, MIN(u.last_roll_time) ASC LIMIT 10`, nameFormat, joinChat, whereChat)
 	default:
 		return nil, fmt.Errorf("неизвестный критерий топа")
@@ -279,17 +299,6 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 		board = append(board, entry)
 	}
 	return board, nil
-}
-
-// Ищем пользователя по юзернейму (без учета символа @)
-func (r *PostgresRepo) GetUserByUsername(username string) (*models.User, error) {
-	user := &models.User{}
-	// Используем ILIKE для поиска без учета регистра
-	query := "SELECT tg_id, balance, streak_days, last_roll_time, last_streak_date FROM users WHERE username ILIKE $1 LIMIT 1"
-	err := r.db.QueryRow(query, username).Scan(
-		&user.TgID, &user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate,
-	)
-	return user, err
 }
 
 // Достаем одну случайную карту из инвентаря юзера
