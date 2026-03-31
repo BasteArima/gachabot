@@ -12,6 +12,7 @@ import (
 	"time"
 
 	_ "gachabot/internal/i18n"
+
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	tele "gopkg.in/telebot.v3"
@@ -100,6 +101,27 @@ func main() {
 	bot.Handle("\froll_again", h.HandleRollAgainCallback)
 	bot.Handle(tele.OnCheckout, h.HandlePreCheckout)
 	bot.Handle(tele.OnPayment, h.HandlePayment)
+
+	// Предложка карточек
+	bot.Handle("\fsuggest_start", h.HandleSuggestStart)
+	bot.Handle("\fs_q1_yes", h.HandleSuggestQuiz)
+	bot.Handle("\fs_q1_no", h.HandleSuggestQuiz)
+	bot.Handle("\fs_q2_yes", h.HandleSuggestQuiz)
+	bot.Handle("\fs_q2_no", h.HandleSuggestQuiz)
+	bot.Handle("\fs_q3_43", h.HandleSuggestQuiz)
+	bot.Handle("\fs_q3_34", h.HandleSuggestQuiz)
+	bot.Handle("\fs_q3_11", h.HandleSuggestQuiz)
+	bot.Handle("\fs_cancel", h.HandleSuggestCancel)
+	bot.Handle("\fs_close", h.HandleSuggestClose)
+
+	// Перехватчики контента
+	bot.Handle(tele.OnPhoto, h.HandleMediaSuggest)
+	bot.Handle(tele.OnDocument, h.HandleMediaSuggest)
+	bot.Handle(tele.OnText, h.HandleTextFallback) // Защита от дурака
+
+	// Язык
+	bot.Handle("/locale", h.HandleLocale)
+	bot.Handle("\flang_set", h.HandleLanguageSetCallback)
 
 	log.Println("Бот запущен...")
 	bot.Start()

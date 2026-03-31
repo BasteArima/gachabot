@@ -6,8 +6,8 @@ BASE_URL = "https://api.baste.ru/cards"
 # Маппинг: Название папки -> (ID редкости в БД, Базовая сила)
 RARITY_CONFIG = {
     #"Common":    (1, 10),
-    "Uncommon":  (2, 50),
-    #"Rare":     (3, 150),
+    #"Uncommon":  (2, 50),
+    "Rare":     (3, 150),
     #"Epic":  (4, 400),
     #"Legendary": (5, 800),
     #"Mythical": (6, 2000)

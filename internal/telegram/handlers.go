@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gachabot/internal/repository"
@@ -19,19 +20,26 @@ type Handler struct {
 	service     *service.GachaService
 	duelService *service.DuelService
 	loc         *i18n.Localizer
+
+	// Состояния для предложки
+	suggestState map[int64]bool
+	mu           sync.RWMutex
+	adminChatID  int64
 }
 
 func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer) *Handler {
 	return &Handler{
-		repo:        repo,
-		service:     service,
-		duelService: duelService,
-		loc:         loc,
+		repo:         repo,
+		service:      service,
+		duelService:  duelService,
+		loc:          loc,
+		suggestState: make(map[int64]bool),
+		adminChatID:  -5214417967, // ТВОЙ ID ДЛЯ ПОЛУЧЕНИЯ АРТОВ
 	}
 }
 
 func (h *Handler) HandleStart(ctx tele.Context) error {
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	sticker := &tele.Sticker{File: tele.File{FileID: "CAACAgIAAxkBAAMGacUaTK2nsNg77On1KstHV1B6SbMAAj-HAAJOpnFK7SHSkw_YzeE6BA"}}
 
 	menu := &tele.ReplyMarkup{}
@@ -47,7 +55,7 @@ func (h *Handler) HandleStart(ctx tele.Context) error {
 
 func (h *Handler) HandleRoll(ctx tele.Context) error {
 	user := ctx.Sender()
-	lang := user.LanguageCode
+	lang := h.getUserLang(user)
 	h.service.TrackChat(user.ID, ctx.Chat().ID)
 
 	result, err := h.service.RollCard(user.ID, user.Username, user.FirstName, user.LastName)
@@ -58,6 +66,13 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 
 	if result.OnCooldown {
 		msg := h.loc.T(lang, "roll_cooldown", result.CooldownTimeLeft)
+
+		// ---> ДОБАВЛЯЕМ СПАСЕНИЕ СТРИКА <---
+		if result.StreakUpdated {
+			streakMsg := h.loc.T(lang, "streak_kept_alive", result.StreakDays)
+			msg = msg + "\n\n" + streakMsg
+		}
+
 		menu := &tele.ReplyMarkup{}
 		btnBuy := menu.Data(h.loc.T(lang, "btn_buy_rolls"), "shop_rolls_menu")
 		menu.Inline(menu.Row(btnBuy))
@@ -97,6 +112,38 @@ func (h *Handler) HandleRoll(ctx tele.Context) error {
 		return ctx.Send(caption+h.loc.T(lang, "error_image"), tele.ModeHTML)
 	}
 
+	// ---> НОВАЯ ЛОГИКА СТРИКОВ <---
+	// Если карточка успешно отправилась и стрик обновился именно сейчас
+	if err == nil && result.StreakUpdated {
+		log.Printf("[DEBUG STREAK] Стрик обновился! Текущий день: %d\n", result.StreakDays)
+
+		if result.StreakDays == 1 {
+			// Первый день — пробуем отправить MP4 как гифку (Animation)
+			gif := &tele.Animation{
+				File:    tele.FromURL("https://api.baste.ru/cards/streak.mp4"), // <-- ВСТАВЬ ССЫЛКУ СЮДА
+				Caption: h.loc.T(lang, "streak_started"),
+			}
+
+			errGif := ctx.Send(gif, tele.ModeHTML)
+			if errGif != nil {
+				log.Printf("[STREAK ERROR] Ошибка отправки гифки по URL: %v\n", errGif)
+				_ = ctx.Send("🔥 "+h.loc.T(lang, "streak_started"), tele.ModeHTML)
+			} else {
+				//log.Println("[DEBUG STREAK] Гифка успешно отправлена!")
+			}
+
+		} else {
+			// Продление стрика (2+ день) — отправляем просто текст
+			msg := h.loc.T(lang, "streak_continued", result.Reward, result.StreakDays)
+			errMsg := ctx.Send(msg, tele.ModeHTML)
+			if errMsg != nil {
+				log.Printf("[STREAK ERROR] Ошибка отправки текста продления стрика: %v\n", errMsg)
+			} else {
+				//log.Println("[DEBUG STREAK] Текст продления стрика успешно отправлен!")
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -107,7 +154,7 @@ func (h *Handler) HandleRollAgainCallback(ctx tele.Context) error {
 
 func (h *Handler) HandleProfile(ctx tele.Context) error {
 	user := ctx.Sender()
-	lang := user.LanguageCode
+	lang := h.getUserLang(user)
 
 	profile, err := h.service.GetUserProfile(user.ID)
 	if err != nil {
@@ -132,6 +179,9 @@ func (h *Handler) HandleProfile(ctx tele.Context) error {
 	btnAddGroup := menu.URL(h.loc.T(lang, "btn_add_group_bot"), "https://t.me/HentaiCard_bot?startgroup=true")
 	rows = append(rows, menu.Row(btnAddGroup))
 
+	btnSuggest := menu.Data(h.loc.T(lang, "btn_profile_suggest"), "suggest_start")
+	rows = append(rows, menu.Row(btnSuggest))
+
 	menu.Inline(rows...)
 
 	if err == nil && len(photos) > 0 {
@@ -148,7 +198,7 @@ func (h *Handler) HandleProfile(ctx tele.Context) error {
 func (h *Handler) HandleCardsNav(ctx tele.Context) error {
 	_ = ctx.Respond()
 	user := ctx.Sender()
-	lang := user.LanguageCode
+	lang := h.getUserLang(user)
 
 	offsetStr := ctx.Callback().Data
 	offset, _ := strconv.Atoi(offsetStr)
@@ -260,7 +310,7 @@ func (h *Handler) buildTopMessage(criteria string, scope string, chatID int64, l
 }
 
 func (h *Handler) HandleLocalTop(ctx tele.Context) error {
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	h.service.TrackChat(ctx.Sender().ID, ctx.Chat().ID)
 
 	if ctx.Chat().Type == tele.ChatPrivate {
@@ -278,7 +328,7 @@ func (h *Handler) HandleLocalTop(ctx tele.Context) error {
 }
 
 func (h *Handler) HandleGlobalTop(ctx tele.Context) error {
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	h.service.TrackChat(ctx.Sender().ID, ctx.Chat().ID)
 
 	text, menu, err := h.buildTopMessage("balance", "global", ctx.Chat().ID, lang)
@@ -290,7 +340,7 @@ func (h *Handler) HandleGlobalTop(ctx tele.Context) error {
 
 func (h *Handler) HandleTopCallback(ctx tele.Context) error {
 	_ = ctx.Respond()
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 
 	data := strings.Split(ctx.Callback().Data, "|")
 	if len(data) != 2 {
@@ -323,12 +373,23 @@ func (h *Handler) buildHelpMessage(section string, lang string) (string, *tele.R
 	btnPity := menu.Data(h.loc.T(lang, "btn_help_pity"), "help_nav", "pity")
 	btnDuel := menu.Data(h.loc.T(lang, "btn_help_duel"), "help_nav", "duel")
 	btnCraft := menu.Data(h.loc.T(lang, "btn_help_craft"), "help_nav", "craft")
+	btnLang := menu.Data(h.loc.T(lang, "btn_help_lang"), "help_nav", "language") // <--- НОВАЯ КНОПКА
 
 	if section == "main" {
 		menu.Inline(
 			menu.Row(btnCards, btnRarities),
 			menu.Row(btnStreaks, btnPity),
 			menu.Row(btnDuel, btnCraft),
+			menu.Row(btnLang), // <--- ДОБАВЛЕНО
+		)
+	} else if section == "language" {
+		// ОСОБАЯ СТРАНИЦА ДЛЯ ВЫБОРА ЯЗЫКА
+		btnRu := menu.Data("🇷🇺 Русский", "lang_set", "ru")
+		btnEn := menu.Data("🇬🇧 English", "lang_set", "en")
+
+		menu.Inline(
+			menu.Row(btnRu, btnEn),
+			menu.Row(btnMain),
 		)
 	} else {
 		menu.Inline(
@@ -340,12 +401,8 @@ func (h *Handler) buildHelpMessage(section string, lang string) (string, *tele.R
 	}
 
 	key := "help_" + section
-
-	// Пытаемся получить перевод
 	text := h.loc.T(lang, key)
 
-	// Наш локализатор возвращает сам ключ, если перевод не найден.
-	// Так мы можем понять, что раздела не существует.
 	if text == key {
 		text = h.loc.T(lang, "err_help_not_found")
 	}
@@ -354,14 +411,14 @@ func (h *Handler) buildHelpMessage(section string, lang string) (string, *tele.R
 }
 
 func (h *Handler) HandleHelp(ctx tele.Context) error {
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	text, menu := h.buildHelpMessage("main", lang)
 	return ctx.Send(text, tele.ModeHTML, menu)
 }
 
 func (h *Handler) HandleHelpCallback(ctx tele.Context) error {
 	_ = ctx.Respond()
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 
 	section := ctx.Callback().Data
 	text, menu := h.buildHelpMessage(section, lang)
@@ -377,7 +434,7 @@ func (h *Handler) HandleHelpCallback(ctx tele.Context) error {
 }
 
 func (h *Handler) HandleDuel(ctx tele.Context) error {
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 
 	if ctx.Chat().Type == tele.ChatPrivate {
 		return ctx.Send(h.loc.T(lang, "err_duel_private"))
@@ -425,7 +482,7 @@ func (h *Handler) HandleDuel(ctx tele.Context) error {
 func (h *Handler) HandleDuelCallback(ctx tele.Context) error {
 	duelID := ctx.Callback().Data
 	callbackUnique := strings.TrimPrefix(ctx.Callback().Unique, "\f")
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 
 	duel, exists := h.duelService.GetDuel(duelID)
 	if !exists {
@@ -469,7 +526,7 @@ func (h *Handler) HandleDuelCallback(ctx tele.Context) error {
 
 func (h *Handler) HandleCraft(ctx tele.Context) error {
 	user := ctx.Sender()
-	lang := user.LanguageCode
+	lang := h.getUserLang(user)
 
 	result, err := h.service.CraftCard(user.ID)
 	if err != nil {
@@ -514,21 +571,21 @@ func (h *Handler) buildShopMenu(lang string) (string, *tele.ReplyMarkup) {
 }
 
 func (h *Handler) HandleDonate(ctx tele.Context) error {
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	text, menu := h.buildShopMenu(lang)
 	return ctx.Send(text, tele.ModeHTML, menu)
 }
 
 func (h *Handler) HandleShopMenu(ctx tele.Context) error {
 	_ = ctx.Respond()
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	text, menu := h.buildShopMenu(lang)
 	return ctx.Edit(text, tele.ModeHTML, menu)
 }
 
 func (h *Handler) HandleSendInvoice(ctx tele.Context) error {
 	_ = ctx.Respond()
-	lang := ctx.Sender().LanguageCode
+	lang := h.getUserLang(ctx.Sender())
 	packageType := ctx.Callback().Data
 
 	var title, description, payload string
@@ -582,7 +639,7 @@ func (h *Handler) HandlePreCheckout(ctx tele.Context) error {
 func (h *Handler) HandlePayment(ctx tele.Context) error {
 	payment := ctx.Message().Payment
 	user := ctx.Sender()
-	lang := user.LanguageCode
+	lang := h.getUserLang(user)
 
 	var rollsToAdd int
 	var isEpicFragment bool
@@ -638,4 +695,233 @@ func (h *Handler) HandlePayment(ctx tele.Context) error {
 
 	successMsg := h.loc.T(lang, "payment_success", rollsToAdd, bonusText)
 	return ctx.Send(successMsg, tele.ModeHTML)
+}
+
+// Вспомогательные методы для безопасной работы с состоянием
+func (h *Handler) setSuggestState(userID int64, state bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if state {
+		h.suggestState[userID] = true
+	} else {
+		delete(h.suggestState, userID)
+	}
+}
+
+func (h *Handler) isSuggesting(userID int64) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.suggestState[userID]
+}
+
+// --- ПРЕДЛОЖКА КАРТОЧЕК ---
+
+func (h *Handler) HandleSuggestStart(ctx tele.Context) error {
+	user := ctx.Sender()
+	lang := h.getUserLang(user)
+
+	// Проверяем баланс
+	profile, err := h.service.GetUserProfile(user.ID)
+	if err != nil || profile.Balance < 1000 {
+		return ctx.Respond(&tele.CallbackResponse{Text: h.loc.T(lang, "suggest_err_funds")})
+	}
+
+	_ = ctx.Respond()
+
+	// Отправляем справку и первый вопрос
+	rules := h.loc.T(lang, "suggest_rules")
+	q1 := h.loc.T(lang, "suggest_q1")
+	text := rules + "\n\n" + q1
+
+	menu := &tele.ReplyMarkup{}
+	btnYes := menu.Data(h.loc.T(lang, "btn_q1_yes"), "s_q1_yes")
+	btnNo := menu.Data(h.loc.T(lang, "btn_q1_no"), "s_q1_no")
+	menu.Inline(menu.Row(btnYes), menu.Row(btnNo))
+
+	// Просто отправляем новое сообщение (Профиль остается нетронутым)
+	return ctx.Send(text, tele.ModeHTML, menu)
+}
+
+// Обработка ответов теста
+// Обработка ответов теста
+func (h *Handler) HandleSuggestQuiz(ctx tele.Context) error {
+	_ = ctx.Respond()
+	lang := h.getUserLang(ctx.Sender())
+
+	// ---> ИСПРАВЛЕНИЕ ЗДЕСЬ <---
+	// Достаем ID кнопки из Unique и убираем \f
+	data := strings.TrimPrefix(ctx.Callback().Unique, "\f")
+
+	menu := &tele.ReplyMarkup{}
+	rules := h.loc.T(lang, "suggest_rules")
+
+	// Логика прохождения
+	switch data {
+	case "s_q1_yes", "s_q2_yes", "s_q3_43", "s_q3_11":
+		// НЕПРАВИЛЬНЫЕ ОТВЕТЫ
+		text := rules + "\n\n" + h.loc.T(lang, "suggest_fail")
+
+		// Вместо "В профиль" делаем кнопку закрытия этого сообщения
+		btnClose := menu.Data("❌ Закрыть", "s_close")
+		menu.Inline(menu.Row(btnClose))
+		return ctx.Edit(text, tele.ModeHTML, menu)
+
+	case "s_q1_no":
+		// ПРАВИЛЬНО 1 -> Идем к 2
+		text := rules + "\n\n" + h.loc.T(lang, "suggest_q2")
+		btnYes := menu.Data(h.loc.T(lang, "btn_q2_yes"), "s_q2_yes")
+		btnNo := menu.Data(h.loc.T(lang, "btn_q2_no"), "s_q2_no")
+		menu.Inline(menu.Row(btnYes), menu.Row(btnNo))
+		return ctx.Edit(text, tele.ModeHTML, menu)
+
+	case "s_q2_no":
+		// ПРАВИЛЬНО 2 -> Идем к 3
+		text := rules + "\n\n" + h.loc.T(lang, "suggest_q3")
+		btn43 := menu.Data(h.loc.T(lang, "btn_q3_43"), "s_q3_43")
+		btn34 := menu.Data(h.loc.T(lang, "btn_q3_34"), "s_q3_34")
+		btn11 := menu.Data(h.loc.T(lang, "btn_q3_11"), "s_q3_11")
+		menu.Inline(menu.Row(btn43), menu.Row(btn34), menu.Row(btn11))
+		return ctx.Edit(text, tele.ModeHTML, menu)
+
+	case "s_q3_34":
+		// ПРАВИЛЬНО 3 -> ФИНАЛ. Включаем ожидание картинки.
+		h.setSuggestState(ctx.Sender().ID, true)
+
+		text := h.loc.T(lang, "suggest_success")
+		btnCancel := menu.Data(h.loc.T(lang, "btn_suggest_cancel"), "s_cancel")
+		menu.Inline(menu.Row(btnCancel))
+		return ctx.Edit(text, tele.ModeHTML, menu)
+	}
+
+	return nil
+}
+
+// Отмена предложки
+func (h *Handler) HandleSuggestCancel(ctx tele.Context) error {
+	_ = ctx.Respond()
+	h.setSuggestState(ctx.Sender().ID, false)
+	return ctx.Edit(h.loc.T(ctx.Sender().LanguageCode, "suggest_cancelled"), tele.ModeHTML)
+}
+
+// Перехват медиафайлов (Фото или Документ)
+func (h *Handler) HandleMediaSuggest(ctx tele.Context) error {
+	user := ctx.Sender()
+	lang := h.getUserLang(user)
+
+	// Если мы не ждем от него предложку — просто игнорируем медиа
+	if !h.isSuggesting(user.ID) {
+		return nil
+	}
+
+	caption := ctx.Message().Caption
+	if caption == "" {
+		// Оставил пустое поле подписи
+		return ctx.Send(h.loc.T(lang, "suggest_err_no_caption"), tele.ModeHTML)
+	}
+
+	// Еще раз проверяем баланс перед списанием
+	dbUser, err := h.repo.GetUser(user.ID)
+	if err != nil || dbUser.Balance < 1000 {
+		h.setSuggestState(user.ID, false)
+		return ctx.Send(h.loc.T(lang, "suggest_err_funds"))
+	}
+
+	// 1. Снимаем 1000 очков
+	dbUser.Balance -= 1000
+	_ = h.repo.UpdateUserAfterRoll(dbUser) // Сохраняем в БД
+
+	// 2. Формируем сообщение для Админа
+	adminMsg := fmt.Sprintf("📩 <b>Новая предложка!</b>\nОт: @%s (ID: %d)\n\nОписание юзера:\n<i>%s</i>",
+		user.Username, user.ID, caption)
+
+	// Пересылаем в чат админа ТОЧНО В ТОМ ФОРМАТЕ, в котором прислал юзер
+	adminChat := &tele.Chat{ID: h.adminChatID}
+
+	if ctx.Message().Photo != nil {
+		photo := ctx.Message().Photo
+		photo.Caption = adminMsg
+		_, _ = ctx.Bot().Send(adminChat, photo, tele.ModeHTML)
+	} else if ctx.Message().Document != nil {
+		doc := ctx.Message().Document
+		doc.Caption = adminMsg
+		_, _ = ctx.Bot().Send(adminChat, doc, tele.ModeHTML)
+	}
+
+	// 3. Завершаем процесс
+	h.setSuggestState(user.ID, false)
+	return ctx.Send(h.loc.T(lang, "suggest_done"), tele.ModeHTML)
+}
+
+// Перехват обычного текста (защита от дурака)
+func (h *Handler) HandleTextFallback(ctx tele.Context) error {
+	// Если юзер в режиме предложки, но прислал просто текст без картинки
+	if h.isSuggesting(ctx.Sender().ID) {
+		return ctx.Send("⚠️ Я жду от тебя **Фотографию** или **Файл**, а не просто текст!\n\nЕсли передумал, нажми кнопку отмены в предыдущем сообщении.", tele.ModeMarkdown)
+	}
+	return nil
+}
+
+// Просто удаляет сообщение с тестом, если юзер нажал "Закрыть"
+func (h *Handler) HandleSuggestClose(ctx tele.Context) error {
+	_ = ctx.Respond()
+	return ctx.Delete()
+}
+
+// --- ЛОКАЛИЗАЦИЯ И НАСТРОЙКИ ---
+
+// Вспомогательная функция для получения актуального языка
+func (h *Handler) getUserLang(u *tele.User) string {
+	// Сначала проверяем БД
+	dbUser, err := h.repo.GetUser(u.ID)
+	if err == nil && dbUser.LanguageCode != "" {
+		return dbUser.LanguageCode
+	}
+	// Если в БД нет, берем язык из профиля Телеграм
+	if u.LanguageCode == "ru" || u.LanguageCode == "en" {
+		return u.LanguageCode
+	}
+	// Запасной вариант по умолчанию
+	return "en"
+}
+
+// Обработчик команды /locale [язык]
+func (h *Handler) HandleLocale(ctx tele.Context) error {
+	u := ctx.Sender()
+	args := ctx.Args()
+
+	// Если написали просто /locale без аргументов — кидаем инлайн-меню из Help
+	if len(args) == 0 {
+		lang := h.getUserLang(u)
+		text, menu := h.buildHelpMessage("language", lang)
+		return ctx.Send(text, tele.ModeHTML, menu)
+	}
+
+	input := strings.ToLower(args[0])
+	var targetLang string
+
+	// Поддержка всех возможных вариантов ввода
+	switch input {
+	case "ru", "rus", "russian", "рус", "русский":
+		targetLang = "ru"
+	case "en", "eng", "english", "англ", "английский":
+		targetLang = "en"
+	default:
+		return ctx.Send("❌ Неизвестный язык / Unknown language. Используйте 'ru' или 'en'.")
+	}
+
+	h.repo.SetUserLanguage(u.ID, u.Username, u.FirstName, u.LastName, targetLang)
+	return ctx.Send(h.loc.T(targetLang, "lang_changed"), tele.ModeHTML)
+}
+
+// Обработчик нажатия на инлайн-кнопки языка в меню Help
+func (h *Handler) HandleLanguageSetCallback(ctx tele.Context) error {
+	u := ctx.Sender()
+	targetLang := ctx.Callback().Data // получим "ru" или "en"
+
+	h.repo.SetUserLanguage(u.ID, u.Username, u.FirstName, u.LastName, targetLang)
+	_ = ctx.Respond(&tele.CallbackResponse{Text: h.loc.T(targetLang, "lang_changed_toast")})
+
+	// Перерисовываем меню уже на НОВОМ языке
+	text, menu := h.buildHelpMessage("language", targetLang)
+	return ctx.Edit(text, tele.ModeHTML, menu)
 }

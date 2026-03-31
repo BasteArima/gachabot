@@ -18,17 +18,32 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 
 func (r *PostgresRepo) GetUser(tgID int64) (*models.User, error) {
 	user := &models.User{}
-	// ДОБАВЛЕН premium_rolls В SELECT
-	query := "SELECT tg_id, username, first_name, last_name, balance, streak_days, last_roll_time, last_streak_date, premium_rolls FROM users WHERE tg_id=$1 LIMIT 1"
+	// ИСПОЛЬЗУЕМ COALESCE, чтобы если язык не задан, возвращалась пустая строка, а не NULL
+	query := "SELECT tg_id, username, first_name, last_name, balance, streak_days, last_roll_time, last_streak_date, premium_rolls, COALESCE(language_code, '') FROM users WHERE tg_id=$1 LIMIT 1"
 	err := r.db.QueryRow(query, tgID).Scan(
 		&user.TgID, &user.Username, &user.FirstName, &user.LastName,
 		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate,
-		&user.PremiumRolls, // <--- ДОБАВЛЕНО
+		&user.PremiumRolls, &user.LanguageCode,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+// НОВЫЙ МЕТОД ДЛЯ СОХРАНЕНИЯ ЯЗЫКА
+func (r *PostgresRepo) SetUserLanguage(tgID int64, username, firstName, lastName, langCode string) error {
+	query := `
+        INSERT INTO users (tg_id, username, first_name, last_name, language_code) 
+        VALUES ($1, $2, $3, $4, $5) 
+        ON CONFLICT (tg_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            language_code = EXCLUDED.language_code
+    `
+	_, err := r.db.Exec(query, tgID, username, firstName, lastName, langCode)
+	return err
 }
 
 func (r *PostgresRepo) CreateUserIfNotExist(tgID int64, username, firstName, lastName string) error {

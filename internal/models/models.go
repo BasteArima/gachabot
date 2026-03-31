@@ -22,6 +22,7 @@ type User struct { // Переименовал UserDB в просто User
 	LastRollTime   sql.NullTime
 	LastStreakDate sql.NullTime
 	PremiumRolls   int
+	LanguageCode   string
 }
 
 type Rarity struct {

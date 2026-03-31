@@ -27,7 +27,8 @@ CREATE TABLE users (
                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                        first_name TEXT,
                        last_name TEXT,
-                       premium_rolls INTEGER NOT NULL DEFAULT 0 -- Добавлено для доната
+                       premium_rolls INTEGER NOT NULL DEFAULT 0, -- Добавлено для доната
+                       language_code VARCHAR(10) DEFAULT '',
 );
 
 -- 4. Таблица Инвентаря (Связь Игроков и Карточек)

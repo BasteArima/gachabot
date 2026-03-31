@@ -11,7 +11,7 @@ import (
 	"gachabot/internal/repository"
 )
 
-const adminId int64 = 348389728
+const adminId int64 = 1
 
 type GachaService struct {
 	repo *repository.PostgresRepo
@@ -35,6 +35,9 @@ type RollResult struct {
 	CardAssembled  bool
 
 	CraftCost int
+
+	StreakDays    int
+	StreakUpdated bool
 }
 
 // RollCard делает всю "грязную работу"
@@ -49,17 +52,53 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 		return nil, fmt.Errorf("ошибка получения юзера: %w", err)
 	}
 
-	// 2. Проверка кулдауна и использования Premium крутки
+	// 2. СЧИТАЕМ СТРИК ДО ПРОВЕРКИ КУЛДАУНА
+	loc := time.FixedZone("MSK", 3*60*60)
+	now := time.Now().In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	newStreak := userDb.StreakDays
+	streakUpdated := false
+
+	if userDb.LastStreakDate.Valid {
+		dbDate := userDb.LastStreakDate.Time
+		lastDate := time.Date(dbDate.Year(), dbDate.Month(), dbDate.Day(), 0, 0, 0, 0, loc)
+		hoursDiff := today.Sub(lastDate).Hours()
+
+		if hoursDiff == 24 { // Если разница ровно 1 сутки
+			newStreak++
+			streakUpdated = true
+		} else if hoursDiff > 24 { // Если прошло больше 1 суток
+			newStreak = 1
+			streakUpdated = true
+		}
+	} else {
+		newStreak = 1
+		streakUpdated = true
+	}
+
+	// Если стрик обновился, сразу фиксируем его в объекте
+	if streakUpdated {
+		userDb.StreakDays = newStreak
+		userDb.LastStreakDate = sql.NullTime{Time: today, Valid: true}
+	}
+
+	// 3. Проверка кулдауна и использования Premium крутки
 	usedPremium := false
 
 	if userDb.PremiumRolls > 0 {
 		usedPremium = true
 	} else if userDb.LastRollTime.Valid {
-		// Обычная логика кулдауна, если нет премиум-круток
 		timePassed := time.Since(userDb.LastRollTime.Time)
 		cooldown := 3 * time.Hour
 
 		if timePassed < cooldown && userID != adminId {
+			// !!! МЫ В ОТКАТЕ !!!
+			// Но если стрик сегодня обновился, обязательно сохраняем его в базу!
+			if streakUpdated {
+				_ = s.repo.UpdateUserAfterRoll(userDb)
+			}
+
 			timeLeft := cooldown - timePassed
 			hours := int(timeLeft.Hours())
 			minutes := int(timeLeft.Minutes()) % 60
@@ -70,35 +109,13 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 			} else {
 				timeStr = fmt.Sprintf("%dм", minutes)
 			}
-			return &RollResult{OnCooldown: true, CooldownTimeLeft: timeStr}, nil
+			return &RollResult{
+				OnCooldown:       true,
+				CooldownTimeLeft: timeStr,
+				StreakDays:       newStreak,     // Отдаем обновленный стрик в хэндлер
+				StreakUpdated:    streakUpdated, // Отдаем флаг
+			}, nil
 		}
-	}
-
-	// 3. Считаем стрик (ЖЕСТКАЯ ПРИВЯЗКА К МОСКВЕ)
-	// Создаем зону UTC+3 (3 часа * 60 минут * 60 секунд)
-	loc := time.FixedZone("MSK", 3*60*60)
-	now := time.Now().In(loc) // Текущее время по Москве
-
-	// Начало "сегодняшнего" дня по Москве (00:00:00)
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
-	newStreak := userDb.StreakDays
-
-	if userDb.LastStreakDate.Valid {
-		dbDate := userDb.LastStreakDate.Time
-
-		// Собираем вчерашнюю дату из БД в том же самом московском поясе
-		lastDate := time.Date(dbDate.Year(), dbDate.Month(), dbDate.Day(), 0, 0, 0, 0, loc)
-
-		// Считаем разницу
-		hoursDiff := today.Sub(lastDate).Hours()
-
-		if hoursDiff == 24 { // Если разница ровно 1 сутки
-			newStreak++
-		} else if hoursDiff > 24 { // Если прошло больше 1 суток
-			newStreak = 1
-		}
-	} else {
-		newStreak = 1
 	}
 
 	// 4. Крутим рандом (Гача)
@@ -177,10 +194,13 @@ func (s *GachaService) RollCard(userID int64, username, firstName, lastName stri
 	finalReward := selectedRarityReward + bonus
 
 	// 6. Формируем базовый ответ
+	// 6. Формируем базовый ответ
 	result := &RollResult{
-		Card:       card,
-		RarityName: rarityName,
-		Reward:     finalReward,
+		Card:          card,
+		RarityName:    rarityName,
+		Reward:        finalReward,
+		StreakDays:    newStreak,     // <--- ПЕРЕДАЕМ СТРИК
+		StreakUpdated: streakUpdated, // <--- ПЕРЕДАЕМ ФЛАГ ОБНОВЛЕНИЯ
 	}
 
 	// 7. Логика выдачи (Осколки или Карта)

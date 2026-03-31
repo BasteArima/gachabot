@@ -14,11 +14,11 @@ OUT_DIR = os.path.join(BASE_DIR, 'out')
 # ВНИМАНИЕ: Проверь, чтобы названия в этом списке В ТОЧНОСТИ (включая регистр) 
 # совпадали с названиями твоих папок в raw_art
 RARITIES = [
-    "Common", 
-    "Uncommon", 
+    #"Common", 
+    #"Uncommon", 
     "Rare", 
-    "Epic", 
-    "Legendary",
+    #"Epic", 
+    #"Legendary",
     #"Mythical"
     ]
 
