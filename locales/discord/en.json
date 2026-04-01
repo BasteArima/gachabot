@@ -52,9 +52,6 @@
   "duel_ds_defender": "Defender: %s",
   "duel_ds_stats": "💪 Power: **%d**\n📈 Chance: **%.1f%%**",
 
-  "link_err_invalid": "❌ Invalid or expired link code.",
-  "link_success": "✅ Telegram and Discord successfully linked!",
-
   "suggest_err_funds": "You need >1000 points to suggest a card!",
   "suggest_rules": "> **Suggestion info:**\n> 💰 Service costs **1 000 points**.\n> 🔄 Propose new art or replacements.\n> ⛔️ Spamming leads to ban.\n> 👌 Recommended format **3:4** (vertical).",
   "suggest_q1": "**Question 1/3:**\nI want to send a funny photo of my classmate, is that ok?",
@@ -90,5 +87,16 @@
   "lang_changed": "✅ **Language successfully changed to English!**",
 
   "suggest_err_no_photo": "⚠️ I need a **Photo**, not just text! Click cancel if you changed your mind.",
-  "suggest_err_no_caption": "⚠️ **You forgot the description!** Please send the photo again and include the card name and rarity."
+  "suggest_err_no_caption": "⚠️ **You forgot the description!** Please send the photo again and include the card name and rarity.",
+
+  "link_err_invalid": "❌ Invalid or expired link code.",
+  "link_err_expired": "❌ Link session expired. Enter the code again.",
+  "link_choice_msg": "🔍 **Data found on both accounts!**\n\n📱 **Telegram:** %d 🪙 | Cards: %d\n🎮 **Discord:** %d 🪙 | Cards: %d\n\n⚠️ **Warning:** You cannot merge inventories. Choose which account you want to KEEP. The other will be **DELETED**.",
+  "link_keep_tg": "📱 Keep Telegram",
+  "link_keep_ds": "🎮 Keep Discord",
+  "link_warn_tg": "🚨 **WARNING!**\nYou chose to keep Telegram. Your **Discord** inventory and balance will be permanently deleted. Are you sure?",
+  "link_warn_ds": "🚨 **WARNING!**\nYou chose to keep Discord. Your **Telegram** inventory and balance will be permanently deleted. Are you sure?",
+  "btn_yes_im_sure": "Yes, I'm sure! (Delete)",
+  "link_cancelled": "🛑 Linking cancelled. Your data is safe.",
+  "link_success": "✅ Accounts successfully linked! Selected inventory saved."
 }

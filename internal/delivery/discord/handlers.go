@@ -32,6 +32,9 @@ type Handler struct {
 
 	// НОВОЕ ПОЛЕ: Функция для отправки в админ-чат
 	NotifyAdmin func(text string, imageURL string)
+
+	linkMu       sync.Mutex
+	pendingLinks map[int64]int64 // Сохраняем сессии: [Discord ID] -> [Telegram ID]
 }
 
 func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) *Handler {
@@ -43,6 +46,7 @@ func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, du
 		lp:           lp,
 		suggestState: make(map[int64]bool),
 		NotifyAdmin:  notifyAdmin, // Сохраняем колбэк
+		pendingLinks: make(map[int64]int64),
 	}
 }
 
@@ -380,6 +384,76 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 			},
 		})
 	}
+
+	// 8. ПРИВЯЗКА АККАУНТОВ (ВЫБОР И ПОДТВЕРЖДЕНИЕ)
+	if strings.HasPrefix(data.CustomID, "link:") {
+		parts := strings.Split(data.CustomID, ":")
+		action := parts[1] // "keep", "confirm" или "cancel"
+		target := ""
+		if len(parts) > 2 {
+			target = parts[2] // "tg" или "ds"
+		}
+
+		h.linkMu.Lock()
+		tgInternalID, exists := h.pendingLinks[dbUser.ID]
+		h.linkMu.Unlock()
+
+		if !exists && action != "cancel" {
+			h.respondEphemeral(s, i, h.loc.T(lang, "link_err_expired"))
+			return
+		}
+
+		switch action {
+		case "cancel":
+			h.linkMu.Lock()
+			delete(h.pendingLinks, dbUser.ID)
+			h.linkMu.Unlock()
+			h.updateWithComponents(s, i, h.loc.T(lang, "link_cancelled"), nil)
+
+		case "keep":
+			// Выдаем финальное предупреждение
+			var msg string
+			if target == "tg" {
+				msg = h.loc.T(lang, "link_warn_tg")
+			} else {
+				msg = h.loc.T(lang, "link_warn_ds")
+			}
+
+			buttons := []discordgo.MessageComponent{discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{Label: h.loc.T(lang, "btn_yes_im_sure"), Style: discordgo.DangerButton, CustomID: "link:confirm:" + target},
+					discordgo.Button{Label: h.loc.T(lang, "btn_cancel"), Style: discordgo.SecondaryButton, CustomID: "link:cancel"},
+				},
+			}}
+			h.updateWithComponents(s, i, msg, buttons)
+
+		case "confirm":
+			// Выполняем объединение
+			var keepID, deleteID int64
+			if target == "tg" {
+				keepID = tgInternalID
+				deleteID = dbUser.ID
+			} else {
+				keepID = dbUser.ID
+				deleteID = tgInternalID
+			}
+
+			err := h.repo.LinkAccountsOverwrite(keepID, deleteID)
+			if err != nil {
+				log.Printf("[DISCORD LINK ERROR]: %v", err) // <--- ВОТ ЭТО ДОБАВЬ, чтобы видеть ошибку в терминале
+				h.updateWithComponents(s, i, h.loc.T(lang, "error_db"), nil)
+				return
+			}
+
+			// Очищаем сессию
+			h.linkMu.Lock()
+			delete(h.pendingLinks, dbUser.ID)
+			h.linkMu.Unlock()
+
+			h.updateWithComponents(s, i, h.loc.T(lang, "link_success"), nil)
+		}
+		return
+	}
 }
 
 func (h *Handler) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
@@ -528,14 +602,30 @@ func (h *Handler) handleLink(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
-	err := h.repo.MergeAccounts(tgInternalID, dsUser.ID)
-	if err != nil {
-		log.Printf("[MERGE ERROR]: %v", err)
+	// Получаем профили обоих аккаунтов, чтобы показать статистику
+	tgProfile, err1 := h.service.GetUserProfile(tgInternalID)
+	dsProfile, err2 := h.service.GetUserProfile(dsUser.ID)
+	if err1 != nil || err2 != nil {
 		h.respond(s, i, h.loc.T(lang, "error_db"))
 		return
 	}
 
-	h.respond(s, i, h.loc.T(lang, "link_success"))
+	// Сохраняем сессию привязки
+	h.linkMu.Lock()
+	h.pendingLinks[dsUser.ID] = tgInternalID
+	h.linkMu.Unlock()
+
+	msg := h.loc.T(lang, "link_choice_msg", tgProfile.Balance, tgProfile.UniqueCardsCount, dsProfile.Balance, dsProfile.UniqueCardsCount)
+
+	buttons := []discordgo.MessageComponent{discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{
+			discordgo.Button{Label: h.loc.T(lang, "link_keep_tg"), Style: discordgo.PrimaryButton, CustomID: "link:keep:tg"},
+			discordgo.Button{Label: h.loc.T(lang, "link_keep_ds"), Style: discordgo.PrimaryButton, CustomID: "link:keep:ds"},
+			discordgo.Button{Label: h.loc.T(lang, "btn_cancel"), Style: discordgo.DangerButton, CustomID: "link:cancel"},
+		},
+	}}
+
+	h.respondWithComponents(s, i, msg, buttons)
 }
 
 func (h *Handler) handleTop(s *discordgo.Session, i *discordgo.InteractionCreate, lang, criteria string, global bool) {
