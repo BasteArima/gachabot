@@ -16,8 +16,8 @@ OUT_DIR = os.path.join(BASE_DIR, 'out')
 RARITIES = [
     #"Common", 
     #"Uncommon", 
-    "Rare", 
-    #"Epic", 
+    #"Rare", 
+    "Epic", 
     #"Legendary",
     #"Mythical"
     ]
