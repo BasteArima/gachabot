@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"gachabot/internal/i18n"
@@ -9,12 +10,12 @@ import (
 	"math/rand/v2"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"gachabot/internal/repository"
 	"gachabot/internal/service"
 
+	"github.com/redis/go-redis/v9"
 	tele "gopkg.in/telebot.v3"
 )
 
@@ -27,22 +28,18 @@ type Handler struct {
 	// Состояния для предложки
 	suggestState map[int64]bool
 
-	// НОВОЕ: Хранилище кодов для привязки (Код -> Внутренний ID юзера)
-	linkCodes map[string]int64
-
-	mu          sync.RWMutex
+	rdb         *redis.Client
 	adminChatID int64
 }
 
-func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer) *Handler {
+func NewHandler(repo *repository.PostgresRepo, rdb *redis.Client, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer) *Handler {
 	return &Handler{
-		repo:         repo,
-		service:      service,
-		duelService:  duelService,
-		loc:          loc,
-		linkCodes:    make(map[string]int64),
-		suggestState: make(map[int64]bool),
-		adminChatID:  -5214417967, // ID чата предложки
+		repo:        repo,
+		service:     service,
+		duelService: duelService,
+		loc:         loc,
+		rdb:         rdb,
+		adminChatID: -5214417967, // ID чата предложки
 	}
 }
 
@@ -75,17 +72,13 @@ func (h *Handler) HandleLinkStart(ctx tele.Context) error {
 
 	code := generateLinkCode()
 
-	// Безопасно сохраняем код в мапу
-	h.mu.Lock()
-	h.linkCodes[code] = dbUser.ID
-	h.mu.Unlock()
-
-	// Ставим таймер на удаление кода через 5 минут
-	time.AfterFunc(5*time.Minute, func() {
-		h.mu.Lock()
-		delete(h.linkCodes, code)
-		h.mu.Unlock()
-	})
+	// Сохраняем код в Redis. Он САМ удалится ровно через 5 минут.
+	rCtx := context.Background()                                             // Назвали rCtx (Redis Context)
+	err = h.rdb.Set(rCtx, "link_code:"+code, dbUser.ID, 5*time.Minute).Err() // Используем = вместо :=
+	if err != nil {
+		log.Println("Redis error:", err)
+		return ctx.Send("Ошибка генерации кода.")
+	}
 
 	// Формируем красивое сообщение
 	msg := h.loc.T(lang, "link_code_msg", code, code)
@@ -795,25 +788,31 @@ func (h *Handler) HandlePayment(ctx tele.Context) error {
 	return ctx.Send(successMsg, tele.ModeHTML)
 }
 
-// Вспомогательные методы для безопасной работы с состоянием
+// Вспомогательные методы для безопасной работы с состоянием (Теперь через Redis)
 func (h *Handler) setSuggestState(internalUserID int64, state bool) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	rCtx := context.Background()
+	key := fmt.Sprintf("suggest_state:%d", internalUserID)
 	if state {
-		h.suggestState[internalUserID] = true
+		// Даем юзеру 10 минут, чтобы отправить фото. Потом состояние сбросится само!
+		h.rdb.Set(rCtx, key, "1", 10*time.Minute)
 	} else {
-		delete(h.suggestState, internalUserID)
+		// Принудительно удаляем состояние
+		h.rdb.Del(rCtx, key)
 	}
 }
 
 func (h *Handler) isSuggesting(internalUserID int64) bool {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.suggestState[internalUserID]
+	rCtx := context.Background()
+	key := fmt.Sprintf("suggest_state:%d", internalUserID)
+
+	val, err := h.rdb.Get(rCtx, key).Result()
+	if err != nil {
+		return false // Ключа нет (или он протух)
+	}
+	return val == "1"
 }
 
 // --- ПРЕДЛОЖКА КАРТОЧЕК ---
-
 func (h *Handler) HandleSuggestStart(ctx tele.Context) error {
 	tgUser := ctx.Sender()
 	dbUser, _ := h.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
@@ -991,20 +990,21 @@ func (h *Handler) HandleLanguageSetCallback(ctx tele.Context) error {
 
 // Реализация интерфейса LinkProvider для Дискорда
 func (h *Handler) GetIDByCode(code string) (int64, bool) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	id, exists := h.linkCodes[code]
+	ctx := context.Background()
 
-	// Если код найден, сразу удаляем его (он одноразовый)
-	if exists {
-		h.mu.RUnlock() // Переключаемся на обычную блокировку для удаления
-		h.mu.Lock()
-		delete(h.linkCodes, code)
-		h.mu.Unlock()
-		h.mu.RLock()
+	// Получаем ID по коду
+	val, err := h.rdb.Get(ctx, "link_code:"+code).Int64()
+	if err == redis.Nil {
+		return 0, false // Кода нет или он протух
+	} else if err != nil {
+		log.Println("Redis get error:", err)
+		return 0, false
 	}
 
-	return id, exists
+	// Если код нашли, сразу удаляем его (он одноразовый)
+	h.rdb.Del(ctx, "link_code:"+code)
+
+	return val, true
 }
 
 // Активация кода игроками (Telegram)

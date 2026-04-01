@@ -1,28 +1,47 @@
+version: '3.8'
+
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: gachabot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  # НОВЫЙ СЕРВИС REDIS
+  redis:
+    image: redis:7-alpine
+    container_name: gachabot_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   bot:
     build: .
     container_name: gachabot_app
     restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - POSTGRES_HOST=postgres
     depends_on:
-      postgres:
-        condition: service_started
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: gachabot_db
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      # ВОТ ЭТА СТРОЧКА! Она заставит БД создать таблицы при первом запуске:
-      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
+      - db
+      - redis # ДОБАВИЛИ ЗАВИСИМОСТЬ
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - REDIS_ADDR=redis:6379 # ДОБАВИЛИ АДРЕС REDIS
 
 volumes:
-  pgdata:
+  postgres_data:
+  redis_data: # НОВЫЙ VOLUME ДЛЯ REDIS

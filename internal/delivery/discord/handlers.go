@@ -1,11 +1,12 @@
 package discord
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
-	"sync"
+	"time"
 
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
@@ -13,6 +14,7 @@ import (
 	"gachabot/internal/service"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/redis/go-redis/v9"
 )
 
 // LinkProvider описывает интерфейс для связи с Telegram-хэндлером
@@ -27,26 +29,20 @@ type Handler struct {
 	loc         *i18n.Localizer
 	lp          LinkProvider
 
-	mu           sync.RWMutex
-	suggestState map[int64]bool
+	rdb *redis.Client // <-- ДОБАВИЛИ REDIS
 
-	// НОВОЕ ПОЛЕ: Функция для отправки в админ-чат
 	NotifyAdmin func(text string, imageURL string)
-
-	linkMu       sync.Mutex
-	pendingLinks map[int64]int64 // Сохраняем сессии: [Discord ID] -> [Telegram ID]
 }
 
-func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) *Handler {
+func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string), rdb *redis.Client) *Handler {
 	return &Handler{
-		repo:         repo,
-		service:      service,
-		duelService:  duelService,
-		loc:          loc,
-		lp:           lp,
-		suggestState: make(map[int64]bool),
-		NotifyAdmin:  notifyAdmin, // Сохраняем колбэк
-		pendingLinks: make(map[int64]int64),
+		repo:        repo,
+		service:     service,
+		duelService: duelService,
+		loc:         loc,
+		lp:          lp,
+		rdb:         rdb,
+		NotifyAdmin: notifyAdmin,
 	}
 }
 
@@ -103,7 +99,6 @@ func (h *Handler) HandleInteraction(s *discordgo.Session, i *discordgo.Interacti
 }
 
 // Обработчик обычных сообщений (для ловли фото предложки)
-// Обработчик обычных сообщений (для ловли фото предложки)
 func (h *Handler) HandleMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.Bot {
 		return
@@ -115,38 +110,30 @@ func (h *Handler) HandleMessageCreate(s *discordgo.Session, m *discordgo.Message
 		lang = "ru"
 	}
 
-	h.mu.RLock()
-	isSuggesting := h.suggestState[dbUser.ID]
-	h.mu.RUnlock()
+	// ИСПОЛЬЗУЕМ REDIS:
+	isSuggesting := h.isSuggesting(dbUser.ID)
 
 	if isSuggesting {
-		// 1. Проверяем, прикрепил ли юзер картинку
 		if len(m.Attachments) == 0 {
 			s.ChannelMessageSend(m.ChannelID, h.loc.T(lang, "suggest_err_no_photo"))
 			return
 		}
 
-		// 2. Проверяем, написал ли юзер текст (описание)
 		if strings.TrimSpace(m.Content) == "" {
 			s.ChannelMessageSend(m.ChannelID, h.loc.T(lang, "suggest_err_no_caption"))
 			return
 		}
 
-		// 3. Проверяем баланс
 		profile, _ := h.service.GetUserProfile(dbUser.ID)
 		if profile.Balance < 1000 {
-			h.mu.Lock()
-			delete(h.suggestState, dbUser.ID)
-			h.mu.Unlock()
+			h.setSuggestState(dbUser.ID, false) // Сброс состояния в Redis
 			s.ChannelMessageSend(m.ChannelID, h.loc.T(lang, "suggest_err_funds"))
 			return
 		}
 
-		// 4. Списываем очки
 		dbUser.Balance -= 1000
 		_ = h.repo.UpdateUserAfterRoll(dbUser)
 
-		// 5. Отправляем в Telegram через колбэк (как мы сделали в main.go)
 		adminMsg := fmt.Sprintf("📩 <b>Новая предложка (Discord)!</b>\nОт: %s (DB_ID: %d)\n\nОписание:\n<i>%s</i>",
 			m.Author.Username, dbUser.ID, m.Content)
 
@@ -154,10 +141,7 @@ func (h *Handler) HandleMessageCreate(s *discordgo.Session, m *discordgo.Message
 			h.NotifyAdmin(adminMsg, m.Attachments[0].URL)
 		}
 
-		// 6. Сбрасываем состояние
-		h.mu.Lock()
-		delete(h.suggestState, dbUser.ID)
-		h.mu.Unlock()
+		h.setSuggestState(dbUser.ID, false) // Успешный сброс состояния в Redis
 
 		s.ChannelMessageSend(m.ChannelID, h.loc.T(lang, "suggest_done"))
 	}
@@ -278,9 +262,7 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 		h.updateWithComponents(s, i, msg, buttons)
 		return
 	case "s_q3_34":
-		h.mu.Lock()
-		h.suggestState[dbUser.ID] = true
-		h.mu.Unlock()
+		h.setSuggestState(dbUser.ID, true) // Включаем предложку через Redis
 		h.updateWithComponents(s, i, h.loc.T(lang, "suggest_success"), []discordgo.MessageComponent{
 			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 				discordgo.Button{Label: h.loc.T(lang, "btn_cancel"), Style: discordgo.DangerButton, CustomID: "s_cancel"},
@@ -288,9 +270,7 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 		})
 		return
 	case "s_cancel":
-		h.mu.Lock()
-		delete(h.suggestState, dbUser.ID)
-		h.mu.Unlock()
+		h.setSuggestState(dbUser.ID, false) // Выключаем предложку через Redis
 		h.updateWithComponents(s, i, h.loc.T(lang, "suggest_cancelled"), []discordgo.MessageComponent{})
 		return
 	}
@@ -396,9 +376,13 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 			target = parts[2] // "tg" или "ds"
 		}
 
-		h.linkMu.Lock()
-		tgInternalID, exists := h.pendingLinks[dbUser.ID]
-		h.linkMu.Unlock()
+		// ИЩЕМ СЕССИЮ В REDIS
+		rCtx := context.Background()
+		key := fmt.Sprintf("pending_link:%d", dbUser.ID)
+
+		tgInternalIDStr, err := h.rdb.Get(rCtx, key).Result()
+		exists := err == nil
+		tgInternalID, _ := strconv.ParseInt(tgInternalIDStr, 10, 64)
 
 		if !exists && action != "cancel" {
 			h.respondEphemeral(s, i, h.loc.T(lang, "link_err_expired"))
@@ -407,9 +391,7 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 
 		switch action {
 		case "cancel":
-			h.linkMu.Lock()
-			delete(h.pendingLinks, dbUser.ID)
-			h.linkMu.Unlock()
+			h.rdb.Del(rCtx, key) // Удаляем сессию
 			h.updateWithComponents(s, i, h.loc.T(lang, "link_cancelled"), nil)
 
 		case "keep":
@@ -442,15 +424,13 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 
 			err := h.repo.LinkAccountsOverwrite(keepID, deleteID)
 			if err != nil {
-				log.Printf("[DISCORD LINK ERROR]: %v", err) // <--- ВОТ ЭТО ДОБАВЬ, чтобы видеть ошибку в терминале
+				log.Printf("[DISCORD LINK ERROR]: %v", err)
 				h.updateWithComponents(s, i, h.loc.T(lang, "error_db"), nil)
 				return
 			}
 
-			// Очищаем сессию
-			h.linkMu.Lock()
-			delete(h.pendingLinks, dbUser.ID)
-			h.linkMu.Unlock()
+			// Очищаем сессию в Redis
+			h.rdb.Del(rCtx, key)
 
 			h.updateWithComponents(s, i, h.loc.T(lang, "link_success"), nil)
 		}
@@ -612,10 +592,9 @@ func (h *Handler) handleLink(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
-	// Сохраняем сессию привязки
-	h.linkMu.Lock()
-	h.pendingLinks[dsUser.ID] = tgInternalID
-	h.linkMu.Unlock()
+	// Сохраняем сессию привязки В REDIS на 10 минут
+	rCtx := context.Background()
+	h.rdb.Set(rCtx, fmt.Sprintf("pending_link:%d", dsUser.ID), tgInternalID, 10*time.Minute)
 
 	msg := h.loc.T(lang, "link_choice_msg", tgProfile.Balance, tgProfile.UniqueCardsCount, dsProfile.Balance, dsProfile.UniqueCardsCount)
 
@@ -898,4 +877,25 @@ func (h *Handler) handlePromo(s *discordgo.Session, i *discordgo.InteractionCrea
 			Embeds: embeds,
 		},
 	})
+}
+
+// Вспомогательные методы для работы с Redis (Discord)
+func (h *Handler) setSuggestState(internalUserID int64, state bool) {
+	rCtx := context.Background()
+	key := fmt.Sprintf("suggest_state:%d", internalUserID)
+	if state {
+		h.rdb.Set(rCtx, key, "1", 10*time.Minute)
+	} else {
+		h.rdb.Del(rCtx, key)
+	}
+}
+
+func (h *Handler) isSuggesting(internalUserID int64) bool {
+	rCtx := context.Background()
+	key := fmt.Sprintf("suggest_state:%d", internalUserID)
+	val, err := h.rdb.Get(rCtx, key).Result()
+	if err != nil {
+		return false
+	}
+	return val == "1"
 }

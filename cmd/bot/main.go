@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"gachabot/internal/delivery/discord"
@@ -16,6 +17,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
+	_ "github.com/redis/go-redis/v9"
 	tele "gopkg.in/telebot.v3"
 )
 
@@ -50,6 +53,25 @@ func main() {
 		log.Fatal("Нет связи с БД:", err)
 	}
 
+	// --- ИНИЦИАЛИЗАЦИЯ REDIS ---
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379" // Фолбэк для локального запуска без докера
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: "", // Без пароля по умолчанию
+		DB:       0,  // Дефолтная база
+	})
+
+	// Проверяем соединение
+	ctx := context.Background()
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Fatal("[REDIS ERROR] Ошибка подключения:", err)
+	}
+	log.Println("[REDIS] Успешно подключен!")
+
 	// 3. Настраиваем Telegram бота
 	token := os.Getenv("BOT_TOKEN")
 	if token == "" {
@@ -77,7 +99,7 @@ func main() {
 	duelService := service.NewDuelService(repo)
 
 	// 6. Инициализация слоя Delivery (Транспорт для Телеграма)
-	h := telegram.NewHandler(repo, gachaService, duelService, telegramLoc)
+	h := telegram.NewHandler(repo, rdb, gachaService, duelService, telegramLoc)
 
 	// 7. Роутинг команд
 	bot.Handle("/start", h.HandleStart)
@@ -164,7 +186,7 @@ func main() {
 		}
 
 		// h — это твой telegram.Handler, который мы создали выше
-		dsHandler := discord.NewHandler(repo, gachaService, duelService, discordLoc, h, notifyAdmin)
+		dsHandler := discord.NewHandler(repo, gachaService, duelService, discordLoc, h, notifyAdmin, rdb)
 		dg.AddHandler(dsHandler.HandleInteraction)
 		dg.AddHandler(dsHandler.HandleComponentInteraction)
 		dg.AddHandler(dsHandler.HandleMessageCreate)
