@@ -140,11 +140,27 @@ func main() {
 		if err != nil {
 			log.Fatal("[DISCORD ERROR] Ошибка создания сессии:", err)
 		}
-		dg.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessages
-		// Инициализация слоев для Дискорда
+
+		dg.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
+
 		discordLoc, _ := i18n.NewLocalizer("locales/discord", "ru")
+
+		adminChatID := int64(-5214417967) // Твой ID админского чата
+		notifyAdmin := func(text string, imageURL string) {
+			adminChat := &tele.Chat{ID: adminChatID}
+			photo := &tele.Photo{
+				File:    tele.FromURL(imageURL),
+				Caption: text,
+			}
+			// Отправляем фото в Телеграм от имени бота
+			_, err := bot.Send(adminChat, photo, tele.ModeHTML)
+			if err != nil {
+				log.Printf("Ошибка пересылки предложки из Discord в Telegram: %v", err)
+			}
+		}
+
 		// h — это твой telegram.Handler, который мы создали выше
-		dsHandler := discord.NewHandler(repo, gachaService, duelService, discordLoc, h)
+		dsHandler := discord.NewHandler(repo, gachaService, duelService, discordLoc, h, notifyAdmin)
 		dg.AddHandler(dsHandler.HandleInteraction)
 		dg.AddHandler(dsHandler.HandleComponentInteraction)
 		dg.AddHandler(dsHandler.HandleMessageCreate)
@@ -159,31 +175,104 @@ func main() {
 
 		// Регистрация команд (Bulk Overwrite)
 		commands := []*discordgo.ApplicationCommand{
-			{Name: "roll", Description: "Получить карточку"},
-			{Name: "profile", Description: "Твой профиль"},
-			{Name: "link", Description: "Связать с Telegram",
-				Options: []*discordgo.ApplicationCommandOption{
-					{Type: discordgo.ApplicationCommandOptionString, Name: "code", Description: "Код", Required: true},
+			{
+				Name:        "roll",
+				Description: "Get a random card", // Базовое (английское) описание
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Получить случайную карточку",
 				},
 			},
-			{Name: "help", Description: "Помощь по игре"},
-			{Name: "top", Description: "Топ сервера по балансу"},
-			{Name: "globaltop", Description: "Мировой топ"},
-			{Name: "craft", Description: "Создать карту из дубликатов"},
+			{
+				Name:        "profile",
+				Description: "View your profile",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Твой профиль",
+				},
+			},
+			{
+				Name:        "link",
+				Description: "Link your account with Telegram",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Связать аккаунт с Telegram",
+				},
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "code",
+						Description: "Code from Telegram",
+						DescriptionLocalizations: map[discordgo.Locale]string{
+							discordgo.Russian: "Код из Telegram",
+						},
+						Required: true,
+					},
+				},
+			},
+			{
+				Name:        "help",
+				Description: "Game help and info",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Помощь по игре",
+				},
+			},
+			{
+				Name:        "top",
+				Description: "Server leaderboard",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Топ сервера по балансу",
+				},
+			},
+			{
+				Name:        "globaltop",
+				Description: "Global leaderboard",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Мировой топ",
+				},
+			},
+			{
+				Name:        "craft",
+				Description: "Craft a card from duplicates",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Создать карту из дубликатов",
+				},
+			},
 			{
 				Name:        "duel",
-				Description: "Вызвать игрока на дуэль",
+				Description: "Challenge a player to a duel",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Вызвать игрока на дуэль",
+				},
 				Options: []*discordgo.ApplicationCommandOption{
 					{
 						Type:        discordgo.ApplicationCommandOptionUser,
 						Name:        "user",
-						Description: "Кого вызываем?",
-						Required:    true,
+						Description: "Who to challenge?",
+						DescriptionLocalizations: map[discordgo.Locale]string{
+							discordgo.Russian: "Кого вызываем?",
+						},
+						Required: true,
 					},
 					{
 						Type:        discordgo.ApplicationCommandOptionInteger,
 						Name:        "amount",
-						Description: "Ставка",
+						Description: "Bet amount",
+						DescriptionLocalizations: map[discordgo.Locale]string{
+							discordgo.Russian: "Ставка",
+						},
+						Required: true,
+					},
+				},
+			},
+			{
+				Name:        "locale",
+				Description: "Change language (ru/en)",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Сменить язык (ru/en)",
+				},
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "lang",
+						Description: "ru or en",
 						Required:    true,
 					},
 				},
