@@ -1,80 +1,97 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
-	"sync"
 	"time"
 
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
+	"github.com/redis/go-redis/v9"
 )
 
+// Добавили JSON теги, убрали Timer
 type DuelRequest struct {
-	ID             string
-	ChallengerID   int64
-	ChallengerName string
-	TargetID       int64
-	TargetName     string
-	Amount         int
-	Timer          *time.Timer
+	ID             string `json:"id"`
+	ChallengerID   int64  `json:"challenger_id"`
+	ChallengerName string `json:"challenger_name"`
+	TargetID       int64  `json:"target_id"`
+	TargetName     string `json:"target_name"`
+	Amount         int    `json:"amount"`
 }
 
 type DuelService struct {
-	repo  *repository.PostgresRepo
-	mu    sync.RWMutex
-	duels map[string]*DuelRequest
+	repo *repository.PostgresRepo
+	rdb  *redis.Client // <-- Добавили Redis, убрали map и Mutex
 }
 
-func NewDuelService(repo *repository.PostgresRepo) *DuelService {
+func NewDuelService(repo *repository.PostgresRepo, rdb *redis.Client) *DuelService {
 	return &DuelService{
-		repo:  repo,
-		duels: make(map[string]*DuelRequest),
+		repo: repo,
+		rdb:  rdb,
 	}
 }
 
 func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerName string, targetID int64, targetName string, amount int) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if oldDuel, exists := s.duels[duelID]; exists {
-		oldDuel.Timer.Stop()
-	}
-
 	req := &DuelRequest{
 		ID:             duelID,
-		ChallengerID:   challengerID, // Теперь это ВНУТРЕННИЙ ID
+		ChallengerID:   challengerID,
 		ChallengerName: challengerName,
-		TargetID:       targetID, // Теперь это ВНУТРЕННИЙ ID
+		TargetID:       targetID,
 		TargetName:     targetName,
 		Amount:         amount,
 	}
 
-	req.Timer = time.AfterFunc(5*time.Minute, func() {
-		s.mu.Lock()
-		delete(s.duels, duelID)
-		s.mu.Unlock()
-	})
+	// Пакуем в JSON
+	data, err := json.Marshal(req)
+	if err != nil {
+		fmt.Println("Ошибка маршалинга дуэли:", err)
+		return
+	}
 
-	s.duels[duelID] = req
+	// Сохраняем в Redis ровно на 5 минут. Он сам удалится!
+	ctx := context.Background()
+	s.rdb.Set(ctx, "duel:"+duelID, data, 5*time.Minute)
 }
 
 func (s *DuelService) PopDuel(duelID string) (*DuelRequest, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	duel, exists := s.duels[duelID]
-	if exists {
-		duel.Timer.Stop()
-		delete(s.duels, duelID)
+	ctx := context.Background()
+	key := "duel:" + duelID
+
+	// Читаем из Redis
+	val, err := s.rdb.Get(ctx, key).Result()
+	if err != nil {
+		return nil, false // Дуэль не найдена или истекло время
 	}
-	return duel, exists
+
+	// Сразу удаляем, так как мы её "забираем"
+	s.rdb.Del(ctx, key)
+
+	var duel DuelRequest
+	if err := json.Unmarshal([]byte(val), &duel); err != nil {
+		return nil, false
+	}
+
+	return &duel, true
 }
 
 func (s *DuelService) GetDuel(duelID string) (*DuelRequest, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	duel, exists := s.duels[duelID]
-	return duel, exists
+	ctx := context.Background()
+	key := "duel:" + duelID
+
+	val, err := s.rdb.Get(ctx, key).Result()
+	if err != nil {
+		return nil, false
+	}
+
+	var duel DuelRequest
+	if err := json.Unmarshal([]byte(val), &duel); err != nil {
+		return nil, false
+	}
+
+	return &duel, true
 }
 
 type DuelResult struct {

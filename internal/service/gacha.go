@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/rand/v2"
@@ -9,16 +11,18 @@ import (
 
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
+	"github.com/redis/go-redis/v9"
 )
 
 const adminId int64 = 348389728
 
 type GachaService struct {
 	repo *repository.PostgresRepo
+	rdb  *redis.Client
 }
 
-func NewGachaService(repo *repository.PostgresRepo) *GachaService {
-	return &GachaService{repo: repo}
+func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client) *GachaService {
+	return &GachaService{repo: repo, rdb: rdb}
 }
 
 // RollResult — структура для передачи ответа из сервиса в хэндлер
@@ -293,7 +297,32 @@ func (s *GachaService) TrackChat(internalUserID int64, chatID int64) {
 }
 
 func (s *GachaService) GetLeaderboard(criteria string, chatID int64) ([]models.LeaderboardEntry, error) {
-	return s.repo.GetLeaderboard(criteria, chatID)
+	ctx := context.Background()
+
+	// Создаем уникальный ключ для кэша (например: "top:balance:0" или "top:cards:-100234")
+	cacheKey := fmt.Sprintf("top:%s:%d", criteria, chatID)
+
+	// 1. Пытаемся достать из Redis
+	cachedData, err := s.rdb.Get(ctx, cacheKey).Result()
+	if err == nil { // Если нашли в кэше
+		var board []models.LeaderboardEntry
+		if json.Unmarshal([]byte(cachedData), &board) == nil {
+			return board, nil // Возвращаем моментально!
+		}
+	}
+
+	// 2. Если в кэше нет, делаем тяжелый запрос в базу данных
+	board, err := s.repo.GetLeaderboard(criteria, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Сохраняем результат в Redis на 1 минуту
+	if jsonData, err := json.Marshal(board); err == nil {
+		s.rdb.Set(ctx, cacheKey, jsonData, 1*time.Minute)
+	}
+
+	return board, nil
 }
 
 func (s *GachaService) CraftCard(internalUserID int64) (*RollResult, error) {

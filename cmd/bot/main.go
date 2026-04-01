@@ -95,8 +95,8 @@ func main() {
 
 	// 5. Инициализация общих слоев (Бизнес-логика)
 	repo := repository.NewPostgresRepo(db)
-	gachaService := service.NewGachaService(repo)
-	duelService := service.NewDuelService(repo)
+	gachaService := service.NewGachaService(repo, rdb)
+	duelService := service.NewDuelService(repo, rdb)
 
 	// 6. Инициализация слоя Delivery (Транспорт для Телеграма)
 	h := telegram.NewHandler(repo, rdb, gachaService, duelService, telegramLoc)
