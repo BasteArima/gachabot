@@ -3,7 +3,9 @@ package discord
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
+	"sync"
 
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
@@ -24,15 +26,19 @@ type Handler struct {
 	duelService *service.DuelService // Добавляем это
 	loc         *i18n.Localizer
 	lp          LinkProvider
+
+	mu           sync.RWMutex
+	suggestState map[int64]bool
 }
 
 func NewHandler(repo *repository.PostgresRepo, service *service.GachaService, duelService *service.DuelService, loc *i18n.Localizer, lp LinkProvider) *Handler {
 	return &Handler{
-		repo:        repo,
-		service:     service,
-		duelService: duelService, // И это
-		loc:         loc,
-		lp:          lp,
+		repo:         repo,
+		service:      service,
+		duelService:  duelService, // И это
+		loc:          loc,
+		lp:           lp,
+		suggestState: make(map[int64]bool),
 	}
 }
 
@@ -108,11 +114,7 @@ func (h *Handler) getHelpMenu(lang string) []discordgo.MessageComponent {
 					CustomID:    "help_select",
 					Placeholder: h.loc.T(lang, "btn_help_select"),
 					Options: []discordgo.SelectMenuOption{
-						{
-							Label:       "🏠 Главная справка",
-							Value:       "main",
-							Description: "Вернуться в начало",
-						},
+						{Label: "Главная справка", Value: "main", Emoji: &discordgo.ComponentEmoji{Name: "🏠"}},
 						{Label: "Карточки", Value: "cards", Emoji: &discordgo.ComponentEmoji{Name: "🃏"}},
 						{Label: "Редкости", Value: "rarities", Emoji: &discordgo.ComponentEmoji{Name: "💎"}},
 						{Label: "Стрики", Value: "streaks", Emoji: &discordgo.ComponentEmoji{Name: "🔥"}},
@@ -133,7 +135,6 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 	}
 
 	data := i.MessageComponentData()
-	// Получаем данные юзера, который нажал на кнопку, чтобы знать его ID и язык
 	dsUser := i.Member.User
 	if dsUser == nil {
 		dsUser = i.User
@@ -143,6 +144,89 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 	lang := dbUser.LanguageCode
 	if lang == "" {
 		lang = "ru"
+	}
+
+	// 1. НАВИГАЦИЯ ПО КАРТОЧКАМ
+	if strings.HasPrefix(data.CustomID, "cards_nav:") {
+		offset, _ := strconv.Atoi(strings.TrimPrefix(data.CustomID, "cards_nav:"))
+		h.handleCardsNav(s, i, dbUser, lang, offset)
+		return
+	}
+
+	// 2. ВОЗВРАТ В ПРОФИЛЬ
+	if data.CustomID == "back_to_profile" {
+		embed, buttons := h.getProfileData(dbUser, lang)
+		h.updateWithEmbedAndComponents(s, i, "", embed, buttons)
+		return
+	}
+
+	// 3. СТАРТ ПРЕДЛОЖКИ (КВИЗ)
+	if data.CustomID == "suggest_start" {
+		profile, _ := h.service.GetUserProfile(dbUser.ID)
+		if profile.Balance < 1000 {
+			h.respondEphemeral(s, i, h.loc.T(lang, "suggest_err_funds"))
+			return
+		}
+
+		msg := h.loc.T(lang, "suggest_rules") + "\n\n" + h.loc.T(lang, "suggest_q1")
+		buttons := []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "✅ Да", Style: discordgo.SuccessButton, CustomID: "s_q1_yes"},
+				discordgo.Button{Label: "❌ Нет", Style: discordgo.DangerButton, CustomID: "s_q1_no"},
+			}},
+		}
+		h.updateWithComponents(s, i, msg, buttons)
+		return
+	}
+
+	// 4. ЭТАПЫ КВИЗА
+	switch data.CustomID {
+	case "s_q1_yes", "s_q2_yes", "s_q3_43", "s_q3_11": // Неправильные ответы
+		msg := h.loc.T(lang, "suggest_rules") + "\n\n" + h.loc.T(lang, "suggest_fail")
+		buttons := []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "🔄 Попробовать снова", Style: discordgo.PrimaryButton, CustomID: "suggest_start"},
+			}},
+		}
+		h.updateWithComponents(s, i, msg, buttons)
+
+	case "s_q1_no": // Правильный Q1 -> Q2
+		msg := h.loc.T(lang, "suggest_rules") + "\n\n" + h.loc.T(lang, "suggest_q2")
+		buttons := []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "✅ Да", Style: discordgo.SuccessButton, CustomID: "s_q2_yes"},
+				discordgo.Button{Label: "❌ Нет", Style: discordgo.DangerButton, CustomID: "s_q2_no"},
+			}},
+		}
+		h.updateWithComponents(s, i, msg, buttons)
+
+	case "s_q2_no": // Правильный Q2 -> Q3
+		msg := h.loc.T(lang, "suggest_rules") + "\n\n" + h.loc.T(lang, "suggest_q3")
+		buttons := []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "4:3", Style: discordgo.SecondaryButton, CustomID: "s_q3_43"},
+				discordgo.Button{Label: "3:4", Style: discordgo.SecondaryButton, CustomID: "s_q3_34"},
+				discordgo.Button{Label: "1:1", Style: discordgo.SecondaryButton, CustomID: "s_q3_11"},
+			}},
+		}
+		h.updateWithComponents(s, i, msg, buttons)
+
+	case "s_q3_34": // Финал квиза
+		h.mu.Lock()
+		h.suggestState[dbUser.ID] = true // Включаем режим ожидания фото
+		h.mu.Unlock()
+
+		h.updateWithComponents(s, i, h.loc.T(lang, "suggest_success"), []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "❌ Отмена", Style: discordgo.DangerButton, CustomID: "s_cancel"},
+			}},
+		})
+
+	case "s_cancel":
+		h.mu.Lock()
+		delete(h.suggestState, dbUser.ID)
+		h.mu.Unlock()
+		h.updateWithComponents(s, i, h.loc.T(lang, "suggest_cancelled"), []discordgo.MessageComponent{})
 	}
 
 	// --- ОБРАБОТКА ДУЭЛЕЙ ---
@@ -288,7 +372,7 @@ func (h *Handler) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreat
 	}
 
 	// Формируем описание карты
-	title := h.loc.T(lang, "roll_success_title")
+	title := h.loc.T(lang, "roll_success")
 	desc := h.loc.T(lang, "roll_success_desc", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
 
 	if result.IsFragment {
@@ -327,6 +411,24 @@ func (h *Handler) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreat
 
 // Команда /profile
 func (h *Handler) handleProfile(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
+	// Добавь кнопку в метод handleProfile
+	buttons := discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{
+			discordgo.Button{
+				Label:    h.loc.T(lang, "btn_my_cards_ds"), // Ключ для перевода
+				Style:    discordgo.PrimaryButton,
+				CustomID: "cards_nav:0",
+				Emoji:    &discordgo.ComponentEmoji{Name: "🎴"},
+			},
+			discordgo.Button{
+				Label:    h.loc.T(lang, "btn_profile_suggest"),
+				Style:    discordgo.SecondaryButton,
+				CustomID: "suggest_start",
+				Emoji:    &discordgo.ComponentEmoji{Name: "💡"},
+			},
+		},
+	}
+
 	profile, err := h.service.GetUserProfile(user.ID)
 	if err != nil {
 		h.respond(s, i, "Error loading profile")
@@ -351,9 +453,41 @@ func (h *Handler) handleProfile(s *discordgo.Session, i *discordgo.InteractionCr
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Embeds: []*discordgo.MessageEmbed{embed},
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: []discordgo.MessageComponent{buttons}, // <--- ДОБАВЛЯЕМ СЮДА
 		},
 	})
+}
+
+func (h *Handler) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string, offset int) {
+	card, total, err := h.service.GetUserCardPagination(user.ID, offset)
+	if err != nil || card == nil {
+		h.respond(s, i, h.loc.T(lang, "cards_empty"))
+		return
+	}
+
+	desc := h.loc.T(lang, "card_nav_caption",
+		card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+
+	embed := &discordgo.MessageEmbed{
+		Title:       "🃏 " + card.CardName,
+		Description: desc,
+		Image:       &discordgo.MessageEmbedImage{URL: card.ImageURL},
+		Color:       0x3498db,
+	}
+
+	// Формируем кнопки
+	var navButtons []discordgo.MessageComponent
+	if offset > 0 {
+		navButtons = append(navButtons, discordgo.Button{Label: "⬅️", Style: discordgo.SecondaryButton, CustomID: fmt.Sprintf("cards_nav:%d", offset-1)})
+	}
+	if offset < total-1 {
+		navButtons = append(navButtons, discordgo.Button{Label: "➡️", Style: discordgo.SecondaryButton, CustomID: fmt.Sprintf("cards_nav:%d", offset+1)})
+	}
+	navButtons = append(navButtons, discordgo.Button{Label: "🔙", Style: discordgo.DangerButton, CustomID: "back_to_profile"})
+
+	row := discordgo.ActionsRow{Components: navButtons}
+	h.updateWithEmbedAndComponents(s, i, "", embed, []discordgo.MessageComponent{row})
 }
 
 // Команда /link [код]
@@ -573,4 +707,74 @@ func (h *Handler) respondEphemeral(s *discordgo.Session, i *discordgo.Interactio
 			Flags:   discordgo.MessageFlagsEphemeral, // Сообщение увидит только тот, кто нажал
 		},
 	})
+}
+
+func (h *Handler) HandleMessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Author.Bot {
+		return
+	}
+
+	// Проверяем, находится ли юзер в состоянии "предложки"
+	dbUser, _ := h.repo.GetOrCreateUserByDiscordID(parseID(m.Author.ID), m.Author.Username)
+
+	h.mu.RLock()
+	isSuggesting := h.suggestState[dbUser.ID]
+	h.mu.RUnlock()
+
+	if isSuggesting && len(m.Attachments) > 0 {
+		// Логика пересылки админу (как в ТГ)
+		// ... (используй m.Attachments[0].URL)
+
+		h.mu.Lock()
+		delete(h.suggestState, dbUser.ID)
+		h.mu.Unlock()
+
+		s.ChannelMessageSend(m.ChannelID, "✅ Карточка отправлена!")
+	}
+}
+
+func (h *Handler) updateWithEmbedAndComponents(s *discordgo.Session, i *discordgo.InteractionCreate, content string, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) {
+	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Content:    content,
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: components,
+		},
+	})
+}
+
+func (h *Handler) getProfileData(user *models.User, lang string) (*discordgo.MessageEmbed, []discordgo.MessageComponent) {
+	profile, _ := h.service.GetUserProfile(user.ID)
+
+	desc := fmt.Sprintf("**%s**\n\n", user.Username)
+	desc += h.loc.T(lang, "profile_stats",
+		profile.UniqueCardsCount, profile.TotalCardsCount,
+		profile.DuplicatesCount, profile.Balance, profile.StreakDays)
+
+	embed := &discordgo.MessageEmbed{
+		Title:       h.loc.T(lang, "profile_title"),
+		Description: desc,
+		Color:       0x7289da,
+	}
+
+	buttons := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					Label:    h.loc.T(lang, "btn_my_cards_ds"),
+					Style:    discordgo.PrimaryButton,
+					CustomID: "cards_nav:0",
+					Emoji:    &discordgo.ComponentEmoji{Name: "🎴"},
+				},
+				discordgo.Button{
+					Label:    h.loc.T(lang, "btn_profile_suggest"),
+					Style:    discordgo.SecondaryButton,
+					CustomID: "suggest_start",
+					Emoji:    &discordgo.ComponentEmoji{Name: "💡"},
+				},
+			},
+		},
+	}
+	return embed, buttons
 }

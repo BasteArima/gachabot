@@ -147,6 +147,7 @@ func main() {
 		dsHandler := discord.NewHandler(repo, gachaService, duelService, discordLoc, h)
 		dg.AddHandler(dsHandler.HandleInteraction)
 		dg.AddHandler(dsHandler.HandleComponentInteraction)
+		dg.AddHandler(dsHandler.HandleMessageCreate)
 
 		// Открываем соединение
 		err = dg.Open()

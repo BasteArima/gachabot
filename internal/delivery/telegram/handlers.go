@@ -326,7 +326,7 @@ func (h *Handler) buildTopMessage(criteria string, scope string, chatID int64, l
 	critName, emoji := "", ""
 	switch criteria {
 	case "balance":
-		critName, emoji = h.loc.T(lang, "top_crit_balance"), "<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>"
+		critName, emoji = h.loc.T(lang, "top_crit_balance"), `<tg-emoji emoji-id="4918300654197277832">🪙</tg-emoji>`
 	case "cards":
 		critName, emoji = h.loc.T(lang, "top_crit_cards"), "🃏"
 	case "streak":
@@ -565,32 +565,41 @@ func (h *Handler) HandleDuelCallback(ctx tele.Context) error {
 			return ctx.Respond(&tele.CallbackResponse{Text: h.loc.T(lang, "err_duel_not_called")})
 		}
 
-		h.duelService.PopDuel(duelID)
+		_ = ctx.Respond() // Убираем часики с кнопки
 
+		// 2. Редактируем сообщение с кнопками, превращая его в статус-бар
+		// Убираем кнопки, чтобы никто не нажал лишнего
+		statusText := h.loc.T(lang, "duel_start")
+		_ = ctx.Edit(statusText, tele.ModeHTML)
+
+		// 3. Анимируем многоточие (3 шага с паузой)
+		for k := 0; k < 3; k++ {
+			time.Sleep(600 * time.Millisecond)
+			dots := strings.Repeat(".", k+1)
+			_ = ctx.Edit(statusText+"<b>"+dots+"</b>", tele.ModeHTML)
+		}
+
+		// 4. Пока идет "анимация", готовим данные боя в фоне
+		h.duelService.PopDuel(duelID)
 		result, err := h.duelService.ExecuteDuel(duel)
 		if err != nil {
 			return ctx.Edit(h.loc.T(lang, "err_duel_exec", err.Error()))
 		}
 
-		// 1. Формируем текст результата (тот же, что был, или чуть красивее)
+		// 5. Формируем финальный альбом
 		resText := h.loc.T(lang, "duel_result",
 			duel.ChallengerName, result.CardChallenger.Name, result.CardChallenger.PowerLevel, result.ChanceChallenger,
 			duel.TargetName, result.CardTarget.Name, result.CardTarget.PowerLevel, result.ChanceTarget,
 			result.Roll, result.WinnerName, result.AmountWon*2)
 
-		// 2. Создаем альбом из двух фото
-		photo1 := &tele.Photo{
-			File:    tele.FromURL(result.CardChallenger.ImageURL),
-			Caption: resText, // Текст результата привязываем к первому фото
-		}
-		photo2 := &tele.Photo{
-			File: tele.FromURL(result.CardTarget.ImageURL),
+		album := tele.Album{
+			&tele.Photo{File: tele.FromURL(result.CardChallenger.ImageURL), Caption: resText},
+			&tele.Photo{File: tele.FromURL(result.CardTarget.ImageURL)},
 		}
 
-		album := tele.Album{photo1, photo2}
+		// 6. ФИНАЛ: Удаляем всё лишнее и показываем результат
+		_ = ctx.Delete() // Удаляем текстовый статус-бар
 
-		// 3. Удаляем сообщение с кнопками и отправляем результат альбомом
-		_ = ctx.Delete()
 		return ctx.SendAlbum(album, tele.ModeHTML)
 	}
 
