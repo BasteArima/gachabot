@@ -366,3 +366,7 @@ func (s *GachaService) CraftCard(internalUserID int64) (*RollResult, error) {
 
 	return result, nil
 }
+
+func (s *GachaService) RedeemPromo(userID int64, code string) (*models.PromoReward, []models.Card, error) {
+	return s.repo.RedeemPromo(userID, code)
+}

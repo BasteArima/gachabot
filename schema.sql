@@ -65,3 +65,19 @@ CREATE TABLE user_chats (
                             chat_id BIGINT NOT NULL,
                             PRIMARY KEY (user_id, chat_id)
 );
+
+CREATE TABLE IF NOT EXISTS promocodes (
+                                          code VARCHAR(50) PRIMARY KEY,
+    reward_json JSONB NOT NULL,
+    max_uses INT DEFAULT NULL,
+    current_uses INT DEFAULT 0,
+    expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+CREATE TABLE IF NOT EXISTS promocode_usages (
+                                                user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    promocode VARCHAR(50) REFERENCES promocodes(code) ON DELETE CASCADE,
+    used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (user_id, promocode)
+    );

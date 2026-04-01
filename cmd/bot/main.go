@@ -123,6 +123,10 @@ func main() {
 	bot.Handle("\fs_cancel", h.HandleSuggestCancel)
 	bot.Handle("\fs_close", h.HandleSuggestClose)
 
+	bot.Handle("/promo", h.HandlePromo)
+	bot.Handle("/addpromo", h.HandleAddPromo) // Админская команда
+	bot.Handle("/createpromo", h.HandleCreatePromo)
+
 	// Перехватчики контента
 	bot.Handle(tele.OnPhoto, h.HandleMediaSuggest)
 	bot.Handle(tele.OnDocument, h.HandleMediaSuggest)
@@ -274,6 +278,24 @@ func main() {
 						Name:        "lang",
 						Description: "ru or en",
 						Required:    true,
+					},
+				},
+			},
+			{
+				Name:        "promo",
+				Description: "Activate a promo code",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Активировать промокод",
+				},
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "code",
+						Description: "Code",
+						DescriptionLocalizations: map[discordgo.Locale]string{
+							discordgo.Russian: "Код",
+						},
+						Required: true,
 					},
 				},
 			},

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Генератор Промокодов GachaBot</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e2e; color: #cdd6f4; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .card { background: #313244; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h2 { margin-top: 0; color: #89b4fa; text-align: center; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #bac2de; }
+        input, select { width: 100%; padding: 10px; margin-top: 5px; background: #181825; border: 1px solid #45475a; color: #cdd6f4; border-radius: 5px; box-sizing: border-box; }
+        .row { display: flex; gap: 10px; }
+        .row > div { flex: 1; }
+        button { background: #a6e3a1; color: #11111b; border: none; padding: 12px; width: 100%; margin-top: 25px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #94e2d5; }
+        .output { background: #11111b; padding: 15px; border-radius: 5px; margin-top: 20px; font-family: monospace; word-wrap: break-word; color: #a6e3a1; border: 1px solid #45475a;}
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🛠 Создание Промокода</h2>
+    
+    <div class="row">
+        <div>
+            <label>Название кода (напр. HENTAI2026)</label>
+            <input type="text" id="code" placeholder="HENTAI2026">
+        </div>
+        <div>
+            <label>Лимит активаций (0 = ∞)</label>
+            <input type="number" id="limit" value="100">
+        </div>
+        <div>
+            <label>Срок годности в часах (0 = ∞)</label>
+            <input type="number" id="hours" value="24" title="Через сколько часов сгорит">
+        </div>
+    </div>
+
+    <hr style="border-color: #45475a; margin: 20px 0;">
+
+    <div class="row">
+        <div>
+            <label>🪙 Дать Очков</label>
+            <input type="number" id="points" value="0">
+        </div>
+        <div>
+            <label>⭐️ Дать Прем. Круток</label>
+            <input type="number" id="rolls" value="0">
+        </div>
+    </div>
+
+    <label>🎴 Дать случайную карту (Редкость):</label>
+    <div class="row">
+        <div>
+            <select id="rarity">
+                <option value="0">Не выдавать</option>
+                <option value="1">⚪️ Обычная</option>
+                <option value="2">🟢 Необычная</option>
+                <option value="3">🔵 Редкая</option>
+                <option value="4">🟣 Эпическая</option>
+                <option value="5">🟡 Легендарная</option>
+                <option value="6">🔴 Мифическая</option>
+            </select>
+        </div>
+        <div>
+            <input type="number" id="rarityCount" value="1" placeholder="Количество">
+        </div>
+    </div>
+
+    <label>🃏 Дать КОНКРЕТНЫЕ карты (укажите ID через запятую)</label>
+    <input type="text" id="specificCards" placeholder="Например: 12, 45, 103">
+
+    <button onclick="generateCommand()">Сгенерировать Команду</button>
+
+    <div id="result" class="output" style="display: none;"></div>
+</div>
+
+<script>
+    function generateCommand() {
+        const code = document.getElementById('code').value.toUpperCase() || 'TESTCODE';
+        const limit = parseInt(document.getElementById('limit').value) || 0;
+        const hours = parseInt(document.getElementById('hours').value) || 0; // <-- Берем часы
+        
+        let reward = {};
+        
+        const points = parseInt(document.getElementById('points').value);
+        if (points > 0) reward.points = points;
+        
+        const rolls = parseInt(document.getElementById('rolls').value);
+        if (rolls > 0) reward.premium_rolls = rolls;
+
+        const rarityStr = document.getElementById('rarity').value;
+        const rarityCount = parseInt(document.getElementById('rarityCount').value);
+        if (rarityStr !== "0" && rarityCount > 0) {
+            reward.random_cards = {};
+            reward.random_cards[rarityStr] = rarityCount;
+        }
+
+        const specificCardsStr = document.getElementById('specificCards').value;
+        if (specificCardsStr.trim() !== "") {
+            const cardsArr = specificCardsStr.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+            if (cardsArr.length > 0) {
+                reward.cards = cardsArr;
+            }
+        }
+
+        const jsonString = JSON.stringify(reward);
+        // Теперь команда включает часы:
+        const finalCommand = `/createpromo ${code} ${limit} ${hours} ${jsonString}`;
+        
+        const resDiv = document.getElementById('result');
+        resDiv.style.display = 'block';
+        resDiv.innerText = finalCommand;
+
+        // Копируем в буфер
+        navigator.clipboard.writeText(finalCommand).then(() => {
+            alert("✅ Команда скопирована в буфер обмена!\nПросто отправь её боту в Telegram.");
+        });
+    }
+</script>
+
+</body>
+</html>

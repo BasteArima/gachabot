@@ -131,5 +131,18 @@
   "streak_kept_alive": "🔥 <b>Стрик спасен!</b>\nТекущая серия продлена: <b>%d дней</b>",
 
   "link_code_msg": "🔗 <b>Привязка аккаунта Discord</b>\n\nТвой одноразовый код: <code>%s</code>\n\n<i>⏳ Код действителен 5 минут. Открой нашего бота в Discord и отправь ему команду:</i>\n<code>/link %s</code>",
-  "link_already_done": "✅ Твой аккаунт уже успешно привязан к Discord!"
+  "link_already_done": "✅ Твой аккаунт уже успешно привязан к Discord!",
+
+  "promo_usage": "📝 Используй команду так: `/promo КОД`",
+  "promo_success": "🎉 <b>Промокод успешно активирован!</b>\nВы получили:",
+  "promo_err_not_found": "❌ Промокод не найден или указан неверно.",
+  "promo_err_limit": "❌ Лимит активаций этого промокода исчерпан.",
+  "promo_err_used": "❌ Вы уже активировали этот промокод ранее.",
+  "promo_err_expired": "❌ Время действия этого промокода истекло.",
+
+  "promo_success_title": "🎉 Промокод успешно активирован!",
+  "promo_reward_points": "🪙 Очки: <b>+%d</b>",
+  "promo_reward_rolls": "⭐️ Премиум крутки: <b>+%d</b>",
+  "promo_reward_cards_count": "📦 Получено карт: <b>%d шт.</b>",
+  "promo_reward_card": "> 🃏 <b>%s</b> (⚔️ %d)"
 }

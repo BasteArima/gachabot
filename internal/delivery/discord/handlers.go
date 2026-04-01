@@ -97,6 +97,8 @@ func (h *Handler) HandleInteraction(s *discordgo.Session, i *discordgo.Interacti
 		h.handleDuel(s, i, dbUser, lang)
 	case "locale":
 		h.handleLocale(s, i, dbUser, lang)
+	case "promo":
+		h.handlePromo(s, i, dbUser, lang)
 	}
 }
 
@@ -818,5 +820,82 @@ func (h *Handler) updateWithEmbedAndComponents(s *discordgo.Session, i *discordg
 	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
 		Data: &discordgo.InteractionResponseData{Content: content, Embeds: []*discordgo.MessageEmbed{embed}, Components: components},
+	})
+}
+
+// Активация кода игроками (Discord)
+func (h *Handler) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, dbUser *models.User, lang string) {
+	// Никакого getLang здесь нет, lang уже пришел в аргументах функции!
+	options := i.ApplicationCommandData().Options
+	if len(options) == 0 {
+		h.respondEphemeral(s, i, "❌ Укажите код.")
+		return
+	}
+
+	code := options[0].StringValue()
+
+	// ПРАВИЛЬНЫЙ ВЫЗОВ: 2 аргумента на вход, 3 на выход
+	reward, cards, err := h.service.RedeemPromo(dbUser.ID, code)
+	if err != nil {
+		var errKey string
+		switch err.Error() {
+		case "not_found":
+			errKey = "promo_err_not_found"
+		case "limit_reached":
+			errKey = "promo_err_limit"
+		case "already_used":
+			errKey = "promo_err_used"
+		case "expired":
+			errKey = "promo_err_expired"
+		default:
+			errKey = "error_db"
+		}
+		h.respondEphemeral(s, i, h.loc.T(lang, errKey))
+		return
+	}
+
+	// Собираем текст
+	var sb strings.Builder
+	if reward.Points > 0 {
+		sb.WriteString(h.loc.T(lang, "promo_reward_points", reward.Points) + "\n")
+	}
+	if reward.PremiumRolls > 0 {
+		sb.WriteString(h.loc.T(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
+	}
+	if len(cards) > 0 {
+		sb.WriteString("\n" + h.loc.T(lang, "promo_reward_cards_count", len(cards)) + "\n")
+		for _, c := range cards {
+			sb.WriteString(h.loc.T(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
+		}
+	}
+
+	// Главный эмбед с текстом награды
+	embeds := []*discordgo.MessageEmbed{
+		{
+			Title:       h.loc.T(lang, "promo_success_title"),
+			Description: sb.String(),
+			Color:       0x2ecc71, // Зеленый цвет
+		},
+	}
+
+	// Лимит Дискорда: 10 эмбедов на сообщение. 1 уже занят текстом, остается 9 под картинки.
+	imgLimit := len(cards)
+	if imgLimit > 9 {
+		imgLimit = 9
+	}
+
+	for j := 0; j < imgLimit; j++ {
+		embeds = append(embeds, &discordgo.MessageEmbed{
+			Title: "🃏 " + cards[j].Name,
+			Image: &discordgo.MessageEmbedImage{URL: cards[j].ImageURL},
+			Color: 0x3498db,
+		})
+	}
+
+	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: embeds,
+		},
 	})
 }

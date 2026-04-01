@@ -98,5 +98,18 @@
   "link_warn_ds": "🚨 **WARNING!**\nYou chose to keep Discord. Your **Telegram** inventory and balance will be permanently deleted. Are you sure?",
   "btn_yes_im_sure": "Yes, I'm sure! (Delete)",
   "link_cancelled": "🛑 Linking cancelled. Your data is safe.",
-  "link_success": "✅ Accounts successfully linked! Selected inventory saved."
+  "link_success": "✅ Accounts successfully linked! Selected inventory saved.",
+
+  "promo_usage": "📝 Use command like this: `/promo CODE`",
+  "promo_success": "🎉 **Promo code activated successfully!**\nYou received:",
+  "promo_err_not_found": "❌ Promo code not found or invalid.",
+  "promo_err_limit": "❌ The activation limit for this promo code has been reached.",
+  "promo_err_used": "❌ You have already activated this promo code.",
+  "promo_err_expired": "❌ This promo code has expired.",
+
+  "promo_success_title": "🎉 Promo code activated successfully!",
+  "promo_reward_points": "🪙 Points: **+%d**",
+  "promo_reward_rolls": "⭐️ Premium rolls: **+%d**",
+  "promo_reward_cards_count": "📦 Cards received: **%d**",
+  "promo_reward_card": "> 🃏 **%s** (⚔️ %d)"
 }

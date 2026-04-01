@@ -131,5 +131,18 @@
   "streak_kept_alive": "🔥 <b>Streak saved!</b>\nCurrent streak extended to: <b>%d days</b>",
 
   "link_code_msg": "🔗 <b>Discord Account Linking</b>\n\nYour one-time code is: <code>%s</code>\n\n<i>⏳ The code is valid for 5 minutes. Open our Discord bot and send the following command:</i>\n<code>/link %s</code>",
-  "link_already_done": "✅ Your account is already linked to Discord!"
+  "link_already_done": "✅ Your account is already linked to Discord!",
+
+  "promo_usage": "📝 Use command like this: `/promo CODE`",
+  "promo_success": "🎉 <b>Promo code activated successfully!</b>\nYou received:",
+  "promo_err_not_found": "❌ Promo code not found or invalid.",
+  "promo_err_limit": "❌ The activation limit for this promo code has been reached.",
+  "promo_err_used": "❌ You have already activated this promo code.",
+  "promo_err_expired": "❌ This promo code has expired.",
+
+  "promo_success_title": "🎉 Promo code activated successfully!",
+  "promo_reward_points": "🪙 Points: <b>+%d</b>",
+  "promo_reward_rolls": "⭐️ Premium rolls: <b>+%d</b>",
+  "promo_reward_cards_count": "📦 Cards received: <b>%d</b>",
+  "promo_reward_card": "> 🃏 <b>%s</b> (⚔️ %d)"
 }

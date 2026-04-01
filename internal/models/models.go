@@ -56,3 +56,10 @@ type LeaderboardEntry struct {
 	DisplayName string
 	Value       int // Сюда положим баланс, стрик или кол-во карт в зависимости от фильтра
 }
+
+type PromoReward struct {
+	Points       int            `json:"points,omitempty"`
+	PremiumRolls int            `json:"premium_rolls,omitempty"`
+	Cards        []int          `json:"cards,omitempty"`        // ID конкретных карт (например [12, 45])
+	RandomCards  map[string]int `json:"random_cards,omitempty"` // Случайные карты: ключ - ID редкости (строка), значение - количество
+}

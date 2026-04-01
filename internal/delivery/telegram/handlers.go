@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"encoding/json"
 	"fmt"
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
@@ -1004,4 +1005,169 @@ func (h *Handler) GetIDByCode(code string) (int64, bool) {
 	}
 
 	return id, exists
+}
+
+// Активация кода игроками (Telegram)
+func (h *Handler) HandlePromo(ctx tele.Context) error {
+	tgUser := ctx.Sender()
+	dbUser, _ := h.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
+	lang := getLang(dbUser, tgUser)
+
+	args := ctx.Args()
+	if len(args) == 0 {
+		return ctx.Send(h.loc.T(lang, "promo_usage"), tele.ModeHTML)
+	}
+
+	code := args[0]
+	// ПРАВИЛЬНЫЙ ВЫЗОВ: 2 аргумента на вход, 3 на выход
+	reward, cards, err := h.service.RedeemPromo(dbUser.ID, code)
+	if err != nil {
+		var errKey string
+		switch err.Error() {
+		case "not_found":
+			errKey = "promo_err_not_found"
+		case "limit_reached":
+			errKey = "promo_err_limit"
+		case "already_used":
+			errKey = "promo_err_used"
+		case "expired":
+			errKey = "promo_err_expired"
+		default:
+			errKey = "error_db"
+		}
+		return ctx.Send(h.loc.T(lang, errKey), tele.ModeHTML)
+	}
+
+	// Собираем красивый текст
+	var sb strings.Builder
+	sb.WriteString("<b>" + h.loc.T(lang, "promo_success_title") + "</b>\n\n")
+
+	if reward.Points > 0 {
+		sb.WriteString(h.loc.T(lang, "promo_reward_points", reward.Points) + "\n")
+	}
+	if reward.PremiumRolls > 0 {
+		sb.WriteString(h.loc.T(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
+	}
+	if len(cards) > 0 {
+		sb.WriteString("\n" + h.loc.T(lang, "promo_reward_cards_count", len(cards)) + "\n")
+		for _, c := range cards {
+			sb.WriteString(h.loc.T(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
+		}
+	}
+
+	text := sb.String()
+
+	// СЦЕНАРИЙ 1: Карт нет -> просто шлем текст
+	if len(cards) == 0 {
+		return ctx.Send(text, tele.ModeHTML)
+	}
+
+	// СЦЕНАРИЙ 2: Выпала 1 карта -> шлем обычное фото с подписью
+	if len(cards) == 1 {
+		photo := &tele.Photo{
+			File:    tele.FromURL(cards[0].ImageURL),
+			Caption: text,
+		}
+		return ctx.Send(photo, tele.ModeHTML)
+	}
+
+	// СЦЕНАРИЙ 3: Выпало несколько карт -> шлем Альбом (до 10 шт)
+	albumLimit := len(cards)
+	if albumLimit > 10 {
+		albumLimit = 10
+	}
+
+	var album tele.Album
+	for i := 0; i < albumLimit; i++ {
+		photo := &tele.Photo{File: tele.FromURL(cards[i].ImageURL)}
+		if i == 0 {
+			photo.Caption = text // Подпись вешаем только на первую картинку альбома
+		}
+		album = append(album, photo)
+	}
+
+	return ctx.SendAlbum(album, tele.ModeHTML)
+}
+
+// Генератор для админа
+func (h *Handler) HandleAddPromo(ctx tele.Context) error {
+	tgUser := ctx.Sender()
+	// Проверка на админа (Подставь свой Telegram ID)
+	if tgUser.ID != 348389728 {
+		return nil // Игнорим
+	}
+
+	args := ctx.Args()
+	// Формат: /addpromo КОД ОЧКИ КРУТКИ МАКС_ИСПОЛЬЗОВАНИЙ
+	if len(args) < 4 {
+		return ctx.Send("Формат: `/addpromo КОД ОЧКИ КРУТКИ МАКС_ЮЗОВ`\nПример: `/addpromo START 5000 5 100`", tele.ModeMarkdown)
+	}
+
+	code := args[0]
+	points, _ := strconv.Atoi(args[1])
+	rolls, _ := strconv.Atoi(args[2])
+	maxUses, _ := strconv.Atoi(args[3])
+
+	reward := models.PromoReward{
+		Points:       points,
+		PremiumRolls: rolls,
+	}
+
+	var usesPtr *int
+	if maxUses > 0 {
+		usesPtr = &maxUses
+	}
+
+	// ИСПРАВЛЕНИЕ ЗДЕСЬ: добавляем nil в конце (бессрочный промокод)
+	err := h.repo.CreatePromoCode(code, reward, usesPtr, nil)
+	if err != nil {
+		return ctx.Send("❌ Ошибка БД: " + err.Error())
+	}
+
+	return ctx.Send(fmt.Sprintf("✅ Промокод **%s** успешно создан!\nОчки: %d, Крутки: %d, Лимит: %d", code, points, rolls, maxUses), tele.ModeMarkdown)
+}
+
+// Генератор УМНЫХ промокодов (принимает JSON из веб-конструктора)
+func (h *Handler) HandleCreatePromo(ctx tele.Context) error {
+	tgUser := ctx.Sender()
+	if tgUser.ID != 348389728 { // Твой ID
+		return nil
+	}
+
+	args := ctx.Args()
+	// Формат: /createpromo КОД ЛИМИТ ЧАСЫ JSON_СТРОКА
+	if len(args) < 4 {
+		return ctx.Send("Формат: `/createpromo КОД ЛИМИТ ЧАСЫ {\"points\": 100}`\n(0 = без ограничений)", tele.ModeMarkdown)
+	}
+
+	code := strings.ToUpper(args[0])
+	maxUses, _ := strconv.Atoi(args[1])
+	hoursValid, _ := strconv.Atoi(args[2]) // <-- Читаем время (в часах)
+
+	jsonPayload := strings.Join(args[3:], " ")
+
+	var reward models.PromoReward
+	if err := json.Unmarshal([]byte(jsonPayload), &reward); err != nil {
+		return ctx.Send("❌ Ошибка парсинга JSON: " + err.Error())
+	}
+
+	var usesPtr *int
+	if maxUses > 0 {
+		usesPtr = &maxUses
+	}
+
+	// Считаем точное время истечения
+	var expiresAt *time.Time
+	if hoursValid > 0 {
+		t := time.Now().Add(time.Duration(hoursValid) * time.Hour)
+		expiresAt = &t
+	}
+
+	err := h.repo.CreatePromoCode(code, reward, usesPtr, expiresAt)
+	if err != nil {
+		return ctx.Send("❌ Ошибка БД: " + err.Error())
+	}
+
+	msg := fmt.Sprintf("✅ Промокод **%s** успешно загружен!\nЛимит: %d юзов\nВремя жизни: %d часов", code, maxUses, hoursValid)
+	return ctx.Send(msg, tele.ModeMarkdown)
 }
