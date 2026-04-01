@@ -216,6 +216,15 @@ func (h *Handler) HandleComponentInteraction(s *discordgo.Session, i *discordgo.
 	// 2. ВОЗВРАТ В ПРОФИЛЬ
 	if data.CustomID == "back_to_profile" {
 		embed, buttons := h.getProfileData(dbUser, lang)
+
+		// --- ДОБАВЛЯЕМ АВАТАРКУ ВОЗВРАТНОМУ ЭМБЕДУ ---
+		if i.Member != nil && i.Member.User != nil && i.Member.User.Avatar != "" {
+			embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: i.Member.User.AvatarURL("128")}
+		} else if i.User != nil && i.User.Avatar != "" {
+			embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: i.User.AvatarURL("128")}
+		}
+		// ----------------------------------------------
+
 		h.updateWithEmbedAndComponents(s, i, "", embed, buttons)
 		return
 	}
@@ -483,7 +492,7 @@ func (h *Handler) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionC
 	}
 
 	desc := h.loc.T(lang, "card_nav_caption",
-		card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+		card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 
 	embed := &discordgo.MessageEmbed{
 		Title:       "🃏 " + card.CardName,
