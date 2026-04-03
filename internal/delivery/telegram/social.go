@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand/v2"
 	"strings"
@@ -49,7 +50,14 @@ func (b *Bot) buildTopMessage(criteria string, scope string, chatID int64, lang 
 			} else if i == 2 {
 				medal = "🥉"
 			}
-			text += b.loc.T(lang, "top_entry", medal, entry.DisplayName, entry.Value, emoji)
+			displayName := entry.DisplayName
+			if entry.ActiveAura != "" {
+				// Если есть аура, приклеиваем её к имени
+				displayName = fmt.Sprintf("%s [✨ %s]", entry.DisplayName, entry.ActiveAura)
+			}
+			// -------------
+
+			text += b.loc.T(lang, "top_entry", medal, displayName, entry.Value, emoji)
 		}
 	}
 	text += "</blockquote>"
@@ -171,36 +179,39 @@ func (b *Bot) HandlePromo(ctx tele.Context) error {
 
 	text := sb.String()
 
-	// СЦЕНАРИЙ 1: Карт нет -> просто шлем текст
+	var sendErr error
 	if len(cards) == 0 {
-		return ctx.Send(text, tele.ModeHTML)
-	}
-
-	// СЦЕНАРИЙ 2: Выпала 1 карта -> шлем обычное фото с подписью
-	if len(cards) == 1 {
-		photo := &tele.Photo{
-			File:    tele.FromURL(cards[0].ImageURL),
-			Caption: text,
+		sendErr = ctx.Send(text, tele.ModeHTML)
+	} else if len(cards) == 1 {
+		photo := &tele.Photo{File: tele.FromURL(cards[0].ImageURL), Caption: text}
+		sendErr = ctx.Send(photo, tele.ModeHTML)
+	} else {
+		// Альбом
+		albumLimit := len(cards)
+		if albumLimit > 10 {
+			albumLimit = 10
 		}
-		return ctx.Send(photo, tele.ModeHTML)
-	}
-
-	// СЦЕНАРИЙ 3: Выпало несколько карт -> шлем Альбом (до 10 шт)
-	albumLimit := len(cards)
-	if albumLimit > 10 {
-		albumLimit = 10
-	}
-
-	var album tele.Album
-	for i := 0; i < albumLimit; i++ {
-		photo := &tele.Photo{File: tele.FromURL(cards[i].ImageURL)}
-		if i == 0 {
-			photo.Caption = text // Подпись вешаем только на первую картинку альбома
+		var album tele.Album
+		for i := 0; i < albumLimit; i++ {
+			p := &tele.Photo{File: tele.FromURL(cards[i].ImageURL)}
+			if i == 0 {
+				p.Caption = text
+			}
+			album = append(album, p)
 		}
-		album = append(album, photo)
+		sendErr = ctx.SendAlbum(album, tele.ModeHTML)
 	}
 
-	return ctx.SendAlbum(album, tele.ModeHTML)
+	// --- ОТДЕЛЬНОЕ СООБЩЕНИЕ ПРИ СБОРЕ СЕТА ИЗ ПРОМОКОДА ---
+	if len(reward.CompletedSets) > 0 {
+		for _, set := range reward.CompletedSets {
+			// ТЕПЕРЬ ПЕРЕДАЕМ set.Reward ВМЕСТО 0
+			msg := b.loc.T(lang, "set_completed_msg", set.Name, set.Reward)
+			_ = ctx.Reply(msg, tele.ModeHTML)
+		}
+	}
+
+	return sendErr
 }
 
 // --- ПРИВЯЗКА АККАУНТОВ ---

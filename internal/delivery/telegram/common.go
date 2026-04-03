@@ -68,6 +68,7 @@ func (b *Bot) buildHelpMessage(section string, lang string) (string, *tele.Reply
 	btnPity := menu.Data(b.loc.T(lang, "btn_help_pity"), "help_nav", "pity")
 	btnDuel := menu.Data(b.loc.T(lang, "btn_help_duel"), "help_nav", "duel")
 	btnCraft := menu.Data(b.loc.T(lang, "btn_help_craft"), "help_nav", "craft")
+	btnSets := menu.Data(b.loc.T(lang, "btn_help_sets"), "help_nav", "sets")
 	btnLang := menu.Data(b.loc.T(lang, "btn_help_lang"), "help_nav", "language")
 
 	if section == "main" {
@@ -75,7 +76,7 @@ func (b *Bot) buildHelpMessage(section string, lang string) (string, *tele.Reply
 			menu.Row(btnCards, btnRarities),
 			menu.Row(btnStreaks, btnPity),
 			menu.Row(btnDuel, btnCraft),
-			menu.Row(btnLang),
+			menu.Row(btnSets, btnLang),
 		)
 	} else if section == "language" {
 		btnRu := menu.Data("🇷🇺 Русский", "lang_set", "ru")
@@ -90,7 +91,7 @@ func (b *Bot) buildHelpMessage(section string, lang string) (string, *tele.Reply
 			menu.Row(btnCards, btnRarities),
 			menu.Row(btnStreaks, btnPity),
 			menu.Row(btnDuel, btnCraft),
-			menu.Row(btnMain),
+			menu.Row(btnSets, btnMain),
 		)
 	}
 

@@ -430,5 +430,43 @@ func (s *GachaService) CraftCard(internalUserID int64) (*models.RollResult, erro
 }
 
 func (s *GachaService) RedeemPromo(userID int64, code string) (*models.PromoReward, []models.Card, error) {
-	return s.repo.RedeemPromo(userID, code)
+	reward, cards, err := s.repo.RedeemPromo(userID, code)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// --- ЛОГИКА СБОРА КОЛЛЕКЦИЙ ИЗ ПРОМОКОДА ---
+	for _, card := range cards {
+		if card.SetID != nil {
+			setID := *card.SetID
+			isComplete, _ := s.repo.CheckSetCompletion(userID, setID)
+			if isComplete {
+				claimed, _ := s.repo.IsSetRewardClaimed(userID, setID)
+				if !claimed {
+					setInfo, _ := s.repo.GetCardSetByID(setID)
+					if setInfo != nil {
+						// Отмечаем сет как собранный
+						_ = s.repo.MarkSetCompleted(userID, setID)
+
+						// Начисляем награду
+						userDb, _ := s.repo.GetUserByID(userID)
+						userDb.Balance += setInfo.RewardPoints
+						_ = s.repo.UpdateUserAfterRoll(userDb)
+
+						// Добавляем очки за сет к общему визуальному ответу промокода
+						if reward != nil {
+							reward.Points += setInfo.RewardPoints
+							reward.CompletedSets = append(reward.CompletedSets, models.CompletedSetInfo{
+								Name:   setInfo.Name,
+								Reward: setInfo.RewardPoints,
+							})
+						}
+					}
+				}
+			}
+		}
+	}
+	// ------------------------------------------
+
+	return reward, cards, nil
 }

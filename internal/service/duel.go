@@ -9,6 +9,7 @@ import (
 
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
+
 	"github.com/redis/go-redis/v9"
 )
 
@@ -20,6 +21,7 @@ type DuelRequest struct {
 	TargetID       int64  `json:"target_id"`
 	TargetName     string `json:"target_name"`
 	Amount         int    `json:"amount"`
+	IsFair         bool   `json:"is_fair"` // <-- НОВОЕ
 }
 
 type DuelService struct {
@@ -34,7 +36,7 @@ func NewDuelService(repo *repository.PostgresRepo, rdb *redis.Client) *DuelServi
 	}
 }
 
-func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerName string, targetID int64, targetName string, amount int) {
+func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerName string, targetID int64, targetName string, amount int, isFair bool) {
 	req := &DuelRequest{
 		ID:             duelID,
 		ChallengerID:   challengerID,
@@ -42,6 +44,7 @@ func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerNa
 		TargetID:       targetID,
 		TargetName:     targetName,
 		Amount:         amount,
+		IsFair:         isFair,
 	}
 
 	// Пакуем в JSON
@@ -94,20 +97,7 @@ func (s *DuelService) GetDuel(duelID string) (*DuelRequest, bool) {
 	return &duel, true
 }
 
-type DuelResult struct {
-	WinnerID         int64
-	WinnerName       string
-	CardChallenger   *models.Card
-	CardTarget       *models.Card
-	ChanceChallenger float64
-	ChanceTarget     float64
-	Roll             float64
-	AmountWon        int
-}
-
-func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*DuelResult, error) {
-	// 1. Проверяем балансы
-	// ИЗМЕНЕНО: Используем GetUserByID вместо GetUser
+func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*models.DuelResult, error) {
 	userA, errA := s.repo.GetUserByID(duel.ChallengerID)
 	userB, errB := s.repo.GetUserByID(duel.TargetID)
 	if errA != nil || errB != nil {
@@ -117,30 +107,59 @@ func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*DuelResult, error) {
 		return nil, fmt.Errorf("недостаточно очков для боя")
 	}
 
-	// 2. Случайные карты
-	// GetRandomUserCard уже работает по внутреннему user_id из таблицы user_inventory
 	cardA, errA := s.repo.GetRandomUserCard(duel.ChallengerID)
 	cardB, errB := s.repo.GetRandomUserCard(duel.TargetID)
 	if errA != nil || errB != nil {
 		return nil, fmt.Errorf("у одного из бойцов нет карт")
 	}
 
-	// 3. Расчет шансов
+	result := &models.DuelResult{
+		CardChallenger: cardA,
+		CardTarget:     cardB,
+		AmountWon:      duel.Amount,
+		IsFair:         duel.IsFair,
+	}
+
+	// === ПРИМЕНЕНИЕ АУР (Если дуэль не fair) ===
+	if !duel.IsFair {
+		// Аура атакующего
+		if auraC, _ := s.repo.GetActiveUserAura(duel.ChallengerID); auraC != nil {
+			result.ChallengerAura = &models.DuelAuraInfo{
+				Name:      auraC.Name,
+				BuffType:  auraC.BuffType,
+				BuffValue: auraC.BuffValue,
+			}
+			if auraC.BuffType == "power_percent" {
+				cardA.PowerLevel += int(float64(cardA.PowerLevel) * (float64(auraC.BuffValue) / 100.0))
+			}
+		}
+
+		// Аура защитника
+		if auraT, _ := s.repo.GetActiveUserAura(duel.TargetID); auraT != nil {
+			result.TargetAura = &models.DuelAuraInfo{
+				Name:      auraT.Name,
+				BuffType:  auraT.BuffType,
+				BuffValue: auraT.BuffValue,
+			}
+			if auraT.BuffType == "power_percent" {
+				cardB.PowerLevel += int(float64(cardB.PowerLevel) * (float64(auraT.BuffValue) / 100.0))
+			}
+		}
+	}
+	// ============================================
+
+	result.CardChallenger = cardA
+	result.CardTarget = cardB
+
 	totalPower := float64(cardA.PowerLevel + cardB.PowerLevel)
 	chanceA := (float64(cardA.PowerLevel) / totalPower) * 100
 	chanceB := 100.0 - chanceA
 
 	roll := rand.Float64() * 100
-	result := &DuelResult{
-		CardChallenger:   cardA,
-		CardTarget:       cardB,
-		ChanceChallenger: chanceA,
-		ChanceTarget:     chanceB,
-		Roll:             roll,
-		AmountWon:        duel.Amount,
-	}
+	result.ChanceChallenger = chanceA
+	result.ChanceTarget = chanceB
+	result.Roll = roll
 
-	// 4. Определение победителя и расчеты
 	if roll <= chanceA {
 		result.WinnerID = duel.ChallengerID
 		result.WinnerName = duel.ChallengerName

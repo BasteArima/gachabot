@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"gachabot/internal/models"
 	"log"
 	"strconv"
 	"strings"
@@ -31,17 +32,20 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 		caption = b.loc.T(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
 	}
 
-	// Если сет был собран, добавляем поздравление к тексту!
-	if result.CompletedSetName != "" {
-		caption += b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
-	}
-
 	photo := &tele.Photo{
 		File:    tele.FromURL(result.Card.ImageURL),
 		Caption: caption,
 	}
 
-	return ctx.Send(photo, tele.ModeHTML)
+	err = ctx.Send(photo, tele.ModeHTML)
+
+	// --- ОТДЕЛЬНОЕ СООБЩЕНИЕ ПРИ СБОРЕ СЕТА ---
+	if result.CompletedSetName != "" {
+		msg := b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+		_ = ctx.Reply(msg, tele.ModeHTML)
+	}
+
+	return err
 }
 
 func (b *Bot) HandleDuel(ctx tele.Context) error {
@@ -79,7 +83,14 @@ func (b *Bot) HandleDuel(ctx tele.Context) error {
 
 	duelID := fmt.Sprintf("%d_%d_%d", challengerDB.ID, targetUserDB.ID, time.Now().Unix())
 
-	b.duelService.CreateDuel(duelID, challengerDB.ID, challengerDB.FirstName, targetUserDB.ID, targetUsername, amount)
+	isFair := false
+	for _, arg := range args {
+		if strings.ToLower(arg) == "fair" {
+			isFair = true
+		}
+	}
+
+	b.duelService.CreateDuel(duelID, challengerDB.ID, challengerDB.FirstName, targetUserDB.ID, targetUsername, amount, isFair)
 
 	menu := &tele.ReplyMarkup{}
 	btnAccept := menu.Data(b.loc.T(lang, "btn_duel_accept"), "duel_accept", duelID)
@@ -142,19 +153,36 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 		}
 
 		// 5. Формируем финальный альбом
+		// Подготавливаем красивые строчки с аурами, если они есть
+		formatAura := func(aura *models.DuelAuraInfo) string {
+			if aura == nil {
+				return ""
+			}
+			// Локализуем тип баффа (например, power_percent -> "Буст силы")
+			buffName := b.loc.T(lang, "buff_type_"+aura.BuffType)
+			return fmt.Sprintf("\n╰ ✨ <b>%s</b> (+%d%% %s)", aura.Name, aura.BuffValue, buffName)
+		}
+
+		cAura := formatAura(result.ChallengerAura)
+		tAura := formatAura(result.TargetAura)
+
+		fairNote := ""
+		if result.IsFair {
+			fairNote = b.loc.T(lang, "duel_fair_note") + "\n\n"
+		}
+
+		// Собираем текст
 		resText := b.loc.T(lang, "duel_result",
-			duel.ChallengerName, result.CardChallenger.Name, result.CardChallenger.PowerLevel, result.ChanceChallenger,
-			duel.TargetName, result.CardTarget.Name, result.CardTarget.PowerLevel, result.ChanceTarget,
-			result.Roll, result.WinnerName, result.AmountWon*2)
+			duel.ChallengerName, cAura, result.CardChallenger.Name, result.CardChallenger.PowerLevel, result.ChanceChallenger,
+			duel.TargetName, tAura, result.CardTarget.Name, result.CardTarget.PowerLevel, result.ChanceTarget,
+			fairNote, result.Roll, result.WinnerName, result.AmountWon*2)
 
 		album := tele.Album{
 			&tele.Photo{File: tele.FromURL(result.CardChallenger.ImageURL), Caption: resText},
 			&tele.Photo{File: tele.FromURL(result.CardTarget.ImageURL)},
 		}
 
-		// 6. ФИНАЛ: Удаляем всё лишнее и показываем результат
-		_ = ctx.Delete() // Удаляем текстовый статус-бар
-
+		_ = ctx.Delete()
 		return ctx.SendAlbum(album, tele.ModeHTML)
 	}
 
@@ -225,11 +253,6 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 		caption = b.loc.T(lang, "roll_success", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
 	}
 
-	// Если сет был собран, добавляем поздравление к тексту!
-	if result.CompletedSetName != "" {
-		caption += b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
-	}
-
 	dynamicURL := fmt.Sprintf("%s?v=%d", result.Card.ImageURL, time.Now().Unix())
 	photo := &tele.Photo{
 		File:    tele.FromURL(dynamicURL),
@@ -249,6 +272,11 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	if err != nil {
 		log.Printf("[TELEGRAM ERROR] Не удалось отправить фото! URL: %s | Ошибка: %v", result.Card.ImageURL, err)
 		return ctx.Send(caption+b.loc.T(lang, "error_image"), tele.ModeHTML)
+	}
+
+	if result.CompletedSetName != "" {
+		msg := b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+		_ = ctx.Reply(msg, tele.ModeHTML)
 	}
 
 	if result.StreakUpdated {

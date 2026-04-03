@@ -155,7 +155,12 @@ func (b *Bot) HandleSetView(ctx tele.Context) error {
 	cards, _ := b.repo.GetSetCards(dbUser.ID, setID)
 
 	var sb strings.Builder
-	buffDesc := fmt.Sprintf("+%d (%s)", currentSet.BuffValue, currentSet.BuffType)
+	// В HandleSetView исправляем формирование buffDesc:
+
+	// Локализуем тип баффа (например, power_percent -> "Буст силы")
+	buffName := b.loc.T(lang, "buff_type_"+currentSet.BuffType)
+	// Формируем красивую строку: "+5% (Буст силы)"
+	buffDesc := fmt.Sprintf("+%d%% (%s)", currentSet.BuffValue, buffName)
 
 	sb.WriteString(b.loc.T(lang, "set_view_title", currentSet.SetName, currentSet.RewardPoints, buffDesc))
 

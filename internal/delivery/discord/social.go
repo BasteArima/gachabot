@@ -32,7 +32,7 @@ func (b *Bot) handleDuel(s *discordgo.Session, i *discordgo.InteractionCreate, c
 	}
 
 	duelID := fmt.Sprintf("duel:%d:%d:%d", challenger.ID, targetDB.ID, amount)
-	b.duelService.CreateDuel(duelID, challenger.ID, challenger.Username, targetDB.ID, targetDB.Username, amount)
+	b.duelService.CreateDuel(duelID, challenger.ID, challenger.Username, targetDB.ID, targetDB.Username, amount, false) // в конце false временно, нужно перенести IsFair сюда тоже
 
 	buttons := []discordgo.MessageComponent{discordgo.ActionsRow{
 		Components: []discordgo.MessageComponent{

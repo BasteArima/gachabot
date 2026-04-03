@@ -59,14 +59,21 @@ type UserCardView struct {
 
 type LeaderboardEntry struct {
 	DisplayName string
-	Value       int // Сюда положим баланс, стрик или кол-во карт в зависимости от фильтра
+	Value       int    // Сюда положим баланс, стрик или кол-во карт в зависимости от фильтра
+	ActiveAura  string // <-- НОВОЕ ПОЛЕ
+}
+
+type CompletedSetInfo struct {
+	Name   string
+	Reward int
 }
 
 type PromoReward struct {
-	Points       int            `json:"points,omitempty"`
-	PremiumRolls int            `json:"premium_rolls,omitempty"`
-	Cards        []int          `json:"cards,omitempty"`        // ID конкретных карт (например [12, 45])
-	RandomCards  map[string]int `json:"random_cards,omitempty"` // Случайные карты: ключ - ID редкости (строка), значение - количество
+	Points        int                `json:"points,omitempty"`
+	PremiumRolls  int                `json:"premium_rolls,omitempty"`
+	Cards         []int              `json:"cards,omitempty"`        // ID конкретных карт (например [12, 45])
+	RandomCards   map[string]int     `json:"random_cards,omitempty"` // Случайные карты: ключ - ID редкости (строка), значение - количество
+	CompletedSets []CompletedSetInfo `json:"-"`                      // Изменили string на структуру
 }
 
 // CardSet представляет саму коллекцию
@@ -112,4 +119,24 @@ type RollResult struct {
 	// НОВЫЕ ПОЛЯ ДЛЯ КОЛЛЕКЦИЙ
 	CompletedSetName   string
 	CompletedSetReward int
+}
+
+type DuelAuraInfo struct {
+	Name      string
+	BuffType  string
+	BuffValue int
+}
+
+type DuelResult struct {
+	WinnerID         int64
+	WinnerName       string
+	CardChallenger   *Card
+	CardTarget       *Card
+	ChanceChallenger float64
+	ChanceTarget     float64
+	Roll             float64
+	AmountWon        int
+	ChallengerAura   *DuelAuraInfo
+	TargetAura       *DuelAuraInfo
+	IsFair           bool
 }

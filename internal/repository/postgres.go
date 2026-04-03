@@ -144,24 +144,14 @@ func (r *PostgresRepo) GetRarities() ([]models.Rarity, error) {
 }
 
 func (r *PostgresRepo) GetRandomCard(rarityID int) (*models.Card, error) {
-	card := &models.Card{}
-	query := "SELECT id, name, rarity_id, image_url, power_level FROM cards WHERE rarity_id=$1 ORDER BY RANDOM() LIMIT 1"
-	err := r.db.QueryRow(query, rarityID).Scan(
-		&card.ID,
-		&card.Name,
-		&card.RarityID,
-		&card.ImageURL,
-		&card.PowerLevel,
-	)
+	query := `SELECT id, name, rarity_id, image_url, power_level, set_id FROM cards WHERE rarity_id = $1 ORDER BY RANDOM() LIMIT 1`
+	var c models.Card
+
+	err := r.db.QueryRow(query, rarityID).Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Println("Карта не найдена")
-			return nil, fmt.Errorf("Карта не найдена: %w", err)
-		}
-		log.Printf("Ошибка БД: %v", err)
-		return nil, fmt.Errorf("Ошибка БД: %w", err)
+		return nil, err
 	}
-	return card, nil
+	return &c, nil
 }
 
 // AddCardToInventory добавляет новую карту или увеличивает счетчик существующей
@@ -289,39 +279,36 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 	joinChat := ""
 	whereChat := ""
 	if chatID != 0 {
-		// ИСПРАВЛЕНО: соединяем по внутреннему id (u.id), а не по tg_id
 		joinChat = "JOIN user_chats uc ON u.id = uc.user_id"
 		whereChat = "WHERE uc.chat_id = $1"
 		args = append(args, chatID)
 	}
 
-	// ИСПРАВЛЕНО: для Дискорд-юзеров first_name может быть пустым,
-	// поэтому берем username как запасной вариант
+	// Подключаем таблицу сетов для получения активной ауры
+	joinAura := "LEFT JOIN card_sets cs ON u.active_set_id = cs.id"
 	nameFormat := "COALESCE(NULLIF(u.first_name, ''), u.username)"
 
 	switch criteria {
 	case "balance":
-		query = fmt.Sprintf(`SELECT %s, u.balance FROM users u %s %s ORDER BY u.balance DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, whereChat)
+		query = fmt.Sprintf(`SELECT %s, u.balance, COALESCE(cs.name, '') FROM users u %s %s %s ORDER BY u.balance DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, joinAura, whereChat)
 	case "streak":
-		query = fmt.Sprintf(`SELECT %s, u.streak_days FROM users u %s %s ORDER BY u.streak_days DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, whereChat)
+		query = fmt.Sprintf(`SELECT %s, u.streak_days, COALESCE(cs.name, '') FROM users u %s %s %s ORDER BY u.streak_days DESC, u.last_roll_time ASC LIMIT 10`, nameFormat, joinChat, joinAura, whereChat)
 	case "cards":
-		// Если есть chatID ($1), он должен быть передан в Query.
-		// В блоке ниже важно сохранить порядок аргументов.
 		query = fmt.Sprintf(`
-          SELECT %s, COUNT(DISTINCT ui.card_id) as val 
-          FROM users u 
-          %s 
-          JOIN user_inventory ui ON u.id = ui.user_id 
-          %s 
-          GROUP BY u.id, u.first_name, u.username 
-          ORDER BY val DESC, MIN(u.last_roll_time) ASC LIMIT 10`, nameFormat, joinChat, whereChat)
+			SELECT %s, COUNT(DISTINCT ui.card_id) as val, COALESCE(cs.name, '')
+			FROM users u 
+			%s %s
+			JOIN user_inventory ui ON u.id = ui.user_id 
+			%s 
+			GROUP BY u.id, u.first_name, u.username, cs.name 
+			ORDER BY val DESC, MIN(u.last_roll_time) ASC LIMIT 10`, nameFormat, joinChat, joinAura, whereChat)
 	default:
 		return nil, fmt.Errorf("неизвестный критерий топа")
 	}
 
 	rows, err := r.db.Query(query, args...)
 	if err != nil {
-		log.Printf("[DB ERROR] Leaderboard query failed: %v", err) // Поможет увидеть ошибку в консоли
+		log.Printf("[DB ERROR] Leaderboard query failed: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -329,7 +316,8 @@ func (r *PostgresRepo) GetLeaderboard(criteria string, chatID int64) ([]models.L
 	var board []models.LeaderboardEntry
 	for rows.Next() {
 		var entry models.LeaderboardEntry
-		if err := rows.Scan(&entry.DisplayName, &entry.Value); err != nil {
+		// Считываем ауру 3-им параметром
+		if err := rows.Scan(&entry.DisplayName, &entry.Value, &entry.ActiveAura); err != nil {
 			return nil, err
 		}
 		board = append(board, entry)
@@ -590,9 +578,9 @@ func (r *PostgresRepo) RedeemPromo(userID int64, code string) (*models.PromoRewa
 			}
 
 			var c models.Card
-			// ИСПРАВЛЕНИЕ: Добавили image_url в SELECT и Scan
-			_ = tx.QueryRow(`SELECT id, name, power_level, image_url FROM cards WHERE id = $1`, cid).
-				Scan(&c.ID, &c.Name, &c.PowerLevel, &c.ImageURL)
+			// ИСПРАВЛЕНИЕ: Добавили image_url И set_id в SELECT и Scan
+			_ = tx.QueryRow(`SELECT id, name, power_level, image_url, set_id FROM cards WHERE id = $1`, cid).
+				Scan(&c.ID, &c.Name, &c.PowerLevel, &c.ImageURL, &c.SetID)
 			grantedCards = append(grantedCards, c)
 		}
 	}
@@ -607,12 +595,12 @@ func (r *PostgresRepo) RedeemPromo(userID int64, code string) (*models.PromoRewa
 
 			for i := 0; i < count; i++ {
 				var c models.Card
-				// ИСПРАВЛЕНИЕ: Добавили image_url в SELECT и Scan
+				// ИСПРАВЛЕНИЕ: Добавили image_url И set_id в SELECT и Scan
 				err = tx.QueryRow(`
-					SELECT id, name, power_level, image_url 
-					FROM cards WHERE rarity_id = $1 
-					ORDER BY RANDOM() LIMIT 1`, rarityLevel).
-					Scan(&c.ID, &c.Name, &c.PowerLevel, &c.ImageURL)
+                SELECT id, name, power_level, image_url, set_id 
+                FROM cards WHERE rarity_id = $1 
+                ORDER BY RANDOM() LIMIT 1`, rarityLevel).
+					Scan(&c.ID, &c.Name, &c.PowerLevel, &c.ImageURL, &c.SetID)
 
 				if err == nil {
 					_, err = tx.Exec(`
