@@ -81,3 +81,26 @@ CREATE TABLE IF NOT EXISTS promocode_usages (
     used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (user_id, promocode)
     );
+
+-- Таблица коллекций (сетов)
+CREATE TABLE IF NOT EXISTS card_sets (
+                                         id SERIAL PRIMARY KEY,
+                                         name VARCHAR(255) NOT NULL,
+    buff_type VARCHAR(50) NOT NULL, -- Тип баффа (например, 'power_percent')
+    buff_value INT NOT NULL DEFAULT 0, -- Значение баффа
+    reward_points INT NOT NULL DEFAULT 0 -- Единоразовая награда за сбор
+    );
+
+-- Добавляем картам ссылку на сет (NULL, если карта без сета)
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS set_id INT REFERENCES card_sets(id) ON DELETE SET NULL;
+
+-- Добавляем пользователю "Экипированную Ауру"
+ALTER TABLE users ADD COLUMN IF NOT EXISTS active_set_id INT REFERENCES card_sets(id) ON DELETE SET NULL;
+
+-- Таблица отслеживания разблокированных сетов и прогресса
+CREATE TABLE IF NOT EXISTS user_unlocked_sets (
+                                                  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    set_id INT REFERENCES card_sets(id) ON DELETE CASCADE,
+    is_completed BOOLEAN DEFAULT FALSE,
+    UNIQUE(user_id, set_id)
+    );

@@ -10,6 +10,7 @@ type Card struct {
 	RarityID   int
 	ImageURL   string
 	PowerLevel int
+	SetID      *int `db:"set_id"` // Pointer, так как карта может не принадлежать сету
 }
 
 type User struct {
@@ -25,6 +26,7 @@ type User struct {
 	LastStreakDate sql.NullTime
 	PremiumRolls   int
 	LanguageCode   string
+	ActiveSetID    *int `db:"active_set_id"` // Pointer, потому что может быть NULL
 }
 
 type Rarity struct {
@@ -42,6 +44,8 @@ type UserProfile struct {
 	TotalCardsCount  int
 	DuplicatesCount  int
 	PremiumRolls     int
+	CompletedSets    int
+	TotalSets        int
 }
 
 type UserCardView struct {
@@ -50,6 +54,7 @@ type UserCardView struct {
 	ImageURL   string
 	Quantity   int
 	PowerLevel int
+	SetName    string
 }
 
 type LeaderboardEntry struct {
@@ -62,4 +67,49 @@ type PromoReward struct {
 	PremiumRolls int            `json:"premium_rolls,omitempty"`
 	Cards        []int          `json:"cards,omitempty"`        // ID конкретных карт (например [12, 45])
 	RandomCards  map[string]int `json:"random_cards,omitempty"` // Случайные карты: ключ - ID редкости (строка), значение - количество
+}
+
+// CardSet представляет саму коллекцию
+type CardSet struct {
+	ID           int    `db:"id"`
+	Name         string `db:"name"`
+	BuffType     string `db:"buff_type"`
+	BuffValue    int    `db:"buff_value"`
+	RewardPoints int    `db:"reward_points"`
+}
+
+// UserSetProgress используется для красивого вывода прогресса в UI бота
+type UserSetProgress struct {
+	SetID          int
+	SetName        string
+	CollectedCards int  // Сколько уникальных карт из сета есть у юзера
+	TotalCards     int  // Сколько всего карт в этом сете
+	IsCompleted    bool // Забрал ли юзер награду
+	IsActive       bool // Экипирована ли эта аура прямо сейчас
+	BuffType       string
+	BuffValue      int
+	RewardPoints   int
+}
+
+// RollResult — структура для передачи ответа из сервиса в хэндлер
+type RollResult struct {
+	OnCooldown       bool
+	CooldownTimeLeft string
+
+	Card       *Card
+	RarityName string
+	Reward     int
+
+	IsFragment     bool
+	FragmentsCount int
+	CardAssembled  bool
+
+	CraftCost int
+
+	StreakDays    int
+	StreakUpdated bool
+
+	// НОВЫЕ ПОЛЯ ДЛЯ КОЛЛЕКЦИЙ
+	CompletedSetName   string
+	CompletedSetReward int
 }

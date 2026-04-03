@@ -26,27 +26,8 @@ func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client) *GachaSer
 	return &GachaService{repo: repo, rdb: rdb}
 }
 
-// RollResult — структура для передачи ответа из сервиса в хэндлер
-type RollResult struct {
-	OnCooldown       bool
-	CooldownTimeLeft string
-
-	Card       *models.Card
-	RarityName string
-	Reward     int
-
-	IsFragment     bool
-	FragmentsCount int
-	CardAssembled  bool
-
-	CraftCost int
-
-	StreakDays    int
-	StreakUpdated bool
-}
-
 // RollCard делает всю "грязную работу", принимая только ВНУТРЕННИЙ ID
-func (s *GachaService) RollCard(internalUserID int64) (*RollResult, error) {
+func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error) {
 	userDb, err := s.repo.GetUserByID(internalUserID)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения юзера: %w", err)
@@ -115,7 +96,7 @@ func (s *GachaService) RollCard(internalUserID int64) (*RollResult, error) {
 			} else {
 				timeStr = fmt.Sprintf("%dм", minutes)
 			}
-			return &RollResult{
+			return &models.RollResult{
 				OnCooldown:       true,
 				CooldownTimeLeft: timeStr,
 				StreakDays:       newStreak,
@@ -196,7 +177,7 @@ func (s *GachaService) RollCard(internalUserID int64) (*RollResult, error) {
 	finalReward := selectedRarityReward + bonus
 
 	// 6. Формируем базовый ответ
-	result := &RollResult{
+	result := &models.RollResult{
 		Card:          card,
 		RarityName:    rarityName,
 		Reward:        finalReward,
@@ -220,6 +201,29 @@ func (s *GachaService) RollCard(internalUserID int64) (*RollResult, error) {
 		}
 	} else {
 		_ = s.repo.AddCardToInventory(internalUserID, card.ID)
+	}
+
+	// --- ЛОГИКА СБОРА КОЛЛЕКЦИЙ (НОВЫЙ БЛОК) ---
+	// Проверяем сет только если мы получили полноценную карту
+	// (или только что дособрали Мифик из осколков)
+	if (!result.IsFragment || result.CardAssembled) && card.SetID != nil {
+		setID := *card.SetID
+		isComplete, _ := s.repo.CheckSetCompletion(internalUserID, setID)
+		if isComplete {
+			claimed, _ := s.repo.IsSetRewardClaimed(internalUserID, setID)
+			if !claimed {
+				setInfo, err := s.repo.GetCardSetByID(setID)
+				if err == nil && setInfo != nil {
+					_ = s.repo.MarkSetCompleted(internalUserID, setID)
+					// Добавляем награду к итоговому балансу
+					finalReward += setInfo.RewardPoints
+
+					// Передаем инфу в UI
+					result.CompletedSetName = setInfo.Name
+					result.CompletedSetReward = setInfo.RewardPoints
+				}
+			}
+		}
 	}
 
 	// 8. Сохраняем прогресс юзера
@@ -261,6 +265,7 @@ func (s *GachaService) GetUserProfile(internalUserID int64) (*models.UserProfile
 	}
 
 	duplicates, _ := s.repo.GetTotalDuplicatesCount(internalUserID)
+	completedSets, totalSets, _ := s.repo.GetUserSetsStats(internalUserID) // <-- НОВОЕ
 
 	return &models.UserProfile{
 		Balance:          user.Balance,
@@ -269,6 +274,8 @@ func (s *GachaService) GetUserProfile(internalUserID int64) (*models.UserProfile
 		TotalCardsCount:  totalCards,
 		DuplicatesCount:  duplicates,
 		PremiumRolls:     user.PremiumRolls,
+		CompletedSets:    completedSets, // <-- НОВОЕ
+		TotalSets:        totalSets,     // <-- НОВОЕ
 	}, nil
 }
 
@@ -326,7 +333,7 @@ func (s *GachaService) GetLeaderboard(criteria string, chatID int64) ([]models.L
 	return board, nil
 }
 
-func (s *GachaService) CraftCard(internalUserID int64) (*RollResult, error) {
+func (s *GachaService) CraftCard(internalUserID int64) (*models.RollResult, error) {
 	dupCounts, err := s.repo.GetAvailableCrafts(internalUserID)
 	if err != nil {
 		return nil, err
@@ -375,7 +382,7 @@ func (s *GachaService) CraftCard(internalUserID int64) (*RollResult, error) {
 		return nil, err
 	}
 
-	result := &RollResult{
+	result := &models.RollResult{
 		Card:       card,
 		RarityName: rarityName,
 		CraftCost:  cost,
@@ -393,6 +400,31 @@ func (s *GachaService) CraftCard(internalUserID int64) (*RollResult, error) {
 	} else {
 		_ = s.repo.AddCardToInventory(internalUserID, card.ID)
 	}
+
+	// --- ЛОГИКА СБОРА КОЛЛЕКЦИЙ (НОВЫЙ БЛОК) ---
+	if (!result.IsFragment || result.CardAssembled) && card.SetID != nil {
+		setID := *card.SetID
+		isComplete, _ := s.repo.CheckSetCompletion(internalUserID, setID)
+		if isComplete {
+			claimed, _ := s.repo.IsSetRewardClaimed(internalUserID, setID)
+			if !claimed {
+				setInfo, _ := s.repo.GetCardSetByID(setID)
+				if setInfo != nil {
+					_ = s.repo.MarkSetCompleted(internalUserID, setID)
+
+					// Так как в крафте мы не загружаем весь UserDB объект,
+					// нам нужно обновить баланс прямым запросом
+					userDb, _ := s.repo.GetUserByID(internalUserID)
+					userDb.Balance += setInfo.RewardPoints
+					_ = s.repo.UpdateUserAfterRoll(userDb)
+
+					result.CompletedSetName = setInfo.Name
+					result.CompletedSetReward = setInfo.RewardPoints
+				}
+			}
+		}
+	}
+	// ------------------------------------------
 
 	return result, nil
 }

@@ -1,8 +1,15 @@
 package telegram
 
-import tele "gopkg.in/telebot.v3"
+import (
+	"log"
+
+	tele "gopkg.in/telebot.v3"
+	"gopkg.in/telebot.v3/middleware"
+)
 
 func (b *Bot) Register(bot *tele.Bot) {
+	bot.Use(middleware.Logger())
+
 	bot.Handle("/start", b.HandleStart)
 	bot.Handle("/roll", b.HandleRoll)
 	bot.Handle("/profile", b.HandleProfile)
@@ -50,10 +57,20 @@ func (b *Bot) Register(bot *tele.Bot) {
 	bot.Handle("/addpromo", b.HandleAddPromo) // Админская команда
 	bot.Handle("/createpromo", b.HandleCreatePromo)
 
+	bot.Handle("\fsets_nav", b.HandleSetsList)
+	bot.Handle("\fset_view", b.HandleSetView)
+	bot.Handle("\fset_equip", b.HandleEquipAura)
+
 	// Перехватчики контента
 	bot.Handle(tele.OnPhoto, b.HandleMediaSuggest)
 	bot.Handle(tele.OnDocument, b.HandleMediaSuggest)
 	bot.Handle(tele.OnText, b.HandleTextFallback) // Защита от дурака
 
 	bot.Handle("/link", b.HandleLinkStart)
+
+	// Перехватчик всех ненайденных коллбэков (для дебага)
+	bot.Handle(tele.OnCallback, func(ctx tele.Context) error {
+		log.Printf("⚠️ ПРИШЕЛ НЕИЗВЕСТНЫЙ КОЛЛБЭК! Unique: '%s', Data: '%s'", ctx.Callback().Unique, ctx.Callback().Data)
+		return ctx.Respond(&tele.CallbackResponse{Text: "Неизвестная кнопка!"})
+	})
 }

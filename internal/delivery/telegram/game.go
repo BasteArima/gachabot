@@ -31,6 +31,11 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 		caption = b.loc.T(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
 	}
 
+	// Если сет был собран, добавляем поздравление к тексту!
+	if result.CompletedSetName != "" {
+		caption += b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+	}
+
 	photo := &tele.Photo{
 		File:    tele.FromURL(result.Card.ImageURL),
 		Caption: caption,
@@ -218,6 +223,11 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 		}
 	} else {
 		caption = b.loc.T(lang, "roll_success", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
+	}
+
+	// Если сет был собран, добавляем поздравление к тексту!
+	if result.CompletedSetName != "" {
+		caption += b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
 	}
 
 	dynamicURL := fmt.Sprintf("%s?v=%d", result.Card.ImageURL, time.Now().Unix())

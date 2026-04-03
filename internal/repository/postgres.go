@@ -213,24 +213,27 @@ func (r *PostgresRepo) GetUserUniqueCardsCount(userID int64) (int, error) {
 }
 
 // Получаем одну карточку пользователя с учетом сдвига (пагинация)
-// Получаем одну карточку пользователя с учетом сдвига (пагинация)
 func (r *PostgresRepo) GetUserCard(userID int64, offset int) (*models.UserCardView, error) {
-	card := &models.UserCardView{}
-	// ДОБАВЛЕН c.power_level В SELECT
 	query := `
-		SELECT c.name, r.name, c.image_url, ui.quantity, c.power_level 
-		FROM user_inventory ui
-		JOIN cards c ON ui.card_id = c.id
+		SELECT c.name, r.name, c.image_url, i.quantity, c.power_level,
+		       COALESCE(cs.name, '') as set_name
+		FROM user_inventory i
+		JOIN cards c ON i.card_id = c.id
 		JOIN rarities r ON c.rarity_id = r.id
-		WHERE ui.user_id = $1
-		ORDER BY r.id DESC, c.id ASC
-		OFFSET $2 LIMIT 1
+		LEFT JOIN card_sets cs ON c.set_id = cs.id
+		WHERE i.user_id = $1
+		ORDER BY c.rarity_id DESC, c.power_level DESC, c.id ASC
+		LIMIT 1 OFFSET $2
 	`
-	// ДОБАВЛЕН &card.PowerLevel В Scan
+	var card models.UserCardView
 	err := r.db.QueryRow(query, userID, offset).Scan(
-		&card.CardName, &card.RarityName, &card.ImageURL, &card.Quantity, &card.PowerLevel,
+		&card.CardName, &card.RarityName, &card.ImageURL,
+		&card.Quantity, &card.PowerLevel, &card.SetName, // <-- Добавили &card.SetName
 	)
-	return card, err
+	if err != nil {
+		return nil, err
+	}
+	return &card, nil
 }
 
 // Получаем все счетчики гарантов пользователя
@@ -635,4 +638,191 @@ func (r *PostgresRepo) RedeemPromo(userID int64, code string) (*models.PromoRewa
 
 	err = tx.Commit()
 	return &reward, grantedCards, err
+}
+
+// ==========================================
+// БЛОК МЕТОДОВ ДЛЯ РАБОТЫ С КОЛЛЕКЦИЯМИ (СЕТАМИ)
+// ==========================================
+
+// GetUserSetsProgress возвращает список ВСЕХ сетов в игре и прогресс юзера по каждому из них
+func (r *PostgresRepo) GetUserSetsProgress(userID int64) ([]models.UserSetProgress, error) {
+	// 1. Берем все сеты и считаем их размер (TotalSetCards)
+	// 2. Считаем, сколько карт из сетов есть у юзера (UserSetCards)
+	// 3. Соединяем всё вместе. Если у юзера 0 карт, COALESCE вернет 0.
+	query := `
+		WITH TotalSetCards AS (
+			SELECT set_id, COUNT(id) as total_cards
+			FROM cards
+			WHERE set_id IS NOT NULL
+			GROUP BY set_id
+		),
+		UserSetCards AS (
+			SELECT c.set_id, COUNT(DISTINCT c.id) as collected_cards
+			FROM user_inventory i
+			JOIN cards c ON i.card_id = c.id
+			WHERE i.user_id = $1 AND c.set_id IS NOT NULL
+			GROUP BY c.set_id
+		)
+		SELECT 
+			cs.id, cs.name, cs.buff_type, cs.buff_value, cs.reward_points,
+			COALESCE(usc.collected_cards, 0) as collected_cards,
+			tsc.total_cards,
+			COALESCE(uus.is_completed, false) as is_completed,
+			COALESCE((u.active_set_id = cs.id), false) as is_active
+		FROM TotalSetCards tsc
+		JOIN card_sets cs ON cs.id = tsc.set_id
+		LEFT JOIN UserSetCards usc ON tsc.set_id = usc.set_id
+		LEFT JOIN user_unlocked_sets uus ON uus.user_id = $1 AND uus.set_id = cs.id
+		LEFT JOIN users u ON u.id = $1
+		ORDER BY cs.id;
+	`
+	rows, err := r.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var progress []models.UserSetProgress
+	for rows.Next() {
+		var p models.UserSetProgress
+		if err := rows.Scan(&p.SetID, &p.SetName, &p.BuffType, &p.BuffValue, &p.RewardPoints, &p.CollectedCards, &p.TotalCards, &p.IsCompleted, &p.IsActive); err != nil {
+			return nil, err
+		}
+		progress = append(progress, p)
+	}
+	return progress, nil
+}
+
+// GetSetCards возвращает все карты конкретного сета. Ненайденные карты маскируются.
+func (r *PostgresRepo) GetSetCards(userID int64, setID int) ([]models.Card, error) {
+	query := `
+		SELECT c.id, c.name, c.rarity_id, c.power_level, c.image_url, 
+		       (MAX(i.user_id) IS NOT NULL) as is_owned
+		FROM cards c
+		LEFT JOIN user_inventory i ON c.id = i.card_id AND i.user_id = $1
+		WHERE c.set_id = $2
+		GROUP BY c.id, c.name, c.rarity_id, c.power_level, c.image_url
+		ORDER BY c.rarity_id, c.id;
+	`
+	rows, err := r.db.Query(query, userID, setID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []models.Card
+	for rows.Next() {
+		var c models.Card
+		var isOwned bool
+
+		// Исправлено: используем rarity_id и c.RarityID
+		if err := rows.Scan(&c.ID, &c.Name, &c.RarityID, &c.PowerLevel, &c.ImageURL, &isOwned); err != nil {
+			return nil, err
+		}
+
+		// Если карты нет в инвентаре, затираем данные (сигнал для фронтенда)
+		if !isOwned {
+			c.Name = "" // Пустая строка - признак скрытой карты
+			c.ImageURL = ""
+			c.PowerLevel = 0
+		}
+		cards = append(cards, c)
+	}
+	return cards, nil
+}
+
+// CheckSetCompletion проверяет, собрал ли юзер все карты в сете
+func (r *PostgresRepo) CheckSetCompletion(userID int64, setID int) (bool, error) {
+	query := `
+		SELECT 
+			(SELECT COUNT(id) FROM cards WHERE set_id = $2) as total_cards,
+			(SELECT COUNT(DISTINCT c.id) 
+			 FROM user_inventory i 
+			 JOIN cards c ON i.card_id = c.id 
+			 WHERE i.user_id = $1 AND c.set_id = $2) as collected_cards
+	`
+	var total, collected int
+	err := r.db.QueryRow(query, userID, setID).Scan(&total, &collected)
+	if err != nil {
+		return false, err
+	}
+	// Защита от деления на ноль (если сет пустой)
+	if total == 0 {
+		return false, nil
+	}
+	return total == collected, nil
+}
+
+// MarkSetCompleted помечает сет как собранный, чтобы больше не выдавать за него награду
+func (r *PostgresRepo) MarkSetCompleted(userID int64, setID int) error {
+	query := `
+		INSERT INTO user_unlocked_sets (user_id, set_id, is_completed)
+		VALUES ($1, $2, true)
+		ON CONFLICT (user_id, set_id) DO UPDATE SET is_completed = true;
+	`
+	_, err := r.db.Exec(query, userID, setID)
+	return err
+}
+
+// EquipSetAura обновляет активную ауру пользователя (setID может быть nil, чтобы снять ауру)
+func (r *PostgresRepo) EquipSetAura(userID int64, setID *int) error {
+	query := `UPDATE users SET active_set_id = $1 WHERE id = $2`
+	_, err := r.db.Exec(query, setID, userID)
+	return err
+}
+
+// GetActiveUserAura возвращает активный сет юзера для применения баффов в дуэли
+func (r *PostgresRepo) GetActiveUserAura(userID int64) (*models.CardSet, error) {
+	query := `
+		SELECT cs.id, cs.name, cs.buff_type, cs.buff_value, cs.reward_points
+		FROM users u
+		JOIN card_sets cs ON u.active_set_id = cs.id
+		WHERE u.id = $1
+	`
+	var cs models.CardSet
+	err := r.db.QueryRow(query, userID).Scan(&cs.ID, &cs.Name, &cs.BuffType, &cs.BuffValue, &cs.RewardPoints)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // У юзера не экипирована аура, это нормально
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &cs, nil
+}
+
+// GetCardSetByID вытягивает информацию о самом сете
+func (r *PostgresRepo) GetCardSetByID(setID int) (*models.CardSet, error) {
+	query := `SELECT id, name, buff_type, buff_value, reward_points FROM card_sets WHERE id = $1`
+	var cs models.CardSet
+	err := r.db.QueryRow(query, setID).Scan(&cs.ID, &cs.Name, &cs.BuffType, &cs.BuffValue, &cs.RewardPoints)
+	if err != nil {
+		return nil, err
+	}
+	return &cs, nil
+}
+
+// IsSetRewardClaimed проверяет, забирал ли юзер награду за этот сет
+func (r *PostgresRepo) IsSetRewardClaimed(userID int64, setID int) (bool, error) {
+	var isCompleted bool
+	err := r.db.QueryRow(`SELECT is_completed FROM user_unlocked_sets WHERE user_id = $1 AND set_id = $2`, userID, setID).Scan(&isCompleted)
+	if err != nil {
+		return false, nil // Если записи нет, значит точно не забирал
+	}
+	return isCompleted, nil
+}
+
+// GetUserSetsStats возвращает количество полностью собранных сетов и общее количество сетов
+func (r *PostgresRepo) GetUserSetsStats(userID int64) (int, int, error) {
+	query := `
+		SELECT 
+			(SELECT COUNT(set_id) FROM user_unlocked_sets WHERE user_id = $1 AND is_completed = true) as completed_sets,
+			(SELECT COUNT(id) FROM card_sets) as total_sets
+	`
+	var completed, total int
+	err := r.db.QueryRow(query, userID).Scan(&completed, &total)
+	if err != nil {
+		return 0, 0, err
+	}
+	return completed, total, nil
 }

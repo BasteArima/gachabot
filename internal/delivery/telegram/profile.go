@@ -30,7 +30,11 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	var rows []tele.Row
 	if profile.UniqueCardsCount > 0 {
 		btnMyCards := menu.Data(b.loc.T(lang, "btn_my_cards", profile.UniqueCardsCount), "cards_nav", "0")
-		rows = append(rows, menu.Row(btnMyCards))
+
+		// Обновленная кнопка со счетчиком
+		btnMySets := menu.Data(b.loc.T(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets), "sets_nav", "0")
+
+		rows = append(rows, menu.Row(btnMyCards, btnMySets))
 	}
 
 	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group_bot"), "https://t.me/HentaiCard_bot?startgroup=true")
@@ -71,8 +75,16 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 		return ctx.Send(b.loc.T(lang, "cards_empty"))
 	}
 
-	caption := b.loc.T(lang, "card_nav_caption",
-		card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+	var caption string
+	if card.SetName != "" {
+		// Если карточка из коллекции, выводим специальный текст
+		caption = b.loc.T(lang, "card_nav_caption_with_set",
+			card.CardName, card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+	} else {
+		// Если обычная карточка
+		caption = b.loc.T(lang, "card_nav_caption",
+			card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+	}
 
 	menu := &tele.ReplyMarkup{}
 	var row []tele.Btn

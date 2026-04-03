@@ -111,5 +111,7 @@
   "promo_reward_points": "🪙 Очки: **+%d**",
   "promo_reward_rolls": "⭐️ Премиум крутки: **+%d**",
   "promo_reward_cards_count": "📦 Получено карт: **%d шт.**",
-  "promo_reward_card": "> 🃏 **%s** (⚔️ %d)"
+  "promo_reward_card": "> 🃏 **%s** (⚔️ %d)",
+
+  "card_unknown": "??? (Неизвестно)"
 }

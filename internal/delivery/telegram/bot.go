@@ -101,6 +101,11 @@ func (b *Bot) setupRoutes() {
 	b.bot.Handle("/addpromo", b.HandleAddPromo)
 	b.bot.Handle("/createpromo", b.HandleCreatePromo)
 
+	// Коллекции
+	b.bot.Handle("\fsets_nav", b.HandleSetsList)
+	b.bot.Handle("\fset_view", b.HandleSetView)
+	b.bot.Handle("\fset_equip", b.HandleEquipAura)
+
 	// Разное
 	b.bot.Handle("/link", b.HandleLinkStart)
 	b.bot.Handle(tele.OnText, b.HandleTextFallback)

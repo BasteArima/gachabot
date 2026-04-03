@@ -111,5 +111,7 @@
   "promo_reward_points": "🪙 Points: **+%d**",
   "promo_reward_rolls": "⭐️ Premium rolls: **+%d**",
   "promo_reward_cards_count": "📦 Cards received: **%d**",
-  "promo_reward_card": "> 🃏 **%s** (⚔️ %d)"
+  "promo_reward_card": "> 🃏 **%s** (⚔️ %d)",
+
+  "card_unknown": "??? (Unknown)"
 }
