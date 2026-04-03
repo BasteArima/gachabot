@@ -1,0 +1,111 @@
+package telegram
+
+import (
+	"log"
+	"strconv"
+	"strings"
+
+	tele "gopkg.in/telebot.v3"
+)
+
+func (b *Bot) HandleProfile(ctx tele.Context) error {
+	tgUser := ctx.Sender()
+	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
+	lang := getLang(dbUser, tgUser)
+
+	profile, err := b.service.GetUserProfile(dbUser.ID)
+	if err != nil {
+		log.Printf("Ошибка получения профиля юзера %d: %v", dbUser.ID, err)
+		return ctx.Send(b.loc.T(lang, "profile_err_load"))
+	}
+
+	caption := b.loc.T(lang, "profile_caption",
+		tgUser.FirstName, tgUser.LastName,
+		profile.UniqueCardsCount, profile.TotalCardsCount,
+		profile.DuplicatesCount, profile.Balance, profile.StreakDays)
+
+	photos, err := ctx.Bot().ProfilePhotosOf(tgUser)
+
+	menu := &tele.ReplyMarkup{}
+	var rows []tele.Row
+	if profile.UniqueCardsCount > 0 {
+		btnMyCards := menu.Data(b.loc.T(lang, "btn_my_cards", profile.UniqueCardsCount), "cards_nav", "0")
+		rows = append(rows, menu.Row(btnMyCards))
+	}
+
+	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group_bot"), "https://t.me/HentaiCard_bot?startgroup=true")
+	rows = append(rows, menu.Row(btnAddGroup))
+
+	btnSuggest := menu.Data(b.loc.T(lang, "btn_profile_suggest"), "suggest_start")
+	rows = append(rows, menu.Row(btnSuggest))
+
+	menu.Inline(rows...)
+
+	if err == nil && len(photos) > 0 {
+		photo := &tele.Photo{
+			File:    photos[0].File,
+			Caption: caption,
+		}
+		return ctx.Send(photo, tele.ModeHTML, menu)
+	}
+
+	return ctx.Send(caption, tele.ModeHTML, menu)
+}
+
+func (b *Bot) HandleCardsNav(ctx tele.Context) error {
+	_ = ctx.Respond()
+	tgUser := ctx.Sender()
+	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
+	lang := getLang(dbUser, tgUser)
+
+	offsetStr := ctx.Callback().Data
+	offset, _ := strconv.Atoi(offsetStr)
+
+	card, total, err := b.service.GetUserCardPagination(dbUser.ID, offset)
+	if err != nil {
+		return ctx.Send(b.loc.T(lang, "cards_err_load"))
+	}
+
+	if card == nil {
+		_ = ctx.Delete()
+		return ctx.Send(b.loc.T(lang, "cards_empty"))
+	}
+
+	caption := b.loc.T(lang, "card_nav_caption",
+		card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+
+	menu := &tele.ReplyMarkup{}
+	var row []tele.Btn
+
+	if offset > 0 {
+		row = append(row, menu.Data(b.loc.T(lang, "btn_back"), "cards_nav", strconv.Itoa(offset-1)))
+	}
+	if offset < total-1 {
+		row = append(row, menu.Data(b.loc.T(lang, "btn_forward"), "cards_nav", strconv.Itoa(offset+1)))
+	}
+
+	btnProfile := menu.Data(b.loc.T(lang, "btn_to_profile"), "back_profile")
+
+	if len(row) > 0 {
+		menu.Inline(menu.Row(row...), menu.Row(btnProfile))
+	} else {
+		menu.Inline(menu.Row(btnProfile))
+	}
+
+	photo := &tele.Photo{
+		File:    tele.FromURL(card.ImageURL),
+		Caption: caption,
+	}
+
+	err = ctx.Edit(photo, tele.ModeHTML, menu)
+	if err != nil && !strings.Contains(err.Error(), "message is not modified") {
+		return err
+	}
+	return nil
+}
+
+func (b *Bot) HandleBackToProfile(ctx tele.Context) error {
+	_ = ctx.Respond()
+	_ = ctx.Delete()
+	return b.HandleProfile(ctx)
+}

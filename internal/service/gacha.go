@@ -11,10 +11,11 @@ import (
 
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
+
 	"github.com/redis/go-redis/v9"
 )
 
-const adminId int64 = 348389728
+const adminId int64 = 1
 
 type GachaService struct {
 	repo *repository.PostgresRepo
