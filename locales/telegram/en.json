@@ -12,7 +12,7 @@
   "roll_success": "<blockquote><tg-emoji emoji-id=\"4996755833950831347\">🎉</tg-emoji>Congratulations! You got a card: <b>%s</b>\n\n<tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji>Rarity: <b>%s</b>\n⚔️ Power: <b>%d</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>Points: <b>+%d</b></blockquote>",
 
   "profile_err_load": "❌ Failed to load profile.",
-  "profile_caption": "<blockquote>👤 You are - %s %s\n\n<tg-emoji emoji-id=\"5368324170671202286\">🃏</tg-emoji> You have %d out of %d cards\n♻️ Duplicates for craft: <b>%d</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> You have %d points\n\n<tg-emoji emoji-id=\"5368324170671202286\">🔥</tg-emoji> Your streak is %d days</blockquote>",
+  "profile_caption": "<blockquote>👤 You are - %s %s\n\n<tg-emoji emoji-id=\"4956525562483967357\">\uD83C\uDCCF</tg-emoji> You have %d out of %d cards\n♻️ Duplicates for craft: <b>%d</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> You have %d points\n\n<tg-emoji emoji-id=\"4956499161319998529\">\uD83D\uDD25</tg-emoji> Your streak is %d days</blockquote>",
   "btn_my_cards": "🎴 My Cards [%d]",
   "btn_add_group_bot": "👥 Add bot to your group",
 
@@ -65,7 +65,7 @@
   "duel_start": "⚔️ <b>The battle has begun</b>",
   "duel_result": "<blockquote><b>⚔️ DUEL RESULT</b>\n\n🅰️ <b>%s</b> played:\n└ %s (Power: %d) — %.1f%%\n\n🅱️ <b>%s</b> played:\n└ %s (Power: %d) — %.1f%%\n\n🎲 Dice roll: <b>%.1f</b>\n🏆 Winner: <b>%s</b>\n💰 Prize: <b>%d points</b></blockquote>",
 
-  "err_craft_failed": "⚒ <b>Alchemy failed:</b> %s",
+  "err_craft_failed": "⚒ <b>Craft failed:</b> %s",
   "craft_success": "<blockquote>⚒ <b>SUCCESSFUL CRAFT!</b>\n\nYou smelted %d duplicates and got:\n🃏 Card: <b>%s</b>\n✨ Rarity: <b>%s</b>\n⚔️ Power: <b>%d</b></blockquote>",
   "craft_mythic_frag": "<blockquote>⚒ <b>SUCCESSFUL CRAFT!</b>\n\nYou smelted %d legendary duplicates and got a Mythical Card fragment:\n🔮 <b>%s</b>\n📦 Collected: <b>%d / 10</b></blockquote>",
   "craft_mythic_assembled": "<blockquote>⚒ <b>MYTHICAL CRAFT!</b>\n\nYou smelted %d duplicates and assembled the final fragment!\n🔥 Obtained Mythical Card: <b>%s</b>\n⚔️ Power: <b>%d</b></blockquote>",
@@ -90,9 +90,9 @@
   "payment_success": "<blockquote>✅ <b>Payment successfully completed!</b>\n\nYou received Premium Rolls: <b>%d</b> ⭐️%s\n\nUse /roll to play right now!</blockquote>",
   "help_main": "<blockquote>📖 <b>Bot Help</b>\n\nWelcome to our Hentai Gacha! Here you can collect unique cards, earn points, and compete with friends.\n\n<b>Main commands:</b>\n/roll — get a new card\n/profile — your inventory and balance\n/top — group leaderboards\n/globaltop — global leaderboards\n/duel @user bet — challenge to a duel\n/craft — smelt duplicates\n\n<i>Choose a section below to learn more.</i></blockquote>",
   "help_cards": "<blockquote>🎴 <b>How do cards work?</b>\n\nOnce every <b>3 hours</b> you can use /roll. The bot gives a random card and <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n🌟 <b>Fragments:</b> Mythical cards drop as Fragments. Collect 10 to get a whole card in your inventory!</blockquote>",
-  "help_rarities": "<blockquote>✨ <b>Card Rarities</b>\n\n⚪️ <b>Common</b>\n🟢 <b>Uncommon</b>\n🔵 <b>Rare</b>\n🟣 <b>Epic</b>\n🟡 <b>Legendary</b>\n🔴 <b>Mythical</b> (Fragment Crafting / Luck)\n\nThe higher the rarity, the higher the card's <b>Power</b>, which is useful in duels!</blockquote>",
+  "help_rarities": "<blockquote>✨ <b>Card Rarities</b>\n\n⚪️ <b>Common</b>\n  └ Drop: 60% | 10 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🟢 <b>Uncommon</b>\n  └ Drop: 20% | 25 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🔵 <b>Rare</b>\n  └ Drop: 15% | 50 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🟣 <b>Epic</b>\n  └ Drop: 4% | 75 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🟡 <b>Legendary</b>\n  └ Drop: 0.99% | 100 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🔴 <b>Mythic</b>\n  └ Drop: 0.01% | 500 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n\nHigher rarity means higher Power for duels!</blockquote>",
   "help_streaks": "<blockquote>🔥 <b>Streaks</b>\n\nLog in every day and use /roll. Your Streak grows daily, increasing bonus <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b> for each roll.\n\n⚠️ <i>If you miss a day, the streak resets.</i></blockquote>",
-  "help_pity": "<blockquote>🛡 <b>Pity System</b>\n\nIf you're unlucky for a long time, the <b>Pity System</b> activates. Each rare category has a counter: when full, a rare card drops with a <b>100% chance</b>.\n\nWhen a rare card drops, the counter for that rarity resets.</blockquote>",
+  "help_pity": "<blockquote>🛡 <b>Pity System</b>\n\nProtects from bad luck. If a rarity doesn't drop for a while, it is guaranteed with a <b>100% chance</b> on a specific roll:\n\n🔵 <b>Rare</b> — on 6th\n🟣 <b>Epic</b> — on 25th\n🟡 <b>Legendary</b> — on 60th\n\nWhen a rarity drops, its counter resets.</blockquote>",
   "help_duel": "<blockquote>⚔️ <b>Point Duels</b>\n\nUse command: <code>/duel @username bet</code>\n\n<b>How it works:</b>\n1. The bot selects one <b>random</b> card from each player's inventory.\n2. Win chance depends on the <b>Power</b> of the selected cards (higher rarity = higher power).\n3. The winner takes the loser's bet.</blockquote>",
   "help_craft": "<blockquote>⚒ <b>Duplicate Crafting</b>\n\nDon't know what to do with extra copies? Use command:\n/craft\n\n<b>Crafting Prices:</b>\n• <b>5 duplicates</b> of one rarity = 1 random card of the next rarity.\n• <b>15 Legendary duplicates</b> = 1 Mythical card fragment.\n\n⚠️ <b>Important:</b>\n- The bot automatically uses the cheapest available duplicates.\n- The original card (1 copy) always stays with you; only extra copies are burned.\n- Mythical cards cannot be dismantled.</blockquote>",
 
@@ -107,7 +107,7 @@
   "suggest_q2": "<b>Question 2/3:</b>\n\nI have a really cool card. If I suggest it, will you 100% add it to the bot?",
   "btn_q2_yes": "✅ Yes, of course",
   "btn_q2_no": "⛔️ No, but the chance is high",
- 
+
   "suggest_q3": "<b>Question 3/3:</b>\n\nWhat is the preferred aspect ratio for the photo?",
   "btn_q3_43": "4:3 (Horizontal)",
   "btn_q3_34": "3:4 (Vertical)",
@@ -141,7 +141,7 @@
   "promo_err_expired": "❌ This promo code has expired.",
 
   "promo_success_title": "🎉 Promo code activated successfully!",
-  "promo_reward_points": "🪙 Points: <b>+%d</b>",
+  "promo_reward_points": "<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Points: <b>+%d</b>",
   "promo_reward_rolls": "⭐️ Premium rolls: <b>+%d</b>",
   "promo_reward_cards_count": "📦 Cards received: <b>%d</b>",
   "promo_reward_card": "> 🃏 <b>%s</b> (⚔️ %d)"

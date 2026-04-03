@@ -78,9 +78,9 @@
 
   "help_main": "> 📖 **Bot Help**\n> \n> Use the menu below to learn more.",
   "help_cards": "> 🎴 **Cards**\n> Use /roll every 3 hours.",
-  "help_rarities": "> ✨ **Rarities**\n> Common ⚪️ -> Uncommon 🟢 -> Rare 🔵 -> Epic 🟣 -> Legendary 🟡 -> Mythic 🔴",
+  "help_rarities": "> ✨ **Card Rarities (Drop | Reward)**\n> ⚪️ **Common** └ 60% | 10 🪙\n> 🟢 **Uncommon** └ 20% | 25 🪙\n> 🔵 **Rare** └ 15% | 50 🪙\n> 🟣 **Epic** └ 4% | 75 🪙\n> 🟡 **Legendary** └ 0.99% | 100 🪙\n> 🔴 **Mythic** └ 0.01% | 500 🪙",
   "help_streaks": "> 🔥 **Streaks**\n> Play daily for streak bonuses.",
-  "help_pity": "> 🛡 **Pity**\n> Guarantees rare drops over time.",
+  "help_pity": "> 🛡 **Pity System**\n> Guarantees a card drop on a specific roll:\n> 🔵 **Rare** (6th) | 🟣 **Epic** (25th) | 🟡 **Legendary** (60th)",
   "help_duel": "> ⚔️ **Duels**\n> Battle with your cards via /duel.",
   "help_craft": "> ⚒ **Craft**\n> 5 duplicates = 1 card of higher rarity.",
 
