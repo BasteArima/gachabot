@@ -149,25 +149,25 @@
 
   "btn_my_sets": "📚 Коллекции (%d/%d)",
   "sets_empty": "Упс! Ты пока не открыл ни одной коллекции. Крути /roll, чтобы найти первые карты!",
-  "sets_list_title": "<blockquote>📚 <b>Твои Коллекции (Сеты)</b>\n\nСобери все карты одной тематики, чтобы забрать награду и разблокировать уникальную Ауру!</blockquote>\n\n",
+  "sets_list_title": "<blockquote>📚 <b>Твои Коллекции (Сеты)</b>\n\nСобери все карты одной тематики, чтобы забрать награду и разблокировать уникальный Бафф!</blockquote>\n\n",
   "set_status_completed": "✅ Собрано",
   "set_status_progress": "⏳ %d/%d",
   "btn_set_view": "📖 %s",
-  "set_view_title": "<blockquote>📚 <b>Сет: «%s»</b>\n\n🎁 Награда за сбор: <b>%d очков</b>\n✨ Аура сета: <b>%s</b></blockquote>\n\n<b>Список карт:</b>\n",
+  "set_view_title": "<blockquote>📚 <b>Сет: «%s»</b>\n\n🎁 Награда за сбор: <b>%d очков</b>\n✨ Бафф сета: <b>%s</b></blockquote>\n\n<b>Список карт:</b>\n",
   "set_card_owned": "✅ %d. <b>%s</b>",
   "set_card_unknown": "❌ %d. <i>??? (Скрыто)</i>",
-  "btn_equip_aura": "✨ Экипировать Ауру",
-  "btn_unequip_aura": "🛑 Снять Ауру",
-  "aura_equipped_toast": "✨ Аура экипирована!",
-  "aura_unequipped_toast": "🛑 Аура снята!",
+  "btn_equip_aura": "✨ Экипировать бафф",
+  "btn_unequip_aura": "🛑 Снять бафф",
+  "aura_equipped_toast": "✨ Бафф экипирован!",
+  "aura_unequipped_toast": "🛑 Бафф снят!",
   "card_nav_caption_with_set": "<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>%s</b>\n📚 Сет: <b>«%s»</b>\n\n✨ Редкость: <b>%s</b>\n⚔️ Сила: <b>%d</b>\n📦 У вас: <b>%d шт.</b>\n\n<i>Карточка %d из %d</i></blockquote>",
 
   "buff_type_power_percent": "Буст силы",
 
   "set_completed_msg": "🎉 <b>ДОСТИЖЕНИЕ ПОЛУЧЕНО!</b>\n\nТы собрал все карты коллекции <b>«%s»</b>!\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Награда: <b>+%d очков</b>\n\n<i>✨ Зайди в /profile ➡️ Коллекции, чтобы экипировать Ауру этого сета!</i>",
 
-  "duel_aura_challenger": "✨ Аура: <b>%s</b>",
-  "duel_aura_target": "✨ Аура: <b>%s</b>",
+  "duel_aura_challenger": "✨ Бафф: <b>%s</b>",
+  "duel_aura_target": "✨ Бафф: <b>%s</b>",
   "duel_fair_note": "⚖️ <b>Это честная дуэль. Ауры коллекций отключены!</b>",
   "duel_result": "⚔️ <b>РЕЗУЛЬТАТЫ СРАЖЕНИЯ</b>\n\n<b>🗡 Игрок 1: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Шанс: <b>%.1f%%</b>\n\n<b>🛡 Игрок 2: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Шанс: <b>%.1f%%</b>\n\n%s━━━━━━━━━━━━━\n🎰 <b>Бросок: %.1f</b>\n🏆 Победитель: <b>%s</b> (+%d 🪙)",
 

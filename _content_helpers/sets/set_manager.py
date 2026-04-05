@@ -1,7 +1,8 @@
 import psycopg2
 
 # Настройки подключения к твоей локальной БД в Docker
-DB_HOST = "localhost"
+#DB_HOST = "localhost"
+DB_HOST = "192.168.0.105"
 DB_PORT = "5432"
 DB_NAME = "gachabot"
 DB_USER = "root"       # Замени, если у тебя другой юзер (например, postgres)

@@ -34,14 +34,15 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 		// Обновленная кнопка со счетчиком
 		btnMySets := menu.Data(b.loc.T(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets), "sets_nav", "0")
 
-		rows = append(rows, menu.Row(btnMyCards, btnMySets))
+		rows = append(rows, menu.Row(btnMyCards))
+		rows = append(rows, menu.Row(btnMySets))
 	}
-
-	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group_bot"), "https://t.me/HentaiCard_bot?startgroup=true")
-	rows = append(rows, menu.Row(btnAddGroup))
 
 	btnSuggest := menu.Data(b.loc.T(lang, "btn_profile_suggest"), "suggest_start")
 	rows = append(rows, menu.Row(btnSuggest))
+
+	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group_bot"), "https://t.me/HentaiCard_bot?startgroup=true")
+	rows = append(rows, menu.Row(btnAddGroup))
 
 	menu.Inline(rows...)
 
@@ -65,6 +66,7 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 	offsetStr := ctx.Callback().Data
 	offset, _ := strconv.Atoi(offsetStr)
 
+	// Получаем текущую карточку и общее кол-во уникальных карт
 	card, total, err := b.service.GetUserCardPagination(dbUser.ID, offset)
 	if err != nil {
 		return ctx.Send(b.loc.T(lang, "cards_err_load"))
@@ -77,29 +79,34 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 
 	var caption string
 	if card.SetName != "" {
-		// Если карточка из коллекции, выводим специальный текст
 		caption = b.loc.T(lang, "card_nav_caption_with_set",
 			card.CardName, card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 	} else {
-		// Если обычная карточка
 		caption = b.loc.T(lang, "card_nav_caption",
 			card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 	}
 
 	menu := &tele.ReplyMarkup{}
-	var row []tele.Btn
+	var navRow []tele.Btn
 
-	if offset > 0 {
-		row = append(row, menu.Data(b.loc.T(lang, "btn_back"), "cards_nav", strconv.Itoa(offset-1)))
-	}
-	if offset < total-1 {
-		row = append(row, menu.Data(b.loc.T(lang, "btn_forward"), "cards_nav", strconv.Itoa(offset+1)))
+	// --- ЛОГИКА ЦИКЛИЧНОГО ЛИСТАНИЯ ---
+	if total > 1 {
+		// Если мы на 0, то (0-1 + total) % total даст индекс последней карты
+		prev := (offset - 1 + total) % total
+		// Если мы на последней, то (last+1) % total даст 0
+		next := (offset + 1) % total
+
+		btnBack := menu.Data(b.loc.T(lang, "btn_back"), "cards_nav", strconv.Itoa(prev))
+		btnForward := menu.Data(b.loc.T(lang, "btn_forward"), "cards_nav", strconv.Itoa(next))
+
+		navRow = append(navRow, btnBack, btnForward)
 	}
 
 	btnProfile := menu.Data(b.loc.T(lang, "btn_to_profile"), "back_profile")
 
-	if len(row) > 0 {
-		menu.Inline(menu.Row(row...), menu.Row(btnProfile))
+	// Собираем меню: кнопки навигации в один ряд, кнопка профиля под ними
+	if len(navRow) > 0 {
+		menu.Inline(menu.Row(navRow...), menu.Row(btnProfile))
 	} else {
 		menu.Inline(menu.Row(btnProfile))
 	}

@@ -148,29 +148,29 @@
   "card_unknown": "??? (Unknown)",
 
   "btn_my_sets": "📚 Collections (%d/%d)",
-  "sets_empty": "Oops! You haven't unlocked any collections yet. Roll to find your first cards!",
-  "sets_list_title": "<blockquote>📚 <b>Your Collections (Sets)</b>\n\nCollect all cards of the same theme to claim your reward and unlock a unique Aura!</blockquote>\n\n",
+  "sets_empty": "Oops! You haven’t unlocked any collections yet. Use /roll to find your first cards!",
+  "sets_list_title": "<blockquote>📚 <b>Your Collections (Sets)</b>\n\nCollect all cards of the same theme to claim a reward and unlock a unique buff!</blockquote>\n\n",
   "set_status_completed": "✅ Completed",
   "set_status_progress": "⏳ %d/%d",
   "btn_set_view": "📖 %s",
-  "set_view_title": "<blockquote>📚 <b>Set: «%s»,</b>\n\n🎁 Reward for completing: <b>%d Points</b>\n✨ Set Aura: <b>%s</b></blockquote>\n\n<b>Card List:</b>\n",
+  "set_view_title": "<blockquote>📚 <b>Set: “%s”</b>\n\n🎁 Completion reward: <b>%d points</b>\n✨ Set buff: <b>%s</b></blockquote>\n\n<b>Card list:</b>\n",
   "set_card_owned": "✅ %d. <b>%s</b>",
   "set_card_unknown": "❌ %d. <i>??? (Hidden)</i>",
-  "btn_equip_aura": "✨ Equip Aura",
-  "btn_unequip_aura": "🛑 Unequip Aura",
-  "aura_equipped_toast": "✨ Aura equipped!",
-  "aura_unequipped_toast": "🛑 Aura unequipped!",
+  "btn_equip_aura": "✨ Equip buff",
+  "btn_unequip_aura": "🛑 Unequip buff",
+  "aura_equipped_toast": "✨ Buff equipped!",
+  "aura_unequipped_toast": "🛑 Buff removed!",
   "card_nav_caption_with_set": "<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>%s</b>\n📚 Set: <b>“%s”</b>\n\n✨ Rarity: <b>%s</b>\n⚔️ Power: <b>%d</b>\n📦 You have: <b>%d pcs.</b>\n\n<i>Card %d of %d</i></blockquote>",
 
   "buff_type_power_percent": "Power Boost",
 
   "set_completed_msg": "🎉 <b>ACHIEVEMENT UNLOCKED!</b>\n\nYou have collected all cards from the <b>“%s”</b> collection!\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Reward: <b>+%d points</b>\n\n<i>✨ Go to /profile ➡️ Collections to equip this set’s Aura!</i>",
 
-  "duel_aura_challenger": "✨ Aura: <b>%s</b>",
-  "duel_aura_target": "✨ Aura: <b>%s</b>",
-  "duel_fair_note": "⚖️ <b>Это честная дуэль. Ауры коллекций отключены!</b>",
-  "duel_result": "⚔️ <b>РЕЗУЛЬТАТЫ СРАЖЕНИЯ</b>\n\n<b>🗡 Игрок 1: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Шанс: <b>%.1f%%</b>\n\n<b>🛡 Игрок 2: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Шанс: <b>%.1f%%</b>\n\n%s━━━━━━━━━━━━━\n🎰 <b>Бросок: %.1f</b>\n🏆 Победитель: <b>%s</b> (+%d 🪙)",
+  "duel_aura_challenger": "✨ Buff: <b>%s</b>",
+  "duel_aura_target": "✨ Buff: <b>%s</b>",
+  "duel_fair_note": "⚖️ <b>This is a fair duel. Collection auras are disabled!</b>",
+  "duel_result": "⚔️ <b>BATTLE RESULTS</b>\n\n<b>🗡 Player 1: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Chance: <b>%.1f%%</b>\n\n<b>🛡 Player 2: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Chance: <b>%.1f%%</b>\n\n%s━━━━━━━━━━━━━\n🎰 <b>Roll: %.1f</b>\n🏆 Winner: <b>%s</b> (+%d 🪙)",
 
   "btn_help_sets": "📚 Collections",
-  "help_sets": "<blockquote>📚 <b>Collections & Auras</b>\n\nCards are grouped into thematic sets. Completing a collection unlocks unique bonuses!\n\n🎁 <b>Reward:</b> Once you collect all cards in a set, you receive a massive <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b> bonus.\n\n✨ <b>Auras:</b> For every completed set, you unlock an Aura. This is a passive buff that increases your cards' <b>Power</b> in duels.\n\n⚙️ <b>How to use:</b>\n1. Go to /profile.\n2. Tap the <b>\"📚 Collections\"</b> button.\n3. Select a completed set and tap <b>\"✨ Equip Aura\"</b>.\n\n⚠️ <i>Note: You can only have one active Aura at a time!</i></blockquote>"
+  "help_sets": "<blockquote>📚 <b>Collections & Auras</b>\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 <b>Reward:</b> As soon as you collect all cards in a set, you will receive a large bonus in <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n✨ <b>Auras:</b> For each completed set, you unlock a unique Aura. This is a passive boost that increases the <b>Power</b> of your cards in duels.\n\n⚙️ <b>How to use:</b>\n1. Go to /profile.\n2. Press the <b>“📚 Collections”</b> button.\n3. Select a completed set and press <b>“✨ Equip”</b>.\n\n⚠️ <i>Important: only one Aura can be active at a time!</i></blockquote>"
 }
