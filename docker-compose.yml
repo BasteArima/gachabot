@@ -39,6 +39,28 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # <--- ИСПРАВЛЕНО ЗДЕСЬ
       - POSTGRES_DB=${POSTGRES_DB}           # <--- ИСПРАВЛЕНО ЗДЕСЬ
       - REDIS_ADDR=redis:6379
+    volumes:
+      # Прокидываем папку бэкапов в бота (только для чтения)
+      - /opt/gachabot/backups:/backups:ro
+
+  pgbackups:
+      image: prodrigestivill/postgres-backup-local
+      restart: always
+      depends_on:
+        - db # Имя твоего сервиса с базой данных
+      volumes:
+        # Папка на сервере (слева), куда будут падать бэкапы
+        - /opt/gachabot/backups:/backups
+      environment:
+        - POSTGRES_HOST=db
+        - POSTGRES_DB=${POSTGRES_DB}
+        - POSTGRES_USER=${POSTGRES_USER}
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+        # Расписание в формате cron (каждый день в 03:00 ночи)
+        - SCHEDULE=0 3 * * *
+        # Сколько дней хранить бэкапы (старые удалятся сами)
+        - BACKUP_KEEP_DAYS=7
+        - BACKUP_KEEP_WEEKS=4
 
 volumes:
   postgres_data:

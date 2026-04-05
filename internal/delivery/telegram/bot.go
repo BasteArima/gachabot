@@ -54,6 +54,7 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 // Запуск поллинга
 func (b *Bot) Start() {
 	log.Println("[TELEGRAM] Бот запущен и слушает обновления!")
+	b.StartBackupSender()
 	b.bot.Start()
 }
 
