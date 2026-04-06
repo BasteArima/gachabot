@@ -3,6 +3,7 @@ package discord
 import (
 	"fmt"
 	"gachabot/internal/models"
+	"log"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -93,8 +94,17 @@ func (b *Bot) updateWithComponents(s *discordgo.Session, i *discordgo.Interactio
 }
 
 func (b *Bot) updateWithEmbedAndComponents(s *discordgo.Session, i *discordgo.InteractionCreate, content string, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) {
-	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
-		Data: &discordgo.InteractionResponseData{Content: content, Embeds: []*discordgo.MessageEmbed{embed}, Components: components},
+		Data: &discordgo.InteractionResponseData{
+			Content:    content,
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: components,
+		},
 	})
+
+	// ВОТ ЭТО СПАСЕТ ТЕБЕ МНОГО ЧАСОВ ДЕБАГА
+	if err != nil {
+		log.Printf("[DISCORD ERROR] Не удалось обновить сообщение: %v", err)
+	}
 }

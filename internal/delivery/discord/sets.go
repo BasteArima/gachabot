@@ -39,7 +39,7 @@ func (b *Bot) handleSetsList(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
-	const pageSize = 5
+	const pageSize = 4
 	totalSets := len(setsProgress)
 	totalPages := (totalSets + pageSize - 1) / pageSize
 
