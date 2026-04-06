@@ -30,8 +30,6 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	var rows []tele.Row
 	if profile.UniqueCardsCount > 0 {
 		btnMyCards := menu.Data(b.loc.T(lang, "btn_my_cards", profile.UniqueCardsCount), "cards_nav", "0")
-
-		// Обновленная кнопка со счетчиком
 		btnMySets := menu.Data(b.loc.T(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets), "sets_nav", "0")
 
 		rows = append(rows, menu.Row(btnMyCards))
@@ -39,10 +37,10 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	}
 
 	btnSuggest := menu.Data(b.loc.T(lang, "btn_profile_suggest"), "suggest_start")
-	rows = append(rows, menu.Row(btnSuggest))
+	btnBack := menu.Data(b.loc.T(lang, "btn_back_to_start"), "start_menu")
 
-	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group_bot"), "https://t.me/HentaiCard_bot?startgroup=true")
-	rows = append(rows, menu.Row(btnAddGroup))
+	rows = append(rows, menu.Row(btnSuggest))
+	rows = append(rows, menu.Row(btnBack))
 
 	menu.Inline(rows...)
 
@@ -51,9 +49,21 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 			File:    photos[0].File,
 			Caption: caption,
 		}
+
+		// Если это вызов по кнопке из Хаба (который тоже картинка), делаем красивый Edit!
+		if ctx.Callback() != nil && ctx.Message().Photo != nil {
+			return ctx.Edit(photo, tele.ModeHTML, menu)
+		}
+
+		// Иначе просто отправляем
 		return ctx.Send(photo, tele.ModeHTML, menu)
 	}
 
+	// Если аватарки нет, шлем просто текст.
+	// Если пришли по кнопке, удаляем старую картинку Хаба и шлем текст
+	if ctx.Callback() != nil {
+		_ = ctx.Delete()
+	}
 	return ctx.Send(caption, tele.ModeHTML, menu)
 }
 

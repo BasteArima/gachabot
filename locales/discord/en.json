@@ -22,7 +22,7 @@
   "card_nav_caption": "> ✨ Rarity: **%s**\n> ⚔️ Power: **%d**\n> 📦 You have: **%d pcs.**\n> \n> *Card %d of %d*",
 
   "top_local_title": "Server Top",
-  "top_global_title": "Global Top",
+  "top_global_title": "World Top",
   "top_crit_balance": "By Balance",
   "top_crit_cards": "By Cards",
   "top_crit_streak": "By Streak",

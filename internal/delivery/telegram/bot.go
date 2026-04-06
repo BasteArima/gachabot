@@ -67,8 +67,8 @@ func (b *Bot) setupRoutes() {
 	b.bot.Handle("\fback_profile", b.HandleBackToProfile)
 
 	// Топы
-	b.bot.Handle("/top", b.HandleLocalTop)
-	b.bot.Handle("/globaltop", b.HandleGlobalTop)
+	//b.bot.Handle("/top", b.HandleLocalTop) // local chat top
+	b.bot.Handle("/top", b.HandleGlobalTop)
 	b.bot.Handle("\ftop_btn", b.HandleTopCallback)
 
 	// Помощь и язык
@@ -106,6 +106,11 @@ func (b *Bot) setupRoutes() {
 	b.bot.Handle("\fsets_nav", b.HandleSetsList)
 	b.bot.Handle("\fset_view", b.HandleSetView)
 	b.bot.Handle("\fset_equip", b.HandleEquipAura)
+
+	b.bot.Handle(&tele.Btn{Unique: "roll_shortcut"}, b.HandleRollShortcut)
+	b.bot.Handle(&tele.Btn{Unique: "profile_menu"}, b.HandleProfileMenu)
+	b.bot.Handle(&tele.Btn{Unique: "start_menu"}, b.HandleStartMenu)
+	b.bot.Handle(&tele.Btn{Unique: "help_menu"}, b.HandleHelpMenu)
 
 	// Разное
 	b.bot.Handle("/link", b.HandleLinkStart)

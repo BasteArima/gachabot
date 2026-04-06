@@ -21,8 +21,8 @@
   "cards_empty": "Упс! Твой инвентарь пуст. Используй /roll!",
   "card_nav_caption": "> ✨ Редкость: **%s**\n> ⚔️ Сила: **%d**\n> 📦 У вас: **%d шт.**\n> \n> *Карточка %d из %d*",
 
-  "top_local_title": "Топ сервера",
-  "top_global_title": "Глобальный топ",
+  "top_local_title": "ТОП сервера",
+  "top_global_title": "Мировой ТОП",
   "top_crit_balance": "По балансу",
   "top_crit_cards": "По картам",
   "top_crit_streak": "По стрику",

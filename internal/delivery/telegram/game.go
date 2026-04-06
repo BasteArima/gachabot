@@ -194,17 +194,58 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
 	lang := getLang(dbUser, tgUser)
 
-	sticker := &tele.Sticker{File: tele.File{FileID: "CAACAgIAAxkBAAMGacUaTK2nsNg77On1KstHV1B6SbMAAj-HAAJOpnFK7SHSkw_YzeE6BA"}}
-
 	menu := &tele.ReplyMarkup{}
+	btnRoll := menu.Data(b.loc.T(lang, "btn_roll_shortcut"), "roll_shortcut")
+	btnProfile := menu.Data(b.loc.T(lang, "btn_profile_menu"), "profile_menu")
+	btnHelp := menu.Data(b.loc.T(lang, "btn_help_menu"), "help_menu")
 	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group"), "https://t.me/HentaiCard_bot?startgroup=true")
-	menu.Inline(menu.Row(btnAddGroup))
 
-	if err := ctx.Send(sticker); err != nil {
-		log.Println("Cant send sticker:", err)
+	menu.Inline(
+		menu.Row(btnProfile, btnHelp),
+		menu.Row(btnAddGroup),
+		menu.Row(btnRoll),
+	)
+
+	text := b.loc.T(lang, "start_msg")
+
+	// Наш новый крутой баннер!
+	banner := &tele.Photo{
+		// Укажи тут URL к сгенерированной картинке или путь к локальному файлу
+		File:    tele.FromURL("https://api.baste.ru/cards/banner.webp"),
+		Caption: text,
 	}
 
-	return ctx.Send(b.loc.T(lang, "start_msg"), tele.ModeHTML, menu)
+	// 1. Если это вызов по команде /start (НОВЫЙ ХАБ)
+	if ctx.Callback() == nil {
+		return ctx.Send(banner, tele.ModeHTML, menu)
+	}
+
+	// 2. ВОЗВРАТ В ХАБ ПО КНОПКЕ
+
+	// Так как Хаб теперь картинка, мы проверяем, откуда мы пришли.
+	// Если мы пришли из Профиля (там тоже картинка - аватарка), то мы можем сделать красивый Edit!
+	if ctx.Message().Photo != nil {
+		return ctx.Edit(banner, tele.ModeHTML, menu)
+	}
+
+	// Если мы пришли из Справки (там был просто текст), мы НЕ МОЖЕМ сделать Edit.
+	// Поэтому удаляем текст Справки и присылаем новую картинку Хаба.
+	_ = ctx.Delete()
+	return ctx.Send(banner, tele.ModeHTML, menu)
+}
+
+// Обрабатывает нажатие на кнопку "Профиль" из главного меню
+func (b *Bot) HandleProfileMenu(ctx tele.Context) error {
+	_ = ctx.Respond()
+	// Мы переходим из Хаба (Картинки) в Профиль (Картинку).
+	// Поэтому НЕ удаляем сообщение! HandleProfile сможет сделать красивый ctx.Edit.
+	return b.HandleProfile(ctx)
+}
+
+// Обрабатывает кнопку "Назад в главное меню"
+func (b *Bot) HandleStartMenu(ctx tele.Context) error {
+	_ = ctx.Respond()
+	return b.HandleStart(ctx)
 }
 
 func (b *Bot) HandleRoll(ctx tele.Context) error {
@@ -294,5 +335,11 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 
 func (b *Bot) HandleRollAgainCallback(ctx tele.Context) error {
 	_ = ctx.Respond()
+	return b.HandleRoll(ctx)
+}
+
+// Обрабатывает нажатие на кнопку "Крутить" из меню
+func (b *Bot) HandleRollShortcut(ctx tele.Context) error {
+	_ = ctx.Respond() // Убираем часики с кнопки
 	return b.HandleRoll(ctx)
 }

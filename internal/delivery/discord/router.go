@@ -47,9 +47,9 @@ func (b *Bot) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleLink(s, i, dbUser, lang)
 	case "help":
 		b.handleHelp(s, i, lang)
+	//case "top":
+	//b.handleTop(s, i, lang, "balance", false)
 	case "top":
-		b.handleTop(s, i, lang, "balance", false)
-	case "globaltop":
 		b.handleTop(s, i, lang, "balance", true)
 	case "craft":
 		b.handleCraft(s, i, dbUser, lang)

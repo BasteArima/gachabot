@@ -61,6 +61,7 @@ func (b *Bot) HandleLanguageSetCallback(ctx tele.Context) error {
 func (b *Bot) buildHelpMessage(section string, lang string) (string, *tele.ReplyMarkup) {
 	menu := &tele.ReplyMarkup{}
 
+	// Генерируем все 10 кнопок заранее
 	btnMain := menu.Data(b.loc.T(lang, "btn_help_main"), "help_nav", "main")
 	btnCards := menu.Data(b.loc.T(lang, "btn_help_cards"), "help_nav", "cards")
 	btnRarities := menu.Data(b.loc.T(lang, "btn_help_rarities"), "help_nav", "rarities")
@@ -71,27 +72,27 @@ func (b *Bot) buildHelpMessage(section string, lang string) (string, *tele.Reply
 	btnSets := menu.Data(b.loc.T(lang, "btn_help_sets"), "help_nav", "sets")
 	btnLang := menu.Data(b.loc.T(lang, "btn_help_lang"), "help_nav", "language")
 
-	if section == "main" {
-		menu.Inline(
-			menu.Row(btnCards, btnRarities),
-			menu.Row(btnStreaks, btnPity),
-			menu.Row(btnDuel, btnCraft),
-			menu.Row(btnSets, btnLang),
-		)
-	} else if section == "language" {
+	// Наша кнопка возврата в Хаб
+	btnBackToStart := menu.Data(b.loc.T(lang, "btn_back_to_start"), "start_menu")
+
+	if section == "language" {
+		// Для языка делаем отдельную клавиатуру
 		btnRu := menu.Data("🇷🇺 Русский", "lang_set", "ru")
 		btnEn := menu.Data("🇬🇧 English", "lang_set", "en")
 
 		menu.Inline(
 			menu.Row(btnRu, btnEn),
-			menu.Row(btnMain),
+			menu.Row(btnMain, btnBackToStart), // Кнопка "Общее" вернет к списку, а "Хаб" выведет в игру
 		)
 	} else {
+		// УНИВЕРСАЛЬНАЯ СТАТИЧНАЯ СЕТКА
+		// Клавиатура не прыгает, не меняет размер, все кнопки на своих местах
 		menu.Inline(
-			menu.Row(btnCards, btnRarities),
+			menu.Row(btnMain, btnCards),
+			menu.Row(btnRarities, btnSets),
 			menu.Row(btnStreaks, btnPity),
 			menu.Row(btnDuel, btnCraft),
-			menu.Row(btnSets, btnMain),
+			menu.Row(btnLang, btnBackToStart),
 		)
 	}
 
@@ -111,7 +112,18 @@ func (b *Bot) HandleHelp(ctx tele.Context) error {
 	lang := getLang(dbUser, tgUser)
 
 	text, menu := b.buildHelpMessage("main", lang)
+
+	// Если вызвано командой /help
 	return ctx.Send(text, tele.ModeHTML, menu)
+}
+
+func (b *Bot) HandleHelpMenu(ctx tele.Context) error {
+	_ = ctx.Respond()
+
+	// Хаб — это картинка, а Справка — текст. Edit сделать нельзя.
+	// Поэтому удаляем Хаб и вызываем HandleHelp, чтобы он прислал новое сообщение.
+	_ = ctx.Delete()
+	return b.HandleHelp(ctx)
 }
 
 func (b *Bot) HandleHelpCallback(ctx tele.Context) error {
@@ -123,6 +135,7 @@ func (b *Bot) HandleHelpCallback(ctx tele.Context) error {
 	section := ctx.Callback().Data
 	text, menu := b.buildHelpMessage(section, lang)
 
+	// Внутри самой Справки мы переключаем разделы (это всё текст, поэтому Edit работает)
 	err := ctx.Edit(text, tele.ModeHTML, menu)
 	if err != nil && !strings.Contains(err.Error(), "message is not modified") {
 		return err

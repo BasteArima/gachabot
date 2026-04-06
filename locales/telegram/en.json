@@ -1,6 +1,11 @@
 {
+  "start_msg": "🌟 <b>Welcome!</b>\n\nYour personal hentai card collection starts right now!\n\n🃏 Open packs and hunt for rare characters\n📚 Complete sets and earn powerful buffs\n⚔️ Battle other players in duels\n\n👇 <i>Try your luck — press the button below!</i>",
+  "btn_roll_shortcut": "🎰 Get a card!",
+  "btn_profile_menu": "👤 Profile",
+  "btn_help_menu": "📖 How to play?",
+  "btn_back_to_start": "🔙 Back to main menu",
+
   "btn_add_group": "👥 Add to group",
-  "start_msg": "👋 Hello! Here you can collect unique cards and compete with other players\n\nHow to get cards?\n<blockquote>send \"/roll\" command</blockquote>\n\nNeed help with bot features?\n<blockquote>send \"/help\" command</blockquote>\n\nLearn all features using /help",
 
   "roll_cooldown": "<blockquote>⏳ The next card will be available in: <b>%s</b></blockquote>",
   "btn_buy_rolls": "⭐️ Buy rolls",
@@ -23,8 +28,8 @@
   "btn_forward": "Forward ➡️",
   "btn_to_profile": "🔙 To Profile",
 
-  "top_global_title": "🌍 Global Top",
-  "top_local_title": "👥 Chat Top",
+  "top_global_title": "🌍 World TOP",
+  "top_local_title": "👥 Chat TOP",
   "top_crit_balance": "By Points",
   "top_crit_cards": "By Unique Cards",
   "top_crit_streak": "By Streak",
@@ -38,7 +43,7 @@
   "err_top_load": "Error loading leaderboard.",
   "err_top_update": "Error updating leaderboard.",
 
-  "btn_help_main": "🏠 Home",
+  "btn_help_main": "\uD83D\uDCD6 Commands",
   "btn_help_cards": "🎴 Cards",
   "btn_help_rarities": "✨ Rarities",
   "btn_help_streaks": "🔥 Streaks",
@@ -87,7 +92,7 @@
   "payment_bonus_assembled": "\n🔥 <b>Fragments assembled! Card added to inventory!</b>",
   "payment_test_refund": "\n\n<i>🛠 TEST: Payment successful. Stars refunded to admin!</i>",
   "payment_success": "<blockquote>✅ <b>Payment successfully completed!</b>\n\nYou received Premium Rolls: <b>%d</b> ⭐️%s\n\nUse /roll to play right now!</blockquote>",
-  "help_main": "<blockquote>📖 <b>Bot Help</b>\n\nWelcome to our Hentai Gacha! Here you can collect unique cards, earn points, and compete with friends.\n\n<b>Main commands:</b>\n/roll — get a new card\n/profile — your inventory and balance\n/top — group leaderboards\n/globaltop — global leaderboards\n/duel @user bet — challenge to a duel\n/craft — smelt duplicates\n\n<i>Choose a section below to learn more.</i></blockquote>",
+  "help_main": "<blockquote>📖 <b>Bot Help</b>\n\nWelcome to our Hentai Gacha! Here you can collect unique cards, earn points, and compete with friends.\n\n<b>Main commands:</b>\n/roll — get a new card\n/profile — your inventory and balance\n/top — global leaderboards\n/duel @user bet — challenge to a duel\n/craft — smelt duplicates\n/link - get a code to link your Discord account\n\n<i>Choose a section below to learn more.</i></blockquote>",
   "help_cards": "<blockquote>🎴 <b>How do cards work?</b>\n\nOnce every <b>3 hours</b> you can use /roll. The bot gives a random card and <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n🌟 <b>Fragments:</b> Mythical cards drop as Fragments. Collect 10 to get a whole card in your inventory!</blockquote>",
   "help_rarities": "<blockquote>✨ <b>Card Rarities</b>\n\n⚪️ <b>Common</b>\n  └ Drop: 60% | 10 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🟢 <b>Uncommon</b>\n  └ Drop: 20% | 25 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🔵 <b>Rare</b>\n  └ Drop: 15% | 50 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🟣 <b>Epic</b>\n  └ Drop: 4% | 75 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🟡 <b>Legendary</b>\n  └ Drop: 0.99% | 100 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n🔴 <b>Mythic</b>\n  └ Drop: 0.01% | 500 <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>\n\nHigher rarity means higher Power for duels!</blockquote>",
   "help_streaks": "<blockquote>🔥 <b>Streaks</b>\n\nLog in every day and use /roll. Your Streak grows daily, increasing bonus <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b> for each roll.\n\n⚠️ <i>If you miss a day, the streak resets.</i></blockquote>",
