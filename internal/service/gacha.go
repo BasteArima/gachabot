@@ -42,10 +42,10 @@ func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error
 	streakUpdated := false
 
 	if userDb.LastStreakDate.Valid {
-		dbDate := userDb.LastStreakDate.Time
+		dbDate := userDb.LastStreakDate.Time.In(loc)
 		lastDate := time.Date(dbDate.Year(), dbDate.Month(), dbDate.Day(), 0, 0, 0, 0, loc)
 		hoursDiff := today.Sub(lastDate).Hours()
-
+		
 		if hoursDiff == 24 { // Если разница ровно 1 сутки
 			newStreak++
 			streakUpdated = true

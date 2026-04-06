@@ -1,6 +1,7 @@
 # Этап 1: Сборка
 FROM golang:1.25-alpine AS builder
 
+RUN apk add --no-cache tzdata
 WORKDIR /app
 
 # Копируем файлы модулей и скачиваем зависимости

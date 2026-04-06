@@ -12,18 +12,26 @@ import (
 // StartBackupSender запускает вечный цикл для отправки бэкапов
 func (b *Bot) StartBackupSender() {
 	go func() {
-		for {
-			now := time.Now()
-			// Бэкап создается в 03:00. Мы ждем до 03:10, чтобы файл точно успел сохраниться
-			next := time.Date(now.Year(), now.Month(), now.Day(), 3, 10, 0, 0, now.Location())
+		// Явно загружаем локацию Москвы
+		loc, err := time.LoadLocation("Europe/Moscow")
+		if err != nil {
+			// Если вдруг в системе нет tzdata, используем фиксированную зону UTC+3
+			loc = time.FixedZone("MSK", 3*60*60)
+		}
 
-			// Если сегодня 03:10 уже прошло, планируем на завтра
+		for {
+			// Берем текущее время именно в московской локации
+			now := time.Now().In(loc)
+
+			// Планируем на 03:10 по Москве
+			next := time.Date(now.Year(), now.Month(), now.Day(), 3, 10, 0, 0, loc)
+
 			if now.After(next) {
 				next = next.Add(24 * time.Hour)
 			}
 
 			sleepDuration := time.Until(next)
-			log.Printf("📦 [BACKUP SENDER] Следующая отправка запланирована через %v", sleepDuration)
+			log.Printf("📦 [BACKUP SENDER] МСК время: %v. Отправка через %v", now.Format("15:04:05"), sleepDuration)
 			time.Sleep(sleepDuration)
 
 			b.sendLatestBackup()
@@ -69,7 +77,7 @@ func (b *Bot) sendLatestBackup() {
 	}
 
 	// Отправляем в твой секретный чат
-	chat := &tele.Chat{ID: 5176167861}
+	chat := &tele.Chat{ID: -5176167861}
 	_, err = b.bot.Send(chat, doc, tele.ModeHTML)
 	if err != nil {
 		log.Printf("❌ [BACKUP SENDER] Ошибка отправки бэкапа в Telegram: %v", err)
