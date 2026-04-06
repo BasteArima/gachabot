@@ -115,6 +115,8 @@
 
   "card_unknown": "??? (Unknown)",
 
+  "card_nav_caption_with_set": "📚 Set: **\"%s\"**\n\n✨ Rarity: **%s**\n⚔️ Power: **%d**\n📦 Owned: **%d pcs.**\n\n*Card %d of %d*",
+
   "btn_my_sets": "📚 Collections (%d/%d)",
   "sets_empty": "Oops! Your inventory is empty. Use /roll to get cards!",
   "sets_list_title": "📚 **Your Collections (Sets)**\nCollect all cards of the same theme to claim a reward and unlock a unique Buff!",

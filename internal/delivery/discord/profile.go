@@ -33,8 +33,16 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 		return
 	}
 
-	desc := b.loc.T(lang, "card_nav_caption",
-		card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+	var desc string
+	if card.SetName != "" {
+		// 6 аргументов: SetName, RarityName, PowerLevel, Quantity, Current, Total
+		desc = b.loc.T(lang, "card_nav_caption_with_set",
+			card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+	} else {
+		// 5 аргументов: RarityName, PowerLevel, Quantity, Current, Total
+		desc = b.loc.T(lang, "card_nav_caption",
+			card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+	}
 
 	embed := &discordgo.MessageEmbed{
 		Title:       "🃏 " + card.CardName,
@@ -44,13 +52,31 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 	}
 
 	var navButtons []discordgo.MessageComponent
-	if offset > 0 {
-		navButtons = append(navButtons, discordgo.Button{Label: "⬅️", Style: discordgo.SecondaryButton, CustomID: fmt.Sprintf("cards_nav:%d", offset-1)})
+
+	// --- ЛОГИКА ЦИКЛИЧНОГО ЛИСТАНИЯ ---
+	if total > 1 {
+		// Вычисляем индексы с закольцовыванием
+		prev := (offset - 1 + total) % total
+		next := (offset + 1) % total
+
+		navButtons = append(navButtons, discordgo.Button{
+			Label:    "⬅️",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("cards_nav:%d", prev),
+		})
+		navButtons = append(navButtons, discordgo.Button{
+			Label:    "➡️",
+			Style:    discordgo.SecondaryButton,
+			CustomID: fmt.Sprintf("cards_nav:%d", next),
+		})
 	}
-	if offset < total-1 {
-		navButtons = append(navButtons, discordgo.Button{Label: "➡️", Style: discordgo.SecondaryButton, CustomID: fmt.Sprintf("cards_nav:%d", offset+1)})
-	}
-	navButtons = append(navButtons, discordgo.Button{Label: "🔙", Style: discordgo.DangerButton, CustomID: "back_to_profile"})
+
+	// Кнопка возврата в профиль всегда в конце
+	navButtons = append(navButtons, discordgo.Button{
+		Label:    "🔙",
+		Style:    discordgo.DangerButton,
+		CustomID: "back_to_profile",
+	})
 
 	row := discordgo.ActionsRow{Components: navButtons}
 	b.updateWithEmbedAndComponents(s, i, "", embed, []discordgo.MessageComponent{row})
