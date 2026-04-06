@@ -330,7 +330,7 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 	}
 
 	// 10. КОЛЛЕКЦИИ (ПРОСМОТР СЕТА ЧЕРЕЗ ВЫПАДАЮЩИЙ СПИСОК)
-	if data.CustomID == "set_view_select" {
+	if strings.HasPrefix(data.CustomID, "set_view:") {
 		b.handleSetView(s, i, dbUser, lang)
 		return
 	}

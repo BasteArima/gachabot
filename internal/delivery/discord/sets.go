@@ -31,7 +31,7 @@ func generateProgressBar(collected, total int) string {
 	return bar
 }
 
-// handleSetsList выводит список сетов через Embed + Select Menu
+// handleSetsList выводит список сетов через вертикальные кнопки
 func (b *Bot) handleSetsList(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string, page int) {
 	setsProgress, err := b.service.GetUserSetsProgress(user.ID)
 	if err != nil || len(setsProgress) == 0 {
@@ -59,60 +59,70 @@ func (b *Bot) handleSetsList(s *discordgo.Session, i *discordgo.InteractionCreat
 	}
 
 	pageSets := setsProgress[start:end]
+	var components []discordgo.MessageComponent
 
-	// --- Создаем выпадающий список (Select Menu) ---
-	var options []discordgo.SelectMenuOption
+	// --- Создаем по одной кнопке в КАЖДОМ ряду (вертикальный список) ---
 	for _, sp := range pageSets {
 		status := fmt.Sprintf("%d/%d", sp.CollectedCards, sp.TotalCards)
+
+		btnStyle := discordgo.SecondaryButton // Серый по умолчанию
 		if sp.IsCompleted {
 			status = b.loc.T(lang, "set_status_completed") // ✅
+			btnStyle = discordgo.SuccessButton             // Зеленый, если собран
 		}
+
 		activeMark := ""
 		if sp.IsActive {
 			activeMark = " ✨"
 		}
+
 		pBar := generateProgressBar(sp.CollectedCards, sp.TotalCards)
 
-		options = append(options, discordgo.SelectMenuOption{
-			// Label: [███░░] Название [3/5] ✨
-			Label:       fmt.Sprintf("%s %s [%s]%s", pBar, sp.SetName, status, activeMark),
-			Description: b.loc.T(lang, "btn_set_view"),
-			Value:       strconv.Itoa(sp.SetID),
+		btnText := fmt.Sprintf("%s %s [%s]%s", pBar, sp.SetName, status, activeMark)
+
+		btn := discordgo.Button{
+			Label:    btnText,
+			Style:    btnStyle,
+			CustomID: fmt.Sprintf("set_view:%d", sp.SetID), // Обрати внимание на формат ID
+		}
+
+		// Каждую кнопку кладем в свой собственный ряд
+		components = append(components, discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{btn},
 		})
 	}
 
-	selectMenu := discordgo.SelectMenu{
-		CustomID:    "set_view_select",
-		Placeholder: "Выбери коллекцию для просмотра...",
-		Options:     options,
-	}
-
-	// --- Создаем кнопки навигации ---
+	// --- Создаем кнопки навигации (Последний ряд) ---
 	var navButtons []discordgo.MessageComponent
 	if totalPages > 1 {
-		navButtons = append(navButtons, discordgo.Button{Label: "⬅️", Style: discordgo.SecondaryButton, CustomID: fmt.Sprintf("sets_nav:%d", page-1)})
-		navButtons = append(navButtons, discordgo.Button{Label: "➡️", Style: discordgo.SecondaryButton, CustomID: fmt.Sprintf("sets_nav:%d", page+1)})
+		navButtons = append(navButtons, discordgo.Button{Label: "⬅️", Style: discordgo.PrimaryButton, CustomID: fmt.Sprintf("sets_nav:%d", page-1)})
+		navButtons = append(navButtons, discordgo.Button{Label: "➡️", Style: discordgo.PrimaryButton, CustomID: fmt.Sprintf("sets_nav:%d", page+1)})
 	}
 	navButtons = append(navButtons, discordgo.Button{Label: "🔙", Style: discordgo.DangerButton, CustomID: "back_to_profile"})
 
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{Components: []discordgo.MessageComponent{selectMenu}},
-		discordgo.ActionsRow{Components: navButtons},
-	}
+	// Добавляем ряд с навигацией в самый низ
+	components = append(components, discordgo.ActionsRow{Components: navButtons})
 
 	embed := &discordgo.MessageEmbed{
 		Title:       b.loc.T(lang, "sets_list_title"),
 		Description: fmt.Sprintf("`─── Стр. %d / %d ───`", page+1, totalPages),
-		Color:       0x5865F2, // Discord Blurple
+		Color:       0x5865F2,
 	}
 
 	b.updateWithEmbedAndComponents(s, i, "", embed, components)
 }
 
-// handleSetView обрабатывает выбор коллекции из Select Menu
+// handleSetView обрабатывает выбор коллекции из кнопки
 func (b *Bot) handleSetView(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
-	setIDStr := i.MessageComponentData().Values[0]
-	setID, _ := strconv.Atoi(setIDStr)
+	// Достаем ID из CustomID кнопки (формат: set_view:ID)
+	customID := i.MessageComponentData().CustomID
+	parts := strings.Split(customID, ":")
+
+	if len(parts) < 2 {
+		return
+	}
+
+	setID, _ := strconv.Atoi(parts[1])
 
 	b.renderSetView(s, i, user, lang, setID, false)
 }

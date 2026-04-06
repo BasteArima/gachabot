@@ -81,11 +81,6 @@ func (b *Bot) HandleSetsList(ctx tele.Context) error {
 	var sb strings.Builder
 	sb.WriteString(b.loc.T(lang, "sets_list_title"))
 
-	if totalPages > 1 {
-		paginationText := fmt.Sprintf("\n<code>   ─── %d / %d ───   </code>\n\n", page+1, totalPages)
-		sb.WriteString(paginationText)
-	}
-
 	menu := &tele.ReplyMarkup{}
 	var rows []tele.Row
 
