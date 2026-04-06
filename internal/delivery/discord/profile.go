@@ -80,6 +80,12 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 					Emoji:    &discordgo.ComponentEmoji{Name: "🎴"},
 				},
 				discordgo.Button{
+					Label:    b.loc.T(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets),
+					Style:    discordgo.SuccessButton, // Зеленый цвет выделяется
+					CustomID: "sets_nav:0",
+					Emoji:    &discordgo.ComponentEmoji{Name: "📚"},
+				},
+				discordgo.Button{
 					Label:    b.loc.T(lang, "btn_profile_suggest"),
 					Style:    discordgo.SecondaryButton,
 					CustomID: "suggest_start",

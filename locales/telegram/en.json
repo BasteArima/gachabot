@@ -149,7 +149,7 @@
 
   "btn_my_sets": "📚 Collections (%d/%d)",
   "sets_empty": "Oops! You haven’t unlocked any collections yet. Use /roll to find your first cards!",
-  "sets_list_title": "<blockquote>📚 <b>Your Collections (Sets)</b>\n\nCollect all cards of the same theme to claim a reward and unlock a unique buff!</blockquote>\n\n",
+  "sets_list_title": "<blockquote>📚 <b>Your Collections (Sets)</b>\n\nCollect all cards of the same theme to claim a reward and unlock a unique Buff!</blockquote>\n\n",
   "set_status_completed": "✅ Completed",
   "set_status_progress": "⏳ %d/%d",
   "btn_set_view": "📖 %s",
@@ -164,13 +164,13 @@
 
   "buff_type_power_percent": "Power Boost",
 
-  "set_completed_msg": "🎉 <b>ACHIEVEMENT UNLOCKED!</b>\n\nYou have collected all cards from the <b>“%s”</b> collection!\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Reward: <b>+%d points</b>\n\n<i>✨ Go to /profile ➡️ Collections to equip this set’s Aura!</i>",
+  "set_completed_msg": "🎉 <b>ACHIEVEMENT UNLOCKED!</b>\n\nYou have collected all cards from the <b>“%s”</b> collection!\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> Reward: <b>+%d points</b>\n\n<i>✨ Go to /profile ➡️ Collections to equip this set’s Buff!</i>",
 
   "duel_aura_challenger": "✨ Buff: <b>%s</b>",
   "duel_aura_target": "✨ Buff: <b>%s</b>",
-  "duel_fair_note": "⚖️ <b>This is a fair duel. Collection auras are disabled!</b>",
+  "duel_fair_note": "⚖️ <b>This is a fair duel. Collection buffs are disabled!</b>",
   "duel_result": "⚔️ <b>BATTLE RESULTS</b>\n\n<b>🗡 Player 1: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Chance: <b>%.1f%%</b>\n\n<b>🛡 Player 2: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Chance: <b>%.1f%%</b>\n\n%s━━━━━━━━━━━━━\n🎰 <b>Roll: %.1f</b>\n🏆 Winner: <b>%s</b> (+%d 🪙)",
 
   "btn_help_sets": "📚 Collections",
-  "help_sets": "<blockquote>📚 <b>Collections & Auras</b>\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 <b>Reward:</b> As soon as you collect all cards in a set, you will receive a large bonus in <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n✨ <b>Auras:</b> For each completed set, you unlock a unique Aura. This is a passive boost that increases the <b>Power</b> of your cards in duels.\n\n⚙️ <b>How to use:</b>\n1. Go to /profile.\n2. Press the <b>“📚 Collections”</b> button.\n3. Select a completed set and press <b>“✨ Equip”</b>.\n\n⚠️ <i>Important: only one Aura can be active at a time!</i></blockquote>"
+  "help_sets": "<blockquote>📚 <b>Collections & Buffs</b>\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 <b>Reward:</b> As soon as you collect all cards in a set, you will receive a large bonus in <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n✨ <b>Buffs:</b> For each completed set, you unlock a unique Buff. This is a passive boost that increases the <b>Power</b> of your cards in duels.\n\n⚙️ <b>How to use:</b>\n1. Go to /profile.\n2. Press the <b>“📚 Collections”</b> button.\n3. Select a completed set and press <b>“✨ Equip”</b>.\n\n⚠️ <i>Important: only one Buff can be active at a time!</i></blockquote>"
 }

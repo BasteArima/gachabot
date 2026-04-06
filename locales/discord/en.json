@@ -113,5 +113,21 @@
   "promo_reward_cards_count": "📦 Cards received: **%d**",
   "promo_reward_card": "> 🃏 **%s** (⚔️ %d)",
 
-  "card_unknown": "??? (Unknown)"
+  "card_unknown": "??? (Unknown)",
+
+  "btn_my_sets": "📚 Collections (%d/%d)",
+  "sets_empty": "Oops! Your inventory is empty. Use /roll to get cards!",
+  "sets_list_title": "📚 **Your Collections (Sets)**\nCollect all cards of the same theme to claim a reward and unlock a unique Buff!",
+  "set_status_completed": "✅",
+  "btn_set_view": "View collection",
+  "set_view_title": "📚 **Set: “%s”**\n\n🎁 Completion reward: **%d points**\n✨ Set buff: **%s**\n\n**Card list:**\n",
+  "set_card_owned": "✅ %d. **%s**",
+  "set_card_unknown": "❌ %d. *??? (Hidden)*",
+  "btn_equip_aura": "✨ Equip Buff",
+  "btn_unequip_aura": "🛑 Unequip Buff",
+  "aura_equipped_toast": "✨ Buff equipped!",
+  "aura_unequipped_toast": "🛑 Buff removed!",
+  "btn_back_to_sets": "⬅️ Back to lists",
+  "btn_help_sets": "📚 Collections",
+  "help_sets": "📚 **Collections & Buffs**\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 **Reward:** As soon as you collect all cards in a set, you will receive a large bonus in 🪙 **Points**.\n\n✨ **Buffs:** For each completed set, you unlock a unique Buff. This is a passive boost that increases the **Power** of your cards in duels.\n\n⚙️ **How to use:**\n1. Go to `/profile`.\n2. Press the **“📚 Collections”** button.\n3. Select a completed set and press **“✨ Equip”**.\n\n⚠️ *Important: only one Buff can be active at a time!*"
 }

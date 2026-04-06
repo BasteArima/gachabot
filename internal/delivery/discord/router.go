@@ -320,6 +320,26 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 		}
 		return
 	}
+
+	// 9. КОЛЛЕКЦИИ (НАВИГАЦИЯ)
+	if strings.HasPrefix(data.CustomID, "sets_nav:") {
+		parts := strings.Split(data.CustomID, ":")
+		page, _ := strconv.Atoi(parts[1])
+		b.handleSetsList(s, i, dbUser, lang, page)
+		return
+	}
+
+	// 10. КОЛЛЕКЦИИ (ПРОСМОТР СЕТА ЧЕРЕЗ ВЫПАДАЮЩИЙ СПИСОК)
+	if data.CustomID == "set_view_select" {
+		b.handleSetView(s, i, dbUser, lang)
+		return
+	}
+
+	// 11. КОЛЛЕКЦИИ (ЭКИПИРОВКА АУРЫ)
+	if strings.HasPrefix(data.CustomID, "set_equip:") {
+		b.handleEquipAura(s, i, dbUser, lang)
+		return
+	}
 }
 
 // HandleMessageCreate - узел для обычных сообщений (предложка)
