@@ -110,15 +110,15 @@ func (b *Bot) setupCommands() {
 				discordgo.Russian: "Помощь по игре",
 			},
 		},
+		/*		{
+				Name:        "top",
+				Description: "Server leaderboard",
+				DescriptionLocalizations: &map[discordgo.Locale]string{
+					discordgo.Russian: "Топ сервера по балансу",
+				},
+			},*/
 		{
 			Name:        "top",
-			Description: "Server leaderboard",
-			DescriptionLocalizations: &map[discordgo.Locale]string{
-				discordgo.Russian: "Топ сервера по балансу",
-			},
-		},
-		{
-			Name:        "globaltop",
 			Description: "Global leaderboard",
 			DescriptionLocalizations: &map[discordgo.Locale]string{
 				discordgo.Russian: "Мировой топ",
