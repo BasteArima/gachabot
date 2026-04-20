@@ -2,6 +2,7 @@ package discord
 
 import (
 	"gachabot/internal/models"
+	"log"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -41,10 +42,32 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		Color:       0x00ff00,
 	}
 
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+	// --- ДОБАВЛЯЕМ КНОПКУ "КРУТИТЬ ЕЩЕ" ---
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.Button{
+					CustomID: "roll_again", // Тот же ID, что и в Telegram
+					Label:    b.loc.T(lang, "btn_roll_again"),
+					Style:    discordgo.PrimaryButton,              // Синяя кнопка (можно discordgo.SuccessButton для зеленой)
+					Emoji:    &discordgo.ComponentEmoji{Name: "🎰"}, // Эмодзи на кнопке (опционально)
+				},
+			},
+		},
+	}
+
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{Embeds: []*discordgo.MessageEmbed{embed}},
+		Data: &discordgo.InteractionResponseData{
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: components, // Прикрепляем кнопку к сообщению
+		},
 	})
+
+	if err != nil {
+		// Рекомендую всегда логировать ошибки Дискорда
+		log.Printf("[DISCORD ERROR] Не удалось отправить карту: %v", err)
+	}
 
 	if result.StreakUpdated {
 		streakMsg := b.loc.T(lang, "streak_continued", result.Reward, result.StreakDays)
@@ -53,6 +76,10 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		}
 		s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "🔥 " + streakMsg})
 	}
+}
+
+func (b *Bot) handleRollAgainCallback(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
+	b.handleRoll(s, i, user, lang)
 }
 
 func (b *Bot) handleCraft(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {

@@ -59,6 +59,8 @@ func (b *Bot) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleLocale(s, i, dbUser, lang)
 	case "promo":
 		b.handlePromo(s, i, dbUser, lang)
+	case "roll_again":
+		b.handleRollAgainCallback(s, i, dbUser, lang)
 	}
 }
 

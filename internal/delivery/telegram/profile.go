@@ -135,6 +135,5 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 
 func (b *Bot) HandleBackToProfile(ctx tele.Context) error {
 	_ = ctx.Respond()
-	_ = ctx.Delete()
 	return b.HandleProfile(ctx)
 }
