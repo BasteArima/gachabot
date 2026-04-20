@@ -59,8 +59,6 @@ func (b *Bot) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleLocale(s, i, dbUser, lang)
 	case "promo":
 		b.handlePromo(s, i, dbUser, lang)
-	case "roll_again":
-		b.handleRollAgainCallback(s, i, dbUser, lang)
 	}
 }
 
@@ -80,6 +78,11 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 	lang := dbUser.LanguageCode
 	if lang == "" {
 		lang = "ru"
+	}
+
+	if data.CustomID == "roll_again" {
+		b.handleRollAgainCallback(s, i, dbUser, lang)
+		return
 	}
 
 	// 1. НАВИГАЦИЯ ПО КАРТОЧКАМ
