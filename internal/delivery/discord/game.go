@@ -50,7 +50,7 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 					CustomID: "roll_again", // Тот же ID, что и в Telegram
 					Label:    b.loc.T(lang, "btn_roll_again"),
 					Style:    discordgo.PrimaryButton,              // Синяя кнопка (можно discordgo.SuccessButton для зеленой)
-					Emoji:    &discordgo.ComponentEmoji{Name: "🎰"}, // Эмодзи на кнопке (опционально)
+					Emoji:    &discordgo.ComponentEmoji{Name: "🎲"}, // Эмодзи на кнопке (опционально)
 				},
 			},
 		},

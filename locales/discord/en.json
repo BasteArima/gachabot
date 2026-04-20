@@ -3,7 +3,7 @@
   "error_top_load": "❌ Error loading leaderboard.",
   "error_db": "⚠️ Database error.",
 
-  "btn_roll_again": "🎲 Roll again",
+  "btn_roll_again": "Roll again",
   "roll_cooldown": "⏳ Wait! You can roll again in: **%s**",
   "streak_kept_alive": "🔥 Streak saved! Current streak: **%d days**",
   "streak_continued": "Streak: **+%d points** (Total: **%d days**)",
