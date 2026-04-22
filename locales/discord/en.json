@@ -32,11 +32,11 @@
   "btn_top_cards": "Cards",
   "btn_top_streak": "Streak",
 
-  "craft_title": "Alchemy",
+  "craft_title": "⚒ Craft",
   "craft_success": "⚒ **SUCCESSFUL CRAFT!**\n> Melted %d duplicates and got:\n> 🃏 Card: **%s**\n> ✨ Rarity: **%s**\n> ⚔️ Power: **%d**",
   "craft_mythic_frag": "⚒ **SUCCESSFUL CRAFT!**\n> Melted %d leg. duplicates.\n> Got fragment: 🔮 **%s**\n> 📦 Total: **%d / 10**",
   "craft_mythic_assembled": "⚒ **MYTHIC CRAFT!**\n> Melted %d duplicates.\n> 🔥 Final fragment found!\n> Card unlocked: **%s**\n> ⚔️ Power: **%d**",
-  "err_craft_failed": "**Alchemy failed:** %s",
+  "err_craft_failed": "**⚒ Craft failed:** %s",
 
   "err_duel_self": "🤡 Challenging yourself is a weird idea.",
   "err_duel_funds": "📉 You don't have enough points!",
@@ -81,7 +81,7 @@
   "help_cards": "> 🎴 **Cards**\n> Use /roll every 3 hours.",
   "help_rarities": "> ✨ **Card Rarities (Drop | Reward)**\n> ⚪️ **Common** └ 60% | 10 🪙\n> 🟢 **Uncommon** └ 20% | 25 🪙\n> 🔵 **Rare** └ 15% | 50 🪙\n> 🟣 **Epic** └ 4% | 75 🪙\n> 🟡 **Legendary** └ 0.99% | 100 🪙\n> 🔴 **Mythic** └ 0.01% | 500 🪙",
   "help_streaks": "> 🔥 **Streaks**\n> Play daily for streak bonuses.",
-  "help_pity": "> 🛡 **Pity System**\n> Guarantees a card drop on a specific roll:\n> 🔵 **Rare** (6th) | 🟣 **Epic** (25th) | 🟡 **Legendary** (60th)",
+  "help_pity": "> 🛡 **Pity System**\n> Guarantees a card drop on a specific roll:\n> 🔵 **Rare** (6th) | 🟣 **Epic** (18th) | 🟡 **Legendary** (40th) | \uD83D\uDD34 **Mythic (shard)** (80th)",
   "help_duel": "> ⚔️ **Duels**\n> Battle with your cards via /duel.",
   "help_craft": "> ⚒ **Craft**\n> 5 duplicates = 1 card of higher rarity.",
 
