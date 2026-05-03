@@ -22,7 +22,7 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	caption := b.loc.T(lang, "profile_caption",
 		tgUser.FirstName, tgUser.LastName,
 		profile.UniqueCardsCount, profile.TotalCardsCount,
-		profile.DuplicatesCount, profile.Balance, profile.StreakDays)
+		profile.Balance, profile.DuplicatesCount, profile.StreakDays)
 
 	photos, err := ctx.Bot().ProfilePhotosOf(tgUser)
 

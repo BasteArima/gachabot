@@ -17,7 +17,7 @@
   "roll_success": "<blockquote><tg-emoji emoji-id=\"4996755833950831347\">🎉</tg-emoji>Поздравляем! Вы получили карточку: <b>%s</b>\n\n<tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji>Редкость: <b>%s</b>\n⚔️ Сила: <b>%d</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji>Очки: <b>+%d</b></blockquote>",
 
   "profile_err_load": "❌ Не удалось загрузить профиль.",
-  "profile_caption": "<blockquote>👤 Ты - %s %s\n\n<tg-emoji emoji-id=\"4956525562483967357\">\uD83C\uDCCF</tg-emoji> У тебя %d из %d карточек\n♻️ Дубликаты для крафта: <b>%d</b>\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> У тебя %d очков\n\n<tg-emoji emoji-id=\"4956499161319998529\">\uD83D\uDD25</tg-emoji> Твой стрик составляет %d дней</blockquote>",
+  "profile_caption": "<blockquote>👤 Ты - %s %s\n\n<tg-emoji emoji-id=\"4956525562483967357\">\uD83C\uDCCF</tg-emoji> У тебя %d из %d карточек\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> У тебя %d очков\n♻\uFE0F Дубликаты для крафта: <b>%d</b>\n\n<tg-emoji emoji-id=\"4956499161319998529\">\uD83D\uDD25</tg-emoji> Твой стрик составляет %d дней</blockquote>",
   "btn_my_cards": "🎴 Мои карточки [%d]",
   "btn_add_group_bot": "👥 Добавить бота в свою группу",
 
