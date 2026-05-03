@@ -27,6 +27,7 @@ type User struct {
 	PremiumRolls   int
 	LanguageCode   string
 	ActiveSetID    *int `db:"active_set_id"` // Pointer, потому что может быть NULL
+	IsAdult        sql.NullBool
 }
 
 type Rarity struct {

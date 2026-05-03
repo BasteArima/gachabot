@@ -177,5 +177,10 @@
   "duel_result": "⚔️ <b>BATTLE RESULTS</b>\n\n<b>🗡 Player 1: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Chance: <b>%.1f%%</b>\n\n<b>🛡 Player 2: %s</b>%s\n└ 🃏 <b>%s</b> (⚔️ %d)\n└ 🎲 Chance: <b>%.1f%%</b>\n\n%s━━━━━━━━━━━━━\n🎰 <b>Roll: %.1f</b>\n🏆 Winner: <b>%s</b> (+%d 🪙)",
 
   "btn_help_sets": "📚 Collections",
-  "help_sets": "<blockquote>📚 <b>Collections & Buffs</b>\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 <b>Reward:</b> As soon as you collect all cards in a set, you will receive a large bonus in <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n✨ <b>Buffs:</b> For each completed set, you unlock a unique Buff. This is a passive boost that increases the <b>Power</b> of your cards in duels.\n\n⚙️ <b>How to use:</b>\n1. Go to /profile.\n2. Press the <b>“📚 Collections”</b> button.\n3. Select a completed set and press <b>“✨ Equip”</b>.\n\n⚠️ <i>Important: only one Buff can be active at a time!</i></blockquote>"
+  "help_sets": "<blockquote>📚 <b>Collections & Buffs</b>\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 <b>Reward:</b> As soon as you collect all cards in a set, you will receive a large bonus in <tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> <b>Points</b>.\n\n✨ <b>Buffs:</b> For each completed set, you unlock a unique Buff. This is a passive boost that increases the <b>Power</b> of your cards in duels.\n\n⚙️ <b>How to use:</b>\n1. Go to /profile.\n2. Press the <b>“📚 Collections”</b> button.\n3. Select a completed set and press <b>“✨ Equip”</b>.\n\n⚠️ <i>Important: only one Buff can be active at a time!</i></blockquote>",
+
+  "adult_verification_msg": "🔞 <b>Age Verification</b>\n\nThis bot contains 18+ content. Please confirm that you are at least 18 years old.",
+  "btn_adult_yes": "✅ Yes, I am 18+",
+  "btn_adult_no": "⛔️ No, I am under 18",
+  "adult_rejected_msg": "🔞 Sorry, but this bot is strictly for users over 18 years old. Come back when you're older!"
 }

@@ -30,12 +30,12 @@ func (r *PostgresRepo) GetUserByID(internalID int64) (*models.User, error) {
            COALESCE(first_name, '') as first_name, 
            COALESCE(last_name, '') as last_name, 
            balance, streak_days, last_roll_time, last_streak_date, 
-           premium_rolls, COALESCE(language_code, '')
+           premium_rolls, COALESCE(language_code, ''), is_adult
 		FROM users WHERE id=$1 LIMIT 1
 	`
 	err := r.db.QueryRow(query, internalID).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode, &user.IsAdult,
 	)
 	return user, err
 }
@@ -48,12 +48,12 @@ func (r *PostgresRepo) GetUserByTelegramID(tgID int64) (*models.User, error) {
            COALESCE(first_name, '') as first_name, 
            COALESCE(last_name, '') as last_name, 
            balance, streak_days, last_roll_time, last_streak_date, 
-           premium_rolls, COALESCE(language_code, '')
+           premium_rolls, COALESCE(language_code, ''), is_adult
 		FROM users WHERE telegram_id=$1 LIMIT 1
 	`
 	err := r.db.QueryRow(query, tgID).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode, &user.IsAdult,
 	)
 	return user, err
 }
@@ -75,11 +75,11 @@ func (r *PostgresRepo) GetOrCreateUserByTelegramID(tgID int64, username, firstNa
 		COALESCE(first_name, '') as first_name, 
 		          COALESCE(last_name, '') as last_name, 
 		          balance, streak_days, last_roll_time, last_streak_date, 
-		          premium_rolls, COALESCE(language_code, '')
+		          premium_rolls, COALESCE(language_code, ''), is_adult
 	`
 	err := r.db.QueryRow(query, tgID, username, firstName, lastName).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode, &user.IsAdult,
 	)
 
 	return user, err
@@ -429,11 +429,11 @@ func (r *PostgresRepo) GetOrCreateUserByDiscordID(discordID int64, username stri
 		COALESCE(first_name, '') as first_name, 
 		          COALESCE(last_name, '') as last_name, 
 		          balance, streak_days, last_roll_time, last_streak_date, 
-		          premium_rolls, COALESCE(language_code, '')
+		          premium_rolls, COALESCE(language_code, ''), is_adult
 	`
 	err := r.db.QueryRow(query, discordID, username).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode, &user.IsAdult,
 	)
 
 	return user, err
@@ -813,4 +813,11 @@ func (r *PostgresRepo) GetUserSetsStats(userID int64) (int, int, error) {
 		return 0, 0, err
 	}
 	return completed, total, nil
+}
+
+// Устанавливает статус 18+ для пользователя
+func (r *PostgresRepo) SetUserAdultStatus(internalID int64, isAdult bool) error {
+	query := `UPDATE users SET is_adult = $1 WHERE id = $2`
+	_, err := r.db.Exec(query, isAdult, internalID)
+	return err
 }

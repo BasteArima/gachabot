@@ -194,6 +194,36 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
 	lang := getLang(dbUser, tgUser)
 
+	// --- БЛОК ПРОВЕРКИ 18+ ---
+	if b.require18Plus {
+		// Если статус еще не установлен (NULL)
+		if !dbUser.IsAdult.Valid {
+			menu := &tele.ReplyMarkup{}
+			btnYes := menu.Data(b.loc.T(lang, "btn_adult_yes"), "adult_yes")
+			btnNo := menu.Data(b.loc.T(lang, "btn_adult_no"), "adult_no")
+			menu.Inline(menu.Row(btnYes), menu.Row(btnNo))
+
+			msg := b.loc.T(lang, "adult_verification_msg")
+
+			// Если мы как-то попали сюда по кнопке (например, из профиля сбросили статус), удаляем старую картинку
+			if ctx.Callback() != nil && ctx.Message() != nil && ctx.Message().Photo != nil {
+				_ = ctx.Delete()
+			}
+			return ctx.Send(msg, tele.ModeHTML, menu)
+		}
+
+		// Если статус установлен, но юзер ответил "Нет" (FALSE)
+		if dbUser.IsAdult.Valid && !dbUser.IsAdult.Bool {
+			msg := b.loc.T(lang, "adult_rejected_msg")
+			if ctx.Callback() != nil && ctx.Message() != nil && ctx.Message().Photo != nil {
+				_ = ctx.Delete()
+			}
+			return ctx.Send(msg, tele.ModeHTML)
+		}
+	}
+	// --- КОНЕЦ БЛОКА 18+ ---
+
+	// Дальше идет стандартная логика Хаба
 	menu := &tele.ReplyMarkup{}
 	btnRoll := menu.Data(b.loc.T(lang, "btn_roll_shortcut"), "roll_shortcut")
 	btnProfile := menu.Data(b.loc.T(lang, "btn_profile_menu"), "profile_menu")
@@ -207,31 +237,51 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	)
 
 	text := b.loc.T(lang, "start_msg")
-
-	// Наш новый крутой баннер!
 	banner := &tele.Photo{
-		// Укажи тут URL к сгенерированной картинке или путь к локальному файлу
 		File:    tele.FromURL("https://api.baste.ru/cards/banner.webp"),
 		Caption: text,
 	}
 
-	// 1. Если это вызов по команде /start (НОВЫЙ ХАБ)
 	if ctx.Callback() == nil {
 		return ctx.Send(banner, tele.ModeHTML, menu)
 	}
 
-	// 2. ВОЗВРАТ В ХАБ ПО КНОПКЕ
-
-	// Так как Хаб теперь картинка, мы проверяем, откуда мы пришли.
-	// Если мы пришли из Профиля (там тоже картинка - аватарка), то мы можем сделать красивый Edit!
-	if ctx.Message().Photo != nil {
+	if ctx.Message() != nil && ctx.Message().Photo != nil {
 		return ctx.Edit(banner, tele.ModeHTML, menu)
 	}
 
-	// Если мы пришли из Справки (там был просто текст), мы НЕ МОЖЕМ сделать Edit.
-	// Поэтому удаляем текст Справки и присылаем новую картинку Хаба.
 	_ = ctx.Delete()
 	return ctx.Send(banner, tele.ModeHTML, menu)
+}
+
+// --- НОВЫЕ ХЭНДЛЕРЫ ---
+
+// HandleAdultConfirm срабатывает, если юзер нажал "Да, мне есть 18"
+func (b *Bot) HandleAdultConfirm(ctx tele.Context) error {
+	_ = ctx.Respond()
+	tgUser := ctx.Sender()
+	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
+
+	// Устанавливаем is_adult = true
+	_ = b.repo.SetUserAdultStatus(dbUser.ID, true)
+
+	// Удаляем сообщение с вопросом и вызываем HandleStart (теперь проверка пройдет)
+	_ = ctx.Delete()
+	return b.HandleStart(ctx)
+}
+
+// HandleAdultReject срабатывает, если юзер нажал "Нет, мне меньше 18"
+func (b *Bot) HandleAdultReject(ctx tele.Context) error {
+	_ = ctx.Respond()
+	tgUser := ctx.Sender()
+	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
+	lang := getLang(dbUser, tgUser)
+
+	// Устанавливаем is_adult = false
+	_ = b.repo.SetUserAdultStatus(dbUser.ID, false)
+
+	_ = ctx.Delete()
+	return ctx.Send(b.loc.T(lang, "adult_rejected_msg"), tele.ModeHTML)
 }
 
 // Обрабатывает нажатие на кнопку "Профиль" из главного меню
@@ -259,6 +309,36 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	}
 
 	lang := getLang(dbUser, tgUser)
+
+	// --- БЛОК ПРОВЕРКИ 18+ ---
+	if b.require18Plus {
+		// Если статус еще не установлен (NULL)
+		if !dbUser.IsAdult.Valid {
+			menu := &tele.ReplyMarkup{}
+			btnYes := menu.Data(b.loc.T(lang, "btn_adult_yes"), "adult_yes")
+			btnNo := menu.Data(b.loc.T(lang, "btn_adult_no"), "adult_no")
+			menu.Inline(menu.Row(btnYes), menu.Row(btnNo))
+
+			msg := b.loc.T(lang, "adult_verification_msg")
+
+			// Если вызвано по кнопке, пытаемся удалить старое сообщение, чтобы не плодить часики
+			if ctx.Callback() != nil {
+				_ = ctx.Delete()
+			}
+			return ctx.Send(msg, tele.ModeHTML, menu)
+		}
+
+		// Если статус установлен, но юзер ответил "Нет" (FALSE)
+		if dbUser.IsAdult.Valid && !dbUser.IsAdult.Bool {
+			msg := b.loc.T(lang, "adult_rejected_msg")
+			if ctx.Callback() != nil {
+				_ = ctx.Delete()
+			}
+			return ctx.Send(msg, tele.ModeHTML)
+		}
+	}
+	// --- КОНЕЦ БЛОКА 18+ ---
+
 	b.service.TrackChat(dbUser.ID, ctx.Chat().ID)
 
 	// БИЗНЕС-ЛОГИКА: передаем ВНУТРЕННИЙ ID

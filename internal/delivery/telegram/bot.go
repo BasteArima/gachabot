@@ -6,6 +6,7 @@ import (
 	"gachabot/internal/repository"
 	"gachabot/internal/service"
 	"log"
+	"os"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -14,13 +15,14 @@ import (
 
 // Обертка над телеграм-ботом
 type Bot struct {
-	bot         *tele.Bot
-	repo        *repository.PostgresRepo // В идеале тут должны быть интерфейсы, но пока оставим так
-	service     *service.GachaService
-	duelService *service.DuelService
-	loc         *i18n.Localizer
-	rdb         *redis.Client
-	adminChatID int64
+	bot           *tele.Bot
+	repo          *repository.PostgresRepo // В идеале тут должны быть интерфейсы, но пока оставим так
+	service       *service.GachaService
+	duelService   *service.DuelService
+	loc           *i18n.Localizer
+	rdb           *redis.Client
+	adminChatID   int64
+	require18Plus bool
 }
 
 // Конструктор бота
@@ -36,13 +38,14 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 	}
 
 	tgBot := &Bot{
-		bot:         b,
-		repo:        repo,
-		service:     gs,
-		duelService: ds,
-		loc:         loc,
-		rdb:         rdb,
-		adminChatID: -5214417967,
+		bot:           b,
+		repo:          repo,
+		service:       gs,
+		duelService:   ds,
+		loc:           loc,
+		rdb:           rdb,
+		adminChatID:   -5214417967,
+		require18Plus: os.Getenv("REQUIRE_18_PLUS_CONFIRM") == "true",
 	}
 
 	// Регистрируем роуты прямо при создании
@@ -115,6 +118,8 @@ func (b *Bot) setupRoutes() {
 	// Разное
 	b.bot.Handle("/link", b.HandleLinkStart)
 	b.bot.Handle(tele.OnText, b.HandleTextFallback)
+	b.bot.Handle("\fadult_yes", b.HandleAdultConfirm)
+	b.bot.Handle("\fadult_no", b.HandleAdultReject)
 }
 
 // Реализация интерфейса LinkProvider для Дискорда

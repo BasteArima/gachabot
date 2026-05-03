@@ -32,7 +32,9 @@ CREATE TABLE users (
                        last_streak_date DATE,
                        premium_rolls INTEGER NOT NULL DEFAULT 0,
                        language_code VARCHAR(10) DEFAULT '',
-                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                       active_set_id INT REFERENCES card_sets(id) ON DELETE SET NULL,
+                       is_adult BOOLEAN DEFAULT NULL
 );
 
 -- 4. Таблица Инвентаря (Связь Игроков и Карточек)
@@ -93,9 +95,6 @@ CREATE TABLE IF NOT EXISTS card_sets (
 
 -- Добавляем картам ссылку на сет (NULL, если карта без сета)
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS set_id INT REFERENCES card_sets(id) ON DELETE SET NULL;
-
--- Добавляем пользователю "Экипированную Ауру"
-ALTER TABLE users ADD COLUMN IF NOT EXISTS active_set_id INT REFERENCES card_sets(id) ON DELETE SET NULL;
 
 -- Таблица отслеживания разблокированных сетов и прогресса
 CREATE TABLE IF NOT EXISTS user_unlocked_sets (
