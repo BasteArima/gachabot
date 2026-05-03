@@ -41,6 +41,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - REDIS_ADDR=redis:6379
+      - REQUIRE_18_PLUS_CONFIRM=${REQUIRE_18_PLUS_CONFIRM}
     volumes:
       # Прокидываем папку бэкапов в бота (только для чтения)
       - /opt/gachabot/backups:/backups:ro
