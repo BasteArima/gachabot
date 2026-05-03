@@ -197,7 +197,7 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	// --- БЛОК ПРОВЕРКИ 18+ ---
 	if b.require18Plus {
 		// Если статус еще не установлен (NULL)
-		if !dbUser.IsAdult.Valid {
+		if !dbUser.IsAdult.Valid || !dbUser.IsAdult.Bool {
 			menu := &tele.ReplyMarkup{}
 			btnYes := menu.Data(b.loc.T(lang, "btn_adult_yes"), "adult_yes")
 			btnNo := menu.Data(b.loc.T(lang, "btn_adult_no"), "adult_no")
@@ -313,7 +313,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	// --- БЛОК ПРОВЕРКИ 18+ ---
 	if b.require18Plus {
 		// Если статус еще не установлен (NULL)
-		if !dbUser.IsAdult.Valid {
+		if !dbUser.IsAdult.Valid || !dbUser.IsAdult.Bool {
 			menu := &tele.ReplyMarkup{}
 			btnYes := menu.Data(b.loc.T(lang, "btn_adult_yes"), "adult_yes")
 			btnNo := menu.Data(b.loc.T(lang, "btn_adult_no"), "adult_no")
