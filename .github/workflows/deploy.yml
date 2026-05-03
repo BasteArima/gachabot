@@ -24,6 +24,7 @@ jobs:
           echo "POSTGRES_HOST=${{ secrets.POSTGRES_HOST }}" >> .env
           echo "POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}" >> .env
           echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> .env
+          echo "REQUIRE_18_PLUS_CONFIRM=true" >> .env
 
       - name: Deploy with Docker Compose
         run: |
