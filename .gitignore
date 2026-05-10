@@ -1,21 +1,5 @@
 .env
 .idea
-_content_helpers/art_gen/out/Common/*
-_content_helpers/art_gen/out/Uncommon/*
-_content_helpers/art_gen/out/Rare/*
-_content_helpers/art_gen/out/Epic/*
-_content_helpers/art_gen/out/Legendary/*
-_content_helpers/art_gen/out/Mythical/*
-
-_content_helpers/art_gen/raw_art/Common/*
-_content_helpers/art_gen/raw_art/Uncommon/*
-_content_helpers/art_gen/raw_art/Rare/*
-_content_helpers/art_gen/raw_art/Epic/*
-_content_helpers/art_gen/raw_art/Legendary/*
-_content_helpers/art_gen/raw_art/Mythical/*
-
-_content_helpers/art_gen/frames/*
-
-_content_helpers/art_gen/import_cards.sql
 
 gachabot.exe
+gachabot.bin
