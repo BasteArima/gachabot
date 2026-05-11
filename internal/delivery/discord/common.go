@@ -13,7 +13,7 @@ func (b *Bot) handleHelp(s *discordgo.Session, i *discordgo.InteractionCreate, l
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content:    b.loc.T(lang, "help_main"),
+			Content:    b.loc.Translate(lang, "help_main"),
 			Components: b.getHelpMenu(lang),
 		},
 	})
@@ -25,15 +25,15 @@ func (b *Bot) getHelpMenu(lang string) []discordgo.MessageComponent {
 			Components: []discordgo.MessageComponent{
 				discordgo.SelectMenu{
 					CustomID:    "help_select",
-					Placeholder: b.loc.T(lang, "btn_help_select"),
+					Placeholder: b.loc.Translate(lang, "btn_help_select"),
 					Options: []discordgo.SelectMenuOption{
-						{Label: b.loc.T(lang, "btn_help_main"), Value: "main", Emoji: &discordgo.ComponentEmoji{Name: "🏠"}},
-						{Label: b.loc.T(lang, "btn_help_cards"), Value: "cards", Emoji: &discordgo.ComponentEmoji{Name: "🃏"}},
-						{Label: b.loc.T(lang, "btn_help_rarities"), Value: "rarities", Emoji: &discordgo.ComponentEmoji{Name: "💎"}},
-						{Label: b.loc.T(lang, "btn_help_streaks"), Value: "streaks", Emoji: &discordgo.ComponentEmoji{Name: "🔥"}},
-						{Label: b.loc.T(lang, "btn_help_pity"), Value: "pity", Emoji: &discordgo.ComponentEmoji{Name: "🛡"}},
-						{Label: b.loc.T(lang, "btn_help_duel"), Value: "duel", Emoji: &discordgo.ComponentEmoji{Name: "⚔️"}},
-						{Label: b.loc.T(lang, "btn_help_craft"), Value: "craft", Emoji: &discordgo.ComponentEmoji{Name: "🛠"}},
+						{Label: b.loc.Translate(lang, "btn_help_main"), Value: "main", Emoji: &discordgo.ComponentEmoji{Name: "🏠"}},
+						{Label: b.loc.Translate(lang, "btn_help_cards"), Value: "cards", Emoji: &discordgo.ComponentEmoji{Name: "🃏"}},
+						{Label: b.loc.Translate(lang, "btn_help_rarities"), Value: "rarities", Emoji: &discordgo.ComponentEmoji{Name: "💎"}},
+						{Label: b.loc.Translate(lang, "btn_help_streaks"), Value: "streaks", Emoji: &discordgo.ComponentEmoji{Name: "🔥"}},
+						{Label: b.loc.Translate(lang, "btn_help_pity"), Value: "pity", Emoji: &discordgo.ComponentEmoji{Name: "🛡"}},
+						{Label: b.loc.Translate(lang, "btn_help_duel"), Value: "duel", Emoji: &discordgo.ComponentEmoji{Name: "⚔️"}},
+						{Label: b.loc.Translate(lang, "btn_help_craft"), Value: "craft", Emoji: &discordgo.ComponentEmoji{Name: "🛠"}},
 					},
 				},
 			},
@@ -55,10 +55,9 @@ func (b *Bot) handleLocale(s *discordgo.Session, i *discordgo.InteractionCreate,
 	}
 
 	b.repo.SetUserLanguage(dbUser.ID, targetLang)
-	b.respond(s, i, b.loc.T(targetLang, "lang_changed"))
+	b.respond(s, i, b.loc.Translate(targetLang, "lang_changed"))
 }
 
-// Вспомогательные функции
 func parseID(idStr string) int64 {
 	var id int64
 	fmt.Sscanf(idStr, "%d", &id)
@@ -103,8 +102,7 @@ func (b *Bot) updateWithEmbedAndComponents(s *discordgo.Session, i *discordgo.In
 		},
 	})
 
-	// ВОТ ЭТО СПАСЕТ ТЕБЕ МНОГО ЧАСОВ ДЕБАГА
 	if err != nil {
-		log.Printf("[DISCORD ERROR] Не удалось обновить сообщение: %v", err)
+		log.Printf("[DISCORD ERROR] Failed to update message: %v", err)
 	}
 }

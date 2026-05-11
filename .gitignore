@@ -1,5 +1,20 @@
 .env
-.idea
+*.env.local
 
-gachabot.exe
-gachabot.bin
+.idea/
+.vscode/
+*.swp
+*.swo
+
+/gachabot
+/gachabot.exe
+/gachabot.bin
+/dist/
+/bin/
+
+*.log
+coverage.txt
+profile.out
+
+.DS_Store
+Thumbs.db

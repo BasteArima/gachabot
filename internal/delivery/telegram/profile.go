@@ -16,10 +16,10 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	profile, err := b.service.GetUserProfile(dbUser.ID)
 	if err != nil {
 		log.Printf("Ошибка получения профиля юзера %d: %v", dbUser.ID, err)
-		return ctx.Send(b.loc.T(lang, "profile_err_load"))
+		return ctx.Send(b.loc.Translate(lang, "profile_err_load"))
 	}
 
-	caption := b.loc.T(lang, "profile_caption",
+	caption := b.loc.Translate(lang, "profile_caption",
 		tgUser.FirstName, tgUser.LastName,
 		profile.UniqueCardsCount, profile.TotalCardsCount,
 		profile.Balance, profile.DuplicatesCount, profile.StreakDays)
@@ -29,15 +29,15 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	menu := &tele.ReplyMarkup{}
 	var rows []tele.Row
 	if profile.UniqueCardsCount > 0 {
-		btnMyCards := menu.Data(b.loc.T(lang, "btn_my_cards", profile.UniqueCardsCount), "cards_nav", "0")
-		btnMySets := menu.Data(b.loc.T(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets), "sets_nav", "0")
+		btnMyCards := menu.Data(b.loc.Translate(lang, "btn_my_cards", profile.UniqueCardsCount), "cards_nav", "0")
+		btnMySets := menu.Data(b.loc.Translate(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets), "sets_nav", "0")
 
 		rows = append(rows, menu.Row(btnMyCards))
 		rows = append(rows, menu.Row(btnMySets))
 	}
 
-	btnSuggest := menu.Data(b.loc.T(lang, "btn_profile_suggest"), "suggest_start")
-	btnBack := menu.Data(b.loc.T(lang, "btn_back_to_start"), "start_menu")
+	btnSuggest := menu.Data(b.loc.Translate(lang, "btn_profile_suggest"), "suggest_start")
+	btnBack := menu.Data(b.loc.Translate(lang, "btn_back_to_start"), "start_menu")
 
 	rows = append(rows, menu.Row(btnSuggest))
 	rows = append(rows, menu.Row(btnBack))
@@ -50,17 +50,15 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 			Caption: caption,
 		}
 
-		// Если это вызов по кнопке из Хаба (который тоже картинка), делаем красивый Edit!
 		if ctx.Callback() != nil && ctx.Message().Photo != nil {
 			return ctx.Edit(photo, tele.ModeHTML, menu)
 		}
 
-		// Иначе просто отправляем
 		return ctx.Send(photo, tele.ModeHTML, menu)
 	}
 
-	// Если аватарки нет, шлем просто текст.
-	// Если пришли по кнопке, удаляем старую картинку Хаба и шлем текст
+	// If there is no avatar, just send text
+	// If the user clicked the button, we delete the old Hub image and send the text
 	if ctx.Callback() != nil {
 		_ = ctx.Delete()
 	}
@@ -76,45 +74,40 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 	offsetStr := ctx.Callback().Data
 	offset, _ := strconv.Atoi(offsetStr)
 
-	// Получаем текущую карточку и общее кол-во уникальных карт
 	card, total, err := b.service.GetUserCardPagination(dbUser.ID, offset)
 	if err != nil {
-		return ctx.Send(b.loc.T(lang, "cards_err_load"))
+		return ctx.Send(b.loc.Translate(lang, "cards_err_load"))
 	}
 
 	if card == nil {
 		_ = ctx.Delete()
-		return ctx.Send(b.loc.T(lang, "cards_empty"))
+		return ctx.Send(b.loc.Translate(lang, "cards_empty"))
 	}
 
 	var caption string
 	if card.SetName != "" {
-		caption = b.loc.T(lang, "card_nav_caption_with_set",
+		caption = b.loc.Translate(lang, "card_nav_caption_with_set",
 			card.CardName, card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 	} else {
-		caption = b.loc.T(lang, "card_nav_caption",
+		caption = b.loc.Translate(lang, "card_nav_caption",
 			card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 	}
 
 	menu := &tele.ReplyMarkup{}
 	var navRow []tele.Btn
 
-	// --- ЛОГИКА ЦИКЛИЧНОГО ЛИСТАНИЯ ---
 	if total > 1 {
-		// Если мы на 0, то (0-1 + total) % total даст индекс последней карты
 		prev := (offset - 1 + total) % total
-		// Если мы на последней, то (last+1) % total даст 0
 		next := (offset + 1) % total
 
-		btnBack := menu.Data(b.loc.T(lang, "btn_back"), "cards_nav", strconv.Itoa(prev))
-		btnForward := menu.Data(b.loc.T(lang, "btn_forward"), "cards_nav", strconv.Itoa(next))
+		btnBack := menu.Data(b.loc.Translate(lang, "btn_back"), "cards_nav", strconv.Itoa(prev))
+		btnForward := menu.Data(b.loc.Translate(lang, "btn_forward"), "cards_nav", strconv.Itoa(next))
 
 		navRow = append(navRow, btnBack, btnForward)
 	}
 
-	btnProfile := menu.Data(b.loc.T(lang, "btn_to_profile"), "back_profile")
+	btnProfile := menu.Data(b.loc.Translate(lang, "btn_to_profile"), "back_profile")
 
-	// Собираем меню: кнопки навигации в один ряд, кнопка профиля под ними
 	if len(navRow) > 0 {
 		menu.Inline(menu.Row(navRow...), menu.Row(btnProfile))
 	} else {

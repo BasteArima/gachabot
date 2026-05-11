@@ -1,35 +1,35 @@
 package discord
 
 import (
+	"gachabot/internal/service/duel"
+	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/suggest"
 	"log"
 
 	"gachabot/internal/i18n"
 	"gachabot/internal/repository"
-	"gachabot/internal/service"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/redis/go-redis/v9"
 )
 
-// LinkProvider описывает интерфейс для связи с Telegram-хэндлером
 type LinkProvider interface {
 	GetIDByCode(code string) (int64, bool)
 }
 
-// Bot - обертка над Discord сессией
 type Bot struct {
-	session     *discordgo.Session
-	repo        *repository.PostgresRepo
-	service     *service.GachaService
-	duelService *service.DuelService
-	loc         *i18n.Localizer
-	lp          LinkProvider
-	rdb         *redis.Client
-	NotifyAdmin func(text string, imageURL string)
+	session        *discordgo.Session
+	repo           *repository.PostgresRepo
+	service        *gacha.GachaService
+	duelService    *duel.DuelService
+	loc            *i18n.Localizer
+	suggestService *suggest.SuggestService
+	lp             LinkProvider
+	rdb            *redis.Client
+	NotifyAdmin    func(text string, imageURL string)
 }
 
-// NewBot создает новый инстанс Discord бота
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *service.GachaService, ds *service.DuelService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) (*Bot, error) {
+func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -38,17 +38,17 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 	dg.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
 
 	b := &Bot{
-		session:     dg,
-		repo:        repo,
-		rdb:         rdb,
-		service:     gs,
-		duelService: ds,
-		loc:         loc,
-		lp:          lp,
-		NotifyAdmin: notifyAdmin,
+		session:        dg,
+		repo:           repo,
+		rdb:            rdb,
+		service:        gs,
+		duelService:    ds,
+		loc:            loc,
+		suggestService: ss,
+		lp:             lp,
+		NotifyAdmin:    notifyAdmin,
 	}
 
-	// Регистрируем глобальные роутеры (они будут лежать в router.go)
 	dg.AddHandler(b.HandleInteraction)
 	dg.AddHandler(b.HandleComponentInteraction)
 	dg.AddHandler(b.HandleMessageCreate)
@@ -56,19 +56,17 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 	return b, nil
 }
 
-// Start открывает соединение и регистрирует слэш-команды
 func (b *Bot) Start() error {
 	err := b.session.Open()
 	if err != nil {
 		return err
 	}
-	log.Println("[DISCORD] Бот успешно подключен к шлюзу!")
+	log.Println("[DISCORD] The bot has been successfully connected to the gateway!")
 
 	b.setupCommands()
 	return nil
 }
 
-// setupCommands регистрирует слэш-команды в Discord
 func (b *Bot) setupCommands() {
 	commands := []*discordgo.ApplicationCommand{
 		{
@@ -195,8 +193,8 @@ func (b *Bot) setupCommands() {
 
 	_, err := b.session.ApplicationCommandBulkOverwrite(b.session.State.User.ID, "", commands)
 	if err != nil {
-		log.Printf("[DISCORD ERROR] Ошибка регистрации команд: %v", err)
+		log.Printf("[DISCORD ERROR] Error registering commands: %v", err)
 	} else {
-		log.Println("[DISCORD] Слэш-команды зарегистрированы!")
+		log.Println("[DISCORD] Slash commands are registered!")
 	}
 }

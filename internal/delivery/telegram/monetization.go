@@ -10,10 +10,10 @@ import (
 func (b *Bot) buildShopMenu(lang string) (string, *tele.ReplyMarkup) {
 	menu := &tele.ReplyMarkup{}
 
-	btn1 := menu.Data(b.loc.T(lang, "btn_shop_1"), "buy_invoice", "1")
-	btn5 := menu.Data(b.loc.T(lang, "btn_shop_5"), "buy_invoice", "5")
-	btn25 := menu.Data(b.loc.T(lang, "btn_shop_25"), "buy_invoice", "25")
-	btn100 := menu.Data(b.loc.T(lang, "btn_shop_100"), "buy_invoice", "100")
+	btn1 := menu.Data(b.loc.Translate(lang, "btn_shop_1"), "buy_invoice", "1")
+	btn5 := menu.Data(b.loc.Translate(lang, "btn_shop_5"), "buy_invoice", "5")
+	btn25 := menu.Data(b.loc.Translate(lang, "btn_shop_25"), "buy_invoice", "25")
+	btn100 := menu.Data(b.loc.Translate(lang, "btn_shop_100"), "buy_invoice", "100")
 
 	menu.Inline(
 		menu.Row(btn1),
@@ -22,7 +22,7 @@ func (b *Bot) buildShopMenu(lang string) (string, *tele.ReplyMarkup) {
 		menu.Row(btn100),
 	)
 
-	return b.loc.T(lang, "shop_menu_text"), menu
+	return b.loc.Translate(lang, "shop_menu_text"), menu
 }
 
 func (b *Bot) HandleDonate(ctx tele.Context) error {
@@ -57,23 +57,23 @@ func (b *Bot) HandleSendInvoice(ctx tele.Context) error {
 
 	switch packageType {
 	case "1":
-		title = b.loc.T(lang, "shop_title_1")
-		description = b.loc.T(lang, "shop_desc_1")
+		title = b.loc.Translate(lang, "shop_title_1")
+		description = b.loc.Translate(lang, "shop_desc_1")
 		payload = "buy_rolls_1"
 		price = 15
 	case "5":
-		title = b.loc.T(lang, "shop_title_5")
-		description = b.loc.T(lang, "shop_desc_5")
+		title = b.loc.Translate(lang, "shop_title_5")
+		description = b.loc.Translate(lang, "shop_desc_5")
 		payload = "buy_rolls_5"
 		price = 65
 	case "25":
-		title = b.loc.T(lang, "shop_title_25")
-		description = b.loc.T(lang, "shop_desc_25")
+		title = b.loc.Translate(lang, "shop_title_25")
+		description = b.loc.Translate(lang, "shop_desc_25")
 		payload = "buy_rolls_25"
 		price = 290
 	case "100":
-		title = b.loc.T(lang, "shop_title_100")
-		description = b.loc.T(lang, "shop_desc_100")
+		title = b.loc.Translate(lang, "shop_title_100")
+		description = b.loc.Translate(lang, "shop_desc_100")
 		payload = "buy_rolls_100"
 		price = 999
 	default:
@@ -129,7 +129,7 @@ func (b *Bot) HandlePayment(ctx tele.Context) error {
 	err = b.repo.AddPremiumRolls(dbUser.ID, rollsToAdd)
 	if err != nil {
 		log.Printf("Ошибка начисления роллов %d: %v", dbUser.ID, err)
-		return ctx.Send(b.loc.T(lang, "err_payment_db"))
+		return ctx.Send(b.loc.Translate(lang, "err_payment_db"))
 	}
 
 	bonusText := ""
@@ -138,30 +138,30 @@ func (b *Bot) HandlePayment(ctx tele.Context) error {
 		epicCard, err := b.repo.GetRandomCard(4)
 		if err == nil {
 			fragCount, _ := b.repo.AddFragment(dbUser.ID, epicCard.ID)
-			bonusText = b.loc.T(lang, "payment_bonus_frag", epicCard.Name, fragCount)
+			bonusText = b.loc.Translate(lang, "payment_bonus_frag", epicCard.Name, fragCount)
 
 			if fragCount >= 10 {
 				_ = b.repo.ClearFragments(dbUser.ID, epicCard.ID)
 				_ = b.repo.AddCardToInventory(dbUser.ID, epicCard.ID)
-				bonusText += b.loc.T(lang, "payment_bonus_assembled")
+				bonusText += b.loc.Translate(lang, "payment_bonus_assembled")
 			}
 		} else {
 			log.Printf("Не удалось выдать эпик осколок: %v", err)
 		}
 	}
 
-	// Возврат средств админу для тестов
-	if tgUser.ID == 348389728 {
+	// Refund to the admin for testing
+	if tgUser.ID == b.adminID {
 		params := map[string]interface{}{
 			"user_id":                    tgUser.ID,
 			"telegram_payment_charge_id": payment.TelegramChargeID,
 		}
 		_, refundErr := ctx.Bot().Raw("refundStarPayment", params)
 		if refundErr == nil {
-			bonusText += b.loc.T(lang, "payment_test_refund")
+			bonusText += b.loc.Translate(lang, "payment_test_refund")
 		}
 	}
 
-	successMsg := b.loc.T(lang, "payment_success", rollsToAdd, bonusText)
+	successMsg := b.loc.Translate(lang, "payment_success", rollsToAdd, bonusText)
 	return ctx.Send(successMsg, tele.ModeHTML)
 }

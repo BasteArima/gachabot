@@ -10,13 +10,13 @@ type Card struct {
 	RarityID   int
 	ImageURL   string
 	PowerLevel int
-	SetID      *int `db:"set_id"` // Pointer, так как карта может не принадлежать сету
+	SetID      *int `db:"set_id"` // Pointer, since the card may not belong to the set
 }
 
 type User struct {
-	ID             int64         // Единый внутренний ID бота
-	TelegramID     sql.NullInt64 // Уникальный ID из Telegram
-	DiscordID      sql.NullInt64 // Уникальный ID из Discord
+	ID             int64
+	TelegramID     sql.NullInt64
+	DiscordID      sql.NullInt64
 	Username       string
 	FirstName      string
 	LastName       string
@@ -26,7 +26,7 @@ type User struct {
 	LastStreakDate sql.NullTime
 	PremiumRolls   int
 	LanguageCode   string
-	ActiveSetID    *int `db:"active_set_id"` // Pointer, потому что может быть NULL
+	ActiveSetID    *int `db:"active_set_id"`
 	IsAdult        sql.NullBool
 }
 
@@ -36,6 +36,7 @@ type Rarity struct {
 	DropChance    float64
 	BaseReward    int
 	PityThreshold int
+	CraftCost     int
 }
 
 type UserProfile struct {
@@ -60,8 +61,8 @@ type UserCardView struct {
 
 type LeaderboardEntry struct {
 	DisplayName string
-	Value       int    // Сюда положим баланс, стрик или кол-во карт в зависимости от фильтра
-	ActiveAura  string // <-- НОВОЕ ПОЛЕ
+	Value       int // Balance, streak, or number of cards depending on the filter
+	ActiveAura  string
 }
 
 type CompletedSetInfo struct {
@@ -72,12 +73,11 @@ type CompletedSetInfo struct {
 type PromoReward struct {
 	Points        int                `json:"points,omitempty"`
 	PremiumRolls  int                `json:"premium_rolls,omitempty"`
-	Cards         []int              `json:"cards,omitempty"`        // ID конкретных карт (например [12, 45])
-	RandomCards   map[string]int     `json:"random_cards,omitempty"` // Случайные карты: ключ - ID редкости (строка), значение - количество
-	CompletedSets []CompletedSetInfo `json:"-"`                      // Изменили string на структуру
+	Cards         []int              `json:"cards,omitempty"`
+	RandomCards   map[string]int     `json:"random_cards,omitempty"`
+	CompletedSets []CompletedSetInfo `json:"-"`
 }
 
-// CardSet представляет саму коллекцию
 type CardSet struct {
 	ID           int    `db:"id"`
 	Name         string `db:"name"`
@@ -86,20 +86,18 @@ type CardSet struct {
 	RewardPoints int    `db:"reward_points"`
 }
 
-// UserSetProgress используется для красивого вывода прогресса в UI бота
 type UserSetProgress struct {
 	SetID          int
 	SetName        string
-	CollectedCards int  // Сколько уникальных карт из сета есть у юзера
-	TotalCards     int  // Сколько всего карт в этом сете
-	IsCompleted    bool // Забрал ли юзер награду
-	IsActive       bool // Экипирована ли эта аура прямо сейчас
+	CollectedCards int
+	TotalCards     int
+	IsCompleted    bool
+	IsActive       bool
 	BuffType       string
 	BuffValue      int
 	RewardPoints   int
 }
 
-// RollResult — структура для передачи ответа из сервиса в хэндлер
 type RollResult struct {
 	OnCooldown       bool
 	CooldownTimeLeft string
@@ -117,7 +115,6 @@ type RollResult struct {
 	StreakDays    int
 	StreakUpdated bool
 
-	// НОВЫЕ ПОЛЯ ДЛЯ КОЛЛЕКЦИЙ
 	CompletedSetName   string
 	CompletedSetReward int
 }
@@ -140,4 +137,14 @@ type DuelResult struct {
 	ChallengerAura   *DuelAuraInfo
 	TargetAura       *DuelAuraInfo
 	IsFair           bool
+}
+
+type DuelRequest struct {
+	ID             string `json:"id"`
+	ChallengerID   int64  `json:"challenger_id"`
+	ChallengerName string `json:"challenger_name"`
+	TargetID       int64  `json:"target_id"`
+	TargetName     string `json:"target_name"`
+	Amount         int    `json:"amount"`
+	IsFair         bool   `json:"is_fair"`
 }

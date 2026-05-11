@@ -14,7 +14,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
 
-  # НОВЫЙ СЕРВИС REDIS
   redis:
     image: redis:7-alpine
     container_name: gachabot_redis
@@ -33,7 +32,7 @@ services:
       - redis
     environment:
       - TZ=Europe/Moscow
-      - BOT_TOKEN=${BOT_TOKEN}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
@@ -42,8 +41,15 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - REDIS_ADDR=redis:6379
       - REQUIRE_18_PLUS_CONFIRM=${REQUIRE_18_PLUS_CONFIRM}
+      - COOLDOWN_HOURS=${COOLDOWN_HOURS}
+      - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID}
+      - ADMIN_TG_BACKUP_GROUP_ID=${ADMIN_TG_BACKUP_GROUP_ID}
+      - ADMIN_TG_SUGGESTS_GROUP_ID=${ADMIN_TG_SUGGESTS_GROUP_ID}
+      - ADD_BOT_TO_GROUP_LINK=${ADD_BOT_TO_GROUP_LINK}
+      - START_BANNER_URL=${START_BANNER_URL}
+      - BACKUP_TIME_HOUR=${BACKUP_TIME_HOUR}
+      - BACKUP_TIME_MINUTE=${BACKUP_TIME_MINUTE}
     volumes:
-      # Прокидываем папку бэкапов в бота (только для чтения)
       - /opt/gachabot/backups:/backups:ro
 
   pgbackups:
@@ -52,7 +58,6 @@ services:
     depends_on:
       - db
     volumes:
-      # Папка на сервере (слева), куда будут падать бэкапы
       - /opt/gachabot/backups:/backups
     environment:
       - POSTGRES_HOST=db
@@ -60,9 +65,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - TZ=Europe/Moscow
-      # Расписание в формате cron (каждый день в 03:00 ночи)
       - SCHEDULE=0 3 * * *
-      # Сколько дней хранить бэкапы (старые удалятся сами)
       - BACKUP_KEEP_DAYS=7
       - BACKUP_KEEP_WEEKS=4
 

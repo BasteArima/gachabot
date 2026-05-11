@@ -70,6 +70,7 @@
   "duel_start": "⚔️ <b>The battle has begun</b>",
 
   "err_craft_failed": "⚒ <b>Craft failed:</b> %s",
+  "err_not_enough_duplicates": "not enough duplicates.",
   "craft_success": "<blockquote>⚒ <b>SUCCESSFUL CRAFT!</b>\n\nYou smelted %d duplicates and got:\n🃏 Card: <b>%s</b>\n✨ Rarity: <b>%s</b>\n⚔️ Power: <b>%d</b></blockquote>",
   "craft_mythic_frag": "<blockquote>⚒ <b>SUCCESSFUL CRAFT!</b>\n\nYou smelted %d legendary duplicates and got a Mythical Card fragment:\n🔮 <b>%s</b>\n📦 Collected: <b>%d / 10</b></blockquote>",
   "craft_mythic_assembled": "<blockquote>⚒ <b>MYTHICAL CRAFT!</b>\n\nYou smelted %d duplicates and assembled the final fragment!\n🔥 Obtained Mythical Card: <b>%s</b>\n⚔️ Power: <b>%d</b></blockquote>",
@@ -103,6 +104,7 @@
   "btn_profile_suggest": "💡 Suggest a Card",
   "suggest_err_funds": "You need more than 1000 points to suggest a card!",
 
+  "suggest_close" : "❌ Close",
   "suggest_rules": "<blockquote><b>Suggestion Rules:</b>\n\n💰 Choose wisely, as this service costs <b>1,000 points</b> (deducted upon successful submission).\n\n🔄 You can suggest <b>new cards</b> as well as <b>replacements for current ones</b> if you found a better art!\n\n⛔️ Jokes, off-topic content, and spam will lead to a ban from the bot.\n\n‼️ We will review your submission, but suggesting a card does not guarantee it will be added to the game.\n\n👌 It is recommended to send photos in <b>3:4</b> format (vertical rectangle), preferably with some empty space around the edges so the frame doesn't cut off the character.</blockquote>",
   "suggest_q1": "<b>Question 1/3:</b>\n\nI want to send a funny photo of my classmate, is that okay?",
   "btn_q1_yes": "✅ Yes, I'll send my friend",
@@ -123,7 +125,9 @@
 
   "suggest_cancelled": "🛑 Card suggestion cancelled.",
   "suggest_err_no_caption": "⚠️ <b>You forgot to add a caption!</b>\nPlease resend the photo/file and include the card name and desired rarity in the caption field.",
+  "suggest_err_no_file": "⚠️ <b>You forgot to add a image!</b>\nPlease resend the photo/file and include the card name and desired rarity in the signature field.",
   "suggest_done": "✅ <b>Your card has been successfully sent for moderation!</b>\n1000 points deducted from your balance. Thanks for your contribution!",
+  "suggest_admin_msg": "\uD83D\uDCE9 <b>New suggest!</b>\nFrom: @%s (TG_ID: %d, DB_ID: %d)\n\nUser description:\n<i>%s</i>",
 
   "btn_help_lang": "🌍 Language / Язык",
   "help_language": "<blockquote><b>🌍 Language Selection / Выбор языка</b>\n\nSelect interface language. This will change the language of all bot buttons and messages.</blockquote>",
@@ -182,5 +186,7 @@
   "adult_verification_msg": "🔞 <b>Age Verification</b>\n\nThis bot contains 18+ content. Please confirm that you are at least 18 years old.",
   "btn_adult_yes": "✅ Yes, I am 18+",
   "btn_adult_no": "⛔️ No, I am under 18",
-  "adult_rejected_msg": "🔞 Sorry, but this bot is strictly for users over 18 years old. Come back when you're older!"
+  "adult_rejected_msg": "🔞 Sorry, but this bot is strictly for users over 18 years old. Come back when you're older!",
+
+  "backup_caption": "📦 <b>Automatic backup of the GachaBot database</b>\n\nThe file can be used for recovery via the command:\n<code>gunzip -c backup.sql.gz | docker exec -i gachabot_db psql -U postgres -d postgres</code>"
 }

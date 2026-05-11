@@ -11,27 +11,27 @@ import (
 func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
 	result, err := b.service.RollCard(user.ID)
 	if err != nil {
-		b.respond(s, i, b.loc.T(lang, "error_tech"))
+		b.respond(s, i, b.loc.Translate(lang, "error_tech"))
 		return
 	}
 
 	if result.OnCooldown {
-		msg := b.loc.T(lang, "roll_cooldown", result.CooldownTimeLeft)
+		msg := b.loc.Translate(lang, "roll_cooldown", result.CooldownTimeLeft)
 		if result.StreakUpdated {
-			msg += "\n\n" + b.loc.T(lang, "streak_kept_alive", result.StreakDays)
+			msg += "\n\n" + b.loc.Translate(lang, "streak_kept_alive", result.StreakDays)
 		}
 		b.respond(s, i, msg)
 		return
 	}
 
-	title := b.loc.T(lang, "roll_success_title")
-	desc := b.loc.T(lang, "roll_success_desc", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
+	title := b.loc.Translate(lang, "roll_success_title")
+	desc := b.loc.Translate(lang, "roll_success_desc", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
 
 	if result.IsFragment {
 		if result.CardAssembled {
-			desc = b.loc.T(lang, "roll_mythic_assembled", result.Card.Name, result.Card.PowerLevel, result.Reward)
+			desc = b.loc.Translate(lang, "roll_mythic_assembled", result.Card.Name, result.Card.PowerLevel, result.Reward)
 		} else {
-			desc = b.loc.T(lang, "roll_mythic_fragment", result.Card.Name, result.FragmentsCount, result.Reward)
+			desc = b.loc.Translate(lang, "roll_mythic_fragment", result.Card.Name, result.FragmentsCount, result.Reward)
 		}
 	}
 
@@ -42,14 +42,13 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		Color:       0x00ff00,
 	}
 
-	// --- ДОБАВЛЯЕМ КНОПКУ "КРУТИТЬ ЕЩЕ" ---
 	components := []discordgo.MessageComponent{
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.Button{
-					CustomID: "roll_again", // Тот же ID, что и в Telegram
-					Label:    b.loc.T(lang, "btn_roll_again"),
-					Style:    discordgo.PrimaryButton, // Синяя кнопка (можно discordgo.SuccessButton для зеленой)
+					CustomID: "roll_again",
+					Label:    b.loc.Translate(lang, "btn_roll_again"),
+					Style:    discordgo.PrimaryButton,
 				},
 			},
 		},
@@ -59,19 +58,19 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds:     []*discordgo.MessageEmbed{embed},
-			Components: components, // Прикрепляем кнопку к сообщению
+			Components: components,
 		},
 	})
 
 	if err != nil {
 		// Рекомендую всегда логировать ошибки Дискорда
-		log.Printf("[DISCORD ERROR] Не удалось отправить карту: %v", err)
+		log.Printf("[DISCORD ERROR] Failed to send card: %v", err)
 	}
 
 	if result.StreakUpdated {
-		streakMsg := b.loc.T(lang, "streak_continued", result.Reward, result.StreakDays)
+		streakMsg := b.loc.Translate(lang, "streak_continued", result.Reward, result.StreakDays)
 		if result.StreakDays == 1 {
-			streakMsg = b.loc.T(lang, "streak_started")
+			streakMsg = b.loc.Translate(lang, "streak_started")
 		}
 		s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{Content: "🔥 " + streakMsg})
 	}
@@ -84,23 +83,24 @@ func (b *Bot) handleRollAgainCallback(s *discordgo.Session, i *discordgo.Interac
 func (b *Bot) handleCraft(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
 	result, err := b.service.CraftCard(user.ID)
 	if err != nil {
-		b.respond(s, i, "❌ "+b.loc.T(lang, "err_craft_failed", err.Error()))
+		translatedReason := b.loc.Translate(lang, err.Error())
+		b.respond(s, i, "❌ "+b.loc.Translate(lang, "err_craft_failed", translatedReason))
 		return
 	}
 
 	var desc string
 	if result.IsFragment {
 		if !result.CardAssembled {
-			desc = b.loc.T(lang, "craft_mythic_frag", result.CraftCost, result.Card.Name, result.FragmentsCount)
+			desc = b.loc.Translate(lang, "craft_mythic_frag", result.CraftCost, result.Card.Name, result.FragmentsCount)
 		} else {
-			desc = b.loc.T(lang, "craft_mythic_assembled", result.CraftCost, result.Card.Name, result.Card.PowerLevel)
+			desc = b.loc.Translate(lang, "craft_mythic_assembled", result.CraftCost, result.Card.Name, result.Card.PowerLevel)
 		}
 	} else {
-		desc = b.loc.T(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
+		desc = b.loc.Translate(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "🛠 " + b.loc.T(lang, "craft_title"),
+		Title:       "🛠 " + b.loc.Translate(lang, "craft_title"),
 		Description: desc,
 		Image:       &discordgo.MessageEmbedImage{URL: result.Card.ImageURL},
 		Color:       0x9b59b6,
@@ -112,18 +112,15 @@ func (b *Bot) handleCraft(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	})
 }
 
-// Активация кода игроками (Discord)
 func (b *Bot) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, dbUser *models.User, lang string) {
-	// Никакого getLang здесь нет, lang уже пришел в аргументах функции!
 	options := i.ApplicationCommandData().Options
 	if len(options) == 0 {
-		b.respondEphemeral(s, i, "❌ Укажите код.")
+		b.respondEphemeral(s, i, b.loc.Translate(lang, "promo_usage"))
 		return
 	}
 
 	code := options[0].StringValue()
 
-	// ПРАВИЛЬНЫЙ ВЫЗОВ: 2 аргумента на вход, 3 на выход
 	reward, cards, err := b.service.RedeemPromo(dbUser.ID, code)
 	if err != nil {
 		var errKey string
@@ -139,35 +136,32 @@ func (b *Bot) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, 
 		default:
 			errKey = "error_db"
 		}
-		b.respondEphemeral(s, i, b.loc.T(lang, errKey))
+		b.respondEphemeral(s, i, b.loc.Translate(lang, errKey))
 		return
 	}
 
-	// Собираем текст
 	var sb strings.Builder
 	if reward.Points > 0 {
-		sb.WriteString(b.loc.T(lang, "promo_reward_points", reward.Points) + "\n")
+		sb.WriteString(b.loc.Translate(lang, "promo_reward_points", reward.Points) + "\n")
 	}
 	if reward.PremiumRolls > 0 {
-		sb.WriteString(b.loc.T(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
+		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
 	}
 	if len(cards) > 0 {
-		sb.WriteString("\n" + b.loc.T(lang, "promo_reward_cards_count", len(cards)) + "\n")
+		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", len(cards)) + "\n")
 		for _, c := range cards {
-			sb.WriteString(b.loc.T(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
+			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
 		}
 	}
 
-	// Главный эмбед с текстом награды
 	embeds := []*discordgo.MessageEmbed{
 		{
-			Title:       b.loc.T(lang, "promo_success_title"),
+			Title:       b.loc.Translate(lang, "promo_success_title"),
 			Description: sb.String(),
-			Color:       0x2ecc71, // Зеленый цвет
+			Color:       0x2ecc71,
 		},
 	}
 
-	// Лимит Дискорда: 10 эмбедов на сообщение. 1 уже занят текстом, остается 9 под картинки.
 	imgLimit := len(cards)
 	if imgLimit > 9 {
 		imgLimit = 9

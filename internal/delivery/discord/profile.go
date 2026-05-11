@@ -10,7 +10,6 @@ import (
 func (b *Bot) handleProfile(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string) {
 	embed, buttons := b.getProfileData(user, lang)
 
-	// В Discord не всегда есть аватарка в i.Member.User, лучше брать из i.Interaction.Member.User
 	if i.Member != nil && i.Member.User != nil && i.Member.User.Avatar != "" {
 		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: i.Member.User.AvatarURL("128")}
 	} else if i.User != nil && i.User.Avatar != "" {
@@ -29,18 +28,16 @@ func (b *Bot) handleProfile(s *discordgo.Session, i *discordgo.InteractionCreate
 func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string, offset int) {
 	card, total, err := b.service.GetUserCardPagination(user.ID, offset)
 	if err != nil || card == nil {
-		b.respondEphemeral(s, i, b.loc.T(lang, "cards_empty"))
+		b.respondEphemeral(s, i, b.loc.Translate(lang, "cards_empty"))
 		return
 	}
 
 	var desc string
 	if card.SetName != "" {
-		// 6 аргументов: SetName, RarityName, PowerLevel, Quantity, Current, Total
-		desc = b.loc.T(lang, "card_nav_caption_with_set",
+		desc = b.loc.Translate(lang, "card_nav_caption_with_set",
 			card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 	} else {
-		// 5 аргументов: RarityName, PowerLevel, Quantity, Current, Total
-		desc = b.loc.T(lang, "card_nav_caption",
+		desc = b.loc.Translate(lang, "card_nav_caption",
 			card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
 	}
 
@@ -53,9 +50,7 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	var navButtons []discordgo.MessageComponent
 
-	// --- ЛОГИКА ЦИКЛИЧНОГО ЛИСТАНИЯ ---
 	if total > 1 {
-		// Вычисляем индексы с закольцовыванием
 		prev := (offset - 1 + total) % total
 		next := (offset + 1) % total
 
@@ -71,7 +66,6 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 		})
 	}
 
-	// Кнопка возврата в профиль всегда в конце
 	navButtons = append(navButtons, discordgo.Button{
 		Label:    "🔙",
 		Style:    discordgo.DangerButton,
@@ -86,12 +80,12 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 	profile, _ := b.service.GetUserProfile(user.ID)
 
 	desc := fmt.Sprintf("**%s**\n\n", user.Username)
-	desc += b.loc.T(lang, "profile_stats",
+	desc += b.loc.Translate(lang, "profile_stats",
 		profile.UniqueCardsCount, profile.TotalCardsCount,
 		profile.DuplicatesCount, profile.Balance, profile.StreakDays)
 
 	embed := &discordgo.MessageEmbed{
-		Title:       b.loc.T(lang, "profile_title"),
+		Title:       b.loc.Translate(lang, "profile_title"),
 		Description: desc,
 		Color:       0x7289da,
 	}
@@ -100,19 +94,19 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 		discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
 				discordgo.Button{
-					Label:    b.loc.T(lang, "btn_my_cards_ds"),
+					Label:    b.loc.Translate(lang, "btn_my_cards_ds"),
 					Style:    discordgo.PrimaryButton,
 					CustomID: "cards_nav:0",
 					Emoji:    &discordgo.ComponentEmoji{Name: "🎴"},
 				},
 				discordgo.Button{
-					Label:    b.loc.T(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets),
-					Style:    discordgo.SuccessButton, // Зеленый цвет выделяется
+					Label:    b.loc.Translate(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets),
+					Style:    discordgo.SuccessButton,
 					CustomID: "sets_nav:0",
 					Emoji:    &discordgo.ComponentEmoji{Name: "📚"},
 				},
 				discordgo.Button{
-					Label:    b.loc.T(lang, "btn_profile_suggest"),
+					Label:    b.loc.Translate(lang, "btn_profile_suggest"),
 					Style:    discordgo.SecondaryButton,
 					CustomID: "suggest_start",
 					Emoji:    &discordgo.ComponentEmoji{Name: "💡"},

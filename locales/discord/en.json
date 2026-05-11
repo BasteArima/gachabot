@@ -34,6 +34,7 @@
 
   "craft_title": "⚒ Craft",
   "craft_success": "⚒ **SUCCESSFUL CRAFT!**\n> Melted %d duplicates and got:\n> 🃏 Card: **%s**\n> ✨ Rarity: **%s**\n> ⚔️ Power: **%d**",
+  "err_not_enough_duplicates": "not enough duplicates.",
   "craft_mythic_frag": "⚒ **SUCCESSFUL CRAFT!**\n> Melted %d leg. duplicates.\n> Got fragment: 🔮 **%s**\n> 📦 Total: **%d / 10**",
   "craft_mythic_assembled": "⚒ **MYTHIC CRAFT!**\n> Melted %d duplicates.\n> 🔥 Final fragment found!\n> Card unlocked: **%s**\n> ⚔️ Power: **%d**",
   "err_craft_failed": "**⚒ Craft failed:** %s",

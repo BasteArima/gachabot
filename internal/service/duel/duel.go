@@ -1,4 +1,4 @@
-package service
+package duel
 
 import (
 	"context"
@@ -13,20 +13,9 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Добавили JSON теги, убрали Timer
-type DuelRequest struct {
-	ID             string `json:"id"`
-	ChallengerID   int64  `json:"challenger_id"`
-	ChallengerName string `json:"challenger_name"`
-	TargetID       int64  `json:"target_id"`
-	TargetName     string `json:"target_name"`
-	Amount         int    `json:"amount"`
-	IsFair         bool   `json:"is_fair"` // <-- НОВОЕ
-}
-
 type DuelService struct {
 	repo *repository.PostgresRepo
-	rdb  *redis.Client // <-- Добавили Redis, убрали map и Mutex
+	rdb  *redis.Client
 }
 
 func NewDuelService(repo *repository.PostgresRepo, rdb *redis.Client) *DuelService {
@@ -37,7 +26,7 @@ func NewDuelService(repo *repository.PostgresRepo, rdb *redis.Client) *DuelServi
 }
 
 func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerName string, targetID int64, targetName string, amount int, isFair bool) {
-	req := &DuelRequest{
+	req := &models.DuelRequest{
 		ID:             duelID,
 		ChallengerID:   challengerID,
 		ChallengerName: challengerName,
@@ -47,32 +36,28 @@ func (s *DuelService) CreateDuel(duelID string, challengerID int64, challengerNa
 		IsFair:         isFair,
 	}
 
-	// Пакуем в JSON
 	data, err := json.Marshal(req)
 	if err != nil {
-		fmt.Println("Ошибка маршалинга дуэли:", err)
+		fmt.Println("[DUEL] Failed to marshal duel request:", err)
 		return
 	}
 
-	// Сохраняем в Redis ровно на 5 минут. Он сам удалится!
 	ctx := context.Background()
 	s.rdb.Set(ctx, "duel:"+duelID, data, 5*time.Minute)
 }
 
-func (s *DuelService) PopDuel(duelID string) (*DuelRequest, bool) {
+func (s *DuelService) PopDuel(duelID string) (*models.DuelRequest, bool) {
 	ctx := context.Background()
 	key := "duel:" + duelID
 
-	// Читаем из Redis
 	val, err := s.rdb.Get(ctx, key).Result()
 	if err != nil {
-		return nil, false // Дуэль не найдена или истекло время
+		return nil, false
 	}
 
-	// Сразу удаляем, так как мы её "забираем"
 	s.rdb.Del(ctx, key)
 
-	var duel DuelRequest
+	var duel models.DuelRequest
 	if err := json.Unmarshal([]byte(val), &duel); err != nil {
 		return nil, false
 	}
@@ -80,7 +65,7 @@ func (s *DuelService) PopDuel(duelID string) (*DuelRequest, bool) {
 	return &duel, true
 }
 
-func (s *DuelService) GetDuel(duelID string) (*DuelRequest, bool) {
+func (s *DuelService) GetDuel(duelID string) (*models.DuelRequest, bool) {
 	ctx := context.Background()
 	key := "duel:" + duelID
 
@@ -89,7 +74,7 @@ func (s *DuelService) GetDuel(duelID string) (*DuelRequest, bool) {
 		return nil, false
 	}
 
-	var duel DuelRequest
+	var duel models.DuelRequest
 	if err := json.Unmarshal([]byte(val), &duel); err != nil {
 		return nil, false
 	}
@@ -97,20 +82,20 @@ func (s *DuelService) GetDuel(duelID string) (*DuelRequest, bool) {
 	return &duel, true
 }
 
-func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*models.DuelResult, error) {
+func (s *DuelService) ExecuteDuel(duel *models.DuelRequest) (*models.DuelResult, error) {
 	userA, errA := s.repo.GetUserByID(duel.ChallengerID)
 	userB, errB := s.repo.GetUserByID(duel.TargetID)
 	if errA != nil || errB != nil {
-		return nil, fmt.Errorf("ошибка доступа к данным игроков")
+		return nil, fmt.Errorf("failed to access player data")
 	}
 	if userA.Balance < duel.Amount || userB.Balance < duel.Amount {
-		return nil, fmt.Errorf("недостаточно очков для боя")
+		return nil, fmt.Errorf("insufficient balance")
 	}
 
 	cardA, errA := s.repo.GetRandomUserCard(duel.ChallengerID)
 	cardB, errB := s.repo.GetRandomUserCard(duel.TargetID)
 	if errA != nil || errB != nil {
-		return nil, fmt.Errorf("у одного из бойцов нет карт")
+		return nil, fmt.Errorf("one of the fighters has no cards")
 	}
 
 	result := &models.DuelResult{
@@ -120,9 +105,9 @@ func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*models.DuelResult, error)
 		IsFair:         duel.IsFair,
 	}
 
-	// === ПРИМЕНЕНИЕ АУР (Если дуэль не fair) ===
+	// Use of auras
 	if !duel.IsFair {
-		// Аура атакующего
+		// Attacker's Aura
 		if auraC, _ := s.repo.GetActiveUserAura(duel.ChallengerID); auraC != nil {
 			result.ChallengerAura = &models.DuelAuraInfo{
 				Name:      auraC.Name,
@@ -134,7 +119,7 @@ func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*models.DuelResult, error)
 			}
 		}
 
-		// Аура защитника
+		// Defender's Aura
 		if auraT, _ := s.repo.GetActiveUserAura(duel.TargetID); auraT != nil {
 			result.TargetAura = &models.DuelAuraInfo{
 				Name:      auraT.Name,
@@ -146,7 +131,6 @@ func (s *DuelService) ExecuteDuel(duel *DuelRequest) (*models.DuelResult, error)
 			}
 		}
 	}
-	// ============================================
 
 	result.CardChallenger = cardA
 	result.CardTarget = cardB

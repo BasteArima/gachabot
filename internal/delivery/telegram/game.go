@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gachabot/internal/models"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,18 +19,19 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 
 	result, err := b.service.CraftCard(dbUser.ID)
 	if err != nil {
-		return ctx.Send(b.loc.T(lang, "err_craft_failed", err.Error()), tele.ModeHTML)
+		translatedReason := b.loc.Translate(lang, err.Error())
+		return ctx.Send(b.loc.Translate(lang, "err_craft_failed", translatedReason), tele.ModeHTML)
 	}
 
 	var caption string
 	if result.IsFragment {
 		if !result.CardAssembled {
-			caption = b.loc.T(lang, "craft_mythic_frag", result.CraftCost, result.Card.Name, result.FragmentsCount)
+			caption = b.loc.Translate(lang, "craft_mythic_frag", result.CraftCost, result.Card.Name, result.FragmentsCount)
 		} else {
-			caption = b.loc.T(lang, "craft_mythic_assembled", result.CraftCost, result.Card.Name, result.Card.PowerLevel)
+			caption = b.loc.Translate(lang, "craft_mythic_assembled", result.CraftCost, result.Card.Name, result.Card.PowerLevel)
 		}
 	} else {
-		caption = b.loc.T(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
+		caption = b.loc.Translate(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
 	}
 
 	photo := &tele.Photo{
@@ -39,9 +41,9 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 
 	err = ctx.Send(photo, tele.ModeHTML)
 
-	// --- ОТДЕЛЬНОЕ СООБЩЕНИЕ ПРИ СБОРЕ СЕТА ---
+	// Separate message when collecting a set
 	if result.CompletedSetName != "" {
-		msg := b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+		msg := b.loc.Translate(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
 		_ = ctx.Reply(msg, tele.ModeHTML)
 	}
 
@@ -54,31 +56,31 @@ func (b *Bot) HandleDuel(ctx tele.Context) error {
 	lang := getLang(challengerDB, tgUser)
 
 	if ctx.Chat().Type == tele.ChatPrivate {
-		return ctx.Send(b.loc.T(lang, "err_duel_private"))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_private"))
 	}
 
 	args := ctx.Args()
 	if len(args) < 2 {
-		return ctx.Send(b.loc.T(lang, "err_duel_usage"))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_usage"))
 	}
 
 	targetUsername := strings.TrimPrefix(args[0], "@")
 	amount, err := strconv.Atoi(args[1])
 	if err != nil || amount <= 0 {
-		return ctx.Send(b.loc.T(lang, "err_duel_amount"))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_amount"))
 	}
 
 	if challengerDB.Balance < amount {
-		return ctx.Send(b.loc.T(lang, "err_duel_funds"))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_funds"))
 	}
 
 	targetUserDB, err := b.repo.GetUserByUsername(targetUsername)
 	if err != nil {
-		return ctx.Send(b.loc.T(lang, "err_duel_not_found", targetUsername))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_not_found", targetUsername))
 	}
 
 	if targetUserDB.ID == challengerDB.ID {
-		return ctx.Send(b.loc.T(lang, "err_duel_self"))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_self"))
 	}
 
 	duelID := fmt.Sprintf("%d_%d_%d", challengerDB.ID, targetUserDB.ID, time.Now().Unix())
@@ -93,11 +95,11 @@ func (b *Bot) HandleDuel(ctx tele.Context) error {
 	b.duelService.CreateDuel(duelID, challengerDB.ID, challengerDB.FirstName, targetUserDB.ID, targetUsername, amount, isFair)
 
 	menu := &tele.ReplyMarkup{}
-	btnAccept := menu.Data(b.loc.T(lang, "btn_duel_accept"), "duel_accept", duelID)
-	btnCancel := menu.Data(b.loc.T(lang, "btn_duel_cancel"), "duel_cancel", duelID)
+	btnAccept := menu.Data(b.loc.Translate(lang, "btn_duel_accept"), "duel_accept", duelID)
+	btnCancel := menu.Data(b.loc.Translate(lang, "btn_duel_cancel"), "duel_cancel", duelID)
 	menu.Inline(menu.Row(btnAccept, btnCancel))
 
-	caption := b.loc.T(lang, "duel_challenge", challengerDB.FirstName, targetUsername, amount)
+	caption := b.loc.Translate(lang, "duel_challenge", challengerDB.FirstName, targetUsername, amount)
 	return ctx.Send(caption, tele.ModeHTML, menu)
 }
 
@@ -111,7 +113,7 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 
 	duel, exists := b.duelService.GetDuel(duelID)
 	if !exists {
-		_ = ctx.Respond(&tele.CallbackResponse{Text: b.loc.T(lang, "err_duel_expired")})
+		_ = ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "err_duel_expired")})
 		return ctx.Delete()
 	}
 
@@ -119,47 +121,43 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 
 	if callbackUnique == "duel_cancel" {
 		if internalUserID != duel.ChallengerID && internalUserID != duel.TargetID {
-			return ctx.Respond(&tele.CallbackResponse{Text: b.loc.T(lang, "err_duel_not_yours")})
+			return ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "err_duel_not_yours")})
 		}
 		b.duelService.PopDuel(duelID)
-		_ = ctx.Respond(&tele.CallbackResponse{Text: b.loc.T(lang, "duel_cancelled_toast")})
-		return ctx.Edit(b.loc.T(lang, "duel_cancelled", duel.ChallengerName, duel.TargetName), tele.ModeHTML)
+		_ = ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "duel_cancelled_toast")})
+		return ctx.Edit(b.loc.Translate(lang, "duel_cancelled", duel.ChallengerName, duel.TargetName), tele.ModeHTML)
 	}
 
 	if callbackUnique == "duel_accept" {
 		if internalUserID != duel.TargetID {
-			return ctx.Respond(&tele.CallbackResponse{Text: b.loc.T(lang, "err_duel_not_called")})
+			return ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "err_duel_not_called")})
 		}
 
-		_ = ctx.Respond() // Убираем часики с кнопки
+		_ = ctx.Respond() // Remove the clock from the button
 
-		// 2. Редактируем сообщение с кнопками, превращая его в статус-бар
-		// Убираем кнопки, чтобы никто не нажал лишнего
-		statusText := b.loc.T(lang, "duel_start")
+		// Editing a message with buttons, turning it into a status bar
+		// Remove buttons so that no one presses unnecessary ones
+		statusText := b.loc.Translate(lang, "duel_start")
 		_ = ctx.Edit(statusText, tele.ModeHTML)
 
-		// 3. Анимируем многоточие (3 шага с паузой)
 		for k := 0; k < 3; k++ {
 			time.Sleep(600 * time.Millisecond)
 			dots := strings.Repeat(".", k+1)
 			_ = ctx.Edit(statusText+"<b>"+dots+"</b>", tele.ModeHTML)
 		}
 
-		// 4. Пока идет "анимация", готовим данные боя в фоне
 		b.duelService.PopDuel(duelID)
 		result, err := b.duelService.ExecuteDuel(duel)
 		if err != nil {
-			return ctx.Edit(b.loc.T(lang, "err_duel_exec", err.Error()))
+			return ctx.Edit(b.loc.Translate(lang, "err_duel_exec", err.Error()))
 		}
 
-		// 5. Формируем финальный альбом
-		// Подготавливаем красивые строчки с аурами, если они есть
 		formatAura := func(aura *models.DuelAuraInfo) string {
 			if aura == nil {
 				return ""
 			}
 			// Локализуем тип баффа (например, power_percent -> "Буст силы")
-			buffName := b.loc.T(lang, "buff_type_"+aura.BuffType)
+			buffName := b.loc.Translate(lang, "buff_type_"+aura.BuffType)
 			return fmt.Sprintf("\n╰ ✨ <b>%s</b> (+%d%% %s)", aura.Name, aura.BuffValue, buffName)
 		}
 
@@ -168,11 +166,11 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 
 		fairNote := ""
 		if result.IsFair {
-			fairNote = b.loc.T(lang, "duel_fair_note") + "\n\n"
+			fairNote = b.loc.Translate(lang, "duel_fair_note") + "\n\n"
 		}
 
 		// Собираем текст
-		resText := b.loc.T(lang, "duel_result",
+		resText := b.loc.Translate(lang, "duel_result",
 			duel.ChallengerName, cAura, result.CardChallenger.Name, result.CardChallenger.PowerLevel, result.ChanceChallenger,
 			duel.TargetName, tAura, result.CardTarget.Name, result.CardTarget.PowerLevel, result.ChanceTarget,
 			fairNote, result.Roll, result.WinnerName, result.AmountWon*2)
@@ -194,41 +192,35 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
 	lang := getLang(dbUser, tgUser)
 
-	// --- БЛОК ПРОВЕРКИ 18+ ---
 	if b.require18Plus {
-		// Если статус еще не установлен (NULL)
 		if !dbUser.IsAdult.Valid || !dbUser.IsAdult.Bool {
 			menu := &tele.ReplyMarkup{}
-			btnYes := menu.Data(b.loc.T(lang, "btn_adult_yes"), "adult_yes")
-			btnNo := menu.Data(b.loc.T(lang, "btn_adult_no"), "adult_no")
+			btnYes := menu.Data(b.loc.Translate(lang, "btn_adult_yes"), "adult_yes")
+			btnNo := menu.Data(b.loc.Translate(lang, "btn_adult_no"), "adult_no")
 			menu.Inline(menu.Row(btnYes), menu.Row(btnNo))
 
-			msg := b.loc.T(lang, "adult_verification_msg")
+			msg := b.loc.Translate(lang, "adult_verification_msg")
 
-			// Если мы как-то попали сюда по кнопке (например, из профиля сбросили статус), удаляем старую картинку
 			if ctx.Callback() != nil && ctx.Message() != nil && ctx.Message().Photo != nil {
 				_ = ctx.Delete()
 			}
 			return ctx.Send(msg, tele.ModeHTML, menu)
 		}
 
-		// Если статус установлен, но юзер ответил "Нет" (FALSE)
 		if dbUser.IsAdult.Valid && !dbUser.IsAdult.Bool {
-			msg := b.loc.T(lang, "adult_rejected_msg")
+			msg := b.loc.Translate(lang, "adult_rejected_msg")
 			if ctx.Callback() != nil && ctx.Message() != nil && ctx.Message().Photo != nil {
 				_ = ctx.Delete()
 			}
 			return ctx.Send(msg, tele.ModeHTML)
 		}
 	}
-	// --- КОНЕЦ БЛОКА 18+ ---
 
-	// Дальше идет стандартная логика Хаба
 	menu := &tele.ReplyMarkup{}
-	btnRoll := menu.Data(b.loc.T(lang, "btn_roll_shortcut"), "roll_shortcut")
-	btnProfile := menu.Data(b.loc.T(lang, "btn_profile_menu"), "profile_menu")
-	btnHelp := menu.Data(b.loc.T(lang, "btn_help_menu"), "help_menu")
-	btnAddGroup := menu.URL(b.loc.T(lang, "btn_add_group"), "https://t.me/HentaiCard_bot?startgroup=true")
+	btnRoll := menu.Data(b.loc.Translate(lang, "btn_roll_shortcut"), "roll_shortcut")
+	btnProfile := menu.Data(b.loc.Translate(lang, "btn_profile_menu"), "profile_menu")
+	btnHelp := menu.Data(b.loc.Translate(lang, "btn_help_menu"), "help_menu")
+	btnAddGroup := menu.URL(b.loc.Translate(lang, "btn_add_group"), b.groupLink)
 
 	menu.Inline(
 		menu.Row(btnProfile, btnHelp),
@@ -236,9 +228,9 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 		menu.Row(btnRoll),
 	)
 
-	text := b.loc.T(lang, "start_msg")
+	text := b.loc.Translate(lang, "start_msg")
 	banner := &tele.Photo{
-		File:    tele.FromURL("https://api.baste.ru/cards/banner.webp"),
+		File:    tele.FromURL(os.Getenv("START_BANNER_URL")),
 		Caption: text,
 	}
 
@@ -254,45 +246,34 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	return ctx.Send(banner, tele.ModeHTML, menu)
 }
 
-// --- НОВЫЕ ХЭНДЛЕРЫ ---
-
-// HandleAdultConfirm срабатывает, если юзер нажал "Да, мне есть 18"
 func (b *Bot) HandleAdultConfirm(ctx tele.Context) error {
 	_ = ctx.Respond()
 	tgUser := ctx.Sender()
 	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
 
-	// Устанавливаем is_adult = true
 	_ = b.repo.SetUserAdultStatus(dbUser.ID, true)
 
-	// Удаляем сообщение с вопросом и вызываем HandleStart (теперь проверка пройдет)
 	_ = ctx.Delete()
 	return b.HandleStart(ctx)
 }
 
-// HandleAdultReject срабатывает, если юзер нажал "Нет, мне меньше 18"
 func (b *Bot) HandleAdultReject(ctx tele.Context) error {
 	_ = ctx.Respond()
 	tgUser := ctx.Sender()
 	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
 	lang := getLang(dbUser, tgUser)
 
-	// Устанавливаем is_adult = false
 	_ = b.repo.SetUserAdultStatus(dbUser.ID, false)
 
 	_ = ctx.Delete()
-	return ctx.Send(b.loc.T(lang, "adult_rejected_msg"), tele.ModeHTML)
+	return ctx.Send(b.loc.Translate(lang, "adult_rejected_msg"), tele.ModeHTML)
 }
 
-// Обрабатывает нажатие на кнопку "Профиль" из главного меню
 func (b *Bot) HandleProfileMenu(ctx tele.Context) error {
 	_ = ctx.Respond()
-	// Мы переходим из Хаба (Картинки) в Профиль (Картинку).
-	// Поэтому НЕ удаляем сообщение! HandleProfile сможет сделать красивый ctx.Edit.
 	return b.HandleProfile(ctx)
 }
 
-// Обрабатывает кнопку "Назад в главное меню"
 func (b *Bot) HandleStartMenu(ctx tele.Context) error {
 	_ = ctx.Respond()
 	return b.HandleStart(ctx)
@@ -301,7 +282,6 @@ func (b *Bot) HandleStartMenu(ctx tele.Context) error {
 func (b *Bot) HandleRoll(ctx tele.Context) error {
 	tgUser := ctx.Sender()
 
-	// АДАПТЕР: превращаем TG User во внутреннего пользователя
 	dbUser, err := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
 	if err != nil {
 		log.Printf("[DB ERROR] Ошибка получения юзера: %v", err)
@@ -310,54 +290,48 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 
 	lang := getLang(dbUser, tgUser)
 
-	// --- БЛОК ПРОВЕРКИ 18+ ---
 	if b.require18Plus {
-		// Если статус еще не установлен (NULL)
 		if !dbUser.IsAdult.Valid || !dbUser.IsAdult.Bool {
 			menu := &tele.ReplyMarkup{}
-			btnYes := menu.Data(b.loc.T(lang, "btn_adult_yes"), "adult_yes")
-			btnNo := menu.Data(b.loc.T(lang, "btn_adult_no"), "adult_no")
+			btnYes := menu.Data(b.loc.Translate(lang, "btn_adult_yes"), "adult_yes")
+			btnNo := menu.Data(b.loc.Translate(lang, "btn_adult_no"), "adult_no")
 			menu.Inline(menu.Row(btnYes), menu.Row(btnNo))
 
-			msg := b.loc.T(lang, "adult_verification_msg")
+			msg := b.loc.Translate(lang, "adult_verification_msg")
 
-			// Если вызвано по кнопке, пытаемся удалить старое сообщение, чтобы не плодить часики
 			if ctx.Callback() != nil {
 				_ = ctx.Delete()
 			}
 			return ctx.Send(msg, tele.ModeHTML, menu)
 		}
 
-		// Если статус установлен, но юзер ответил "Нет" (FALSE)
 		if dbUser.IsAdult.Valid && !dbUser.IsAdult.Bool {
-			msg := b.loc.T(lang, "adult_rejected_msg")
+			msg := b.loc.Translate(lang, "adult_rejected_msg")
 			if ctx.Callback() != nil {
 				_ = ctx.Delete()
 			}
 			return ctx.Send(msg, tele.ModeHTML)
 		}
 	}
-	// --- КОНЕЦ БЛОКА 18+ ---
 
 	b.service.TrackChat(dbUser.ID, ctx.Chat().ID)
 
-	// БИЗНЕС-ЛОГИКА: передаем ВНУТРЕННИЙ ID
 	result, err := b.service.RollCard(dbUser.ID)
 	if err != nil {
 		log.Printf("[ROLL ERROR] Ошибка сервиса для ID %d (%s): %v", dbUser.ID, dbUser.Username, err)
-		return ctx.Send(b.loc.T(lang, "error_tech"))
+		return ctx.Send(b.loc.Translate(lang, "error_tech"))
 	}
 
 	if result.OnCooldown {
-		msg := b.loc.T(lang, "roll_cooldown", result.CooldownTimeLeft)
+		msg := b.loc.Translate(lang, "roll_cooldown", result.CooldownTimeLeft)
 
 		if result.StreakUpdated {
-			streakMsg := b.loc.T(lang, "streak_kept_alive", result.StreakDays)
+			streakMsg := b.loc.Translate(lang, "streak_kept_alive", result.StreakDays)
 			msg = msg + "\n\n" + streakMsg
 		}
 
 		menu := &tele.ReplyMarkup{}
-		btnBuy := menu.Data(b.loc.T(lang, "btn_buy_rolls"), "shop_rolls_menu")
+		btnBuy := menu.Data(b.loc.Translate(lang, "btn_buy_rolls"), "shop_rolls_menu")
 		menu.Inline(menu.Row(btnBuy))
 
 		return ctx.Send(msg, &tele.SendOptions{ReplyTo: ctx.Message(), ParseMode: tele.ModeHTML, ReplyMarkup: menu})
@@ -366,12 +340,12 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	var caption string
 	if result.IsFragment {
 		if result.CardAssembled {
-			caption = b.loc.T(lang, "roll_mythic_assembled", result.Card.Name, result.Card.PowerLevel, result.Reward)
+			caption = b.loc.Translate(lang, "roll_mythic_assembled", result.Card.Name, result.Card.PowerLevel, result.Reward)
 		} else {
-			caption = b.loc.T(lang, "roll_mythic_fragment", result.Card.Name, result.FragmentsCount, result.Reward)
+			caption = b.loc.Translate(lang, "roll_mythic_fragment", result.Card.Name, result.FragmentsCount, result.Reward)
 		}
 	} else {
-		caption = b.loc.T(lang, "roll_success", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
+		caption = b.loc.Translate(lang, "roll_success", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
 	}
 
 	dynamicURL := fmt.Sprintf("%s?v=%d", result.Card.ImageURL, time.Now().Unix())
@@ -381,7 +355,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	}
 
 	menu := &tele.ReplyMarkup{}
-	btnRoll := menu.Data(b.loc.T(lang, "btn_roll_again"), "roll_again")
+	btnRoll := menu.Data(b.loc.Translate(lang, "btn_roll_again"), "roll_again")
 	menu.Inline(menu.Row(btnRoll))
 
 	err = ctx.Send(photo, &tele.SendOptions{
@@ -392,20 +366,20 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 
 	if err != nil {
 		log.Printf("[TELEGRAM ERROR] Не удалось отправить фото! URL: %s | Ошибка: %v", result.Card.ImageURL, err)
-		return ctx.Send(caption+b.loc.T(lang, "error_image"), tele.ModeHTML)
+		return ctx.Send(caption+b.loc.Translate(lang, "error_image"), tele.ModeHTML)
 	}
 
 	if result.CompletedSetName != "" {
-		msg := b.loc.T(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+		msg := b.loc.Translate(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
 		_ = ctx.Reply(msg, tele.ModeHTML)
 	}
 
 	if result.StreakUpdated {
 		if result.StreakDays == 1 {
 			_ = ctx.Send(`<tg-emoji emoji-id="4956499161319998529">🔥</tg-emoji>`, tele.ModeHTML)
-			_ = ctx.Send(b.loc.T(lang, "streak_started"), tele.ModeHTML)
+			_ = ctx.Send(b.loc.Translate(lang, "streak_started"), tele.ModeHTML)
 		} else {
-			msg := b.loc.T(lang, "streak_continued", result.Reward, result.StreakDays)
+			msg := b.loc.Translate(lang, "streak_continued", result.Reward, result.StreakDays)
 			_ = ctx.Send(msg, tele.ModeHTML)
 		}
 	}
@@ -418,8 +392,8 @@ func (b *Bot) HandleRollAgainCallback(ctx tele.Context) error {
 	return b.HandleRoll(ctx)
 }
 
-// Обрабатывает нажатие на кнопку "Крутить" из меню
+// Handles clicking on the "Roll" button from the menu
 func (b *Bot) HandleRollShortcut(ctx tele.Context) error {
-	_ = ctx.Respond() // Убираем часики с кнопки
+	_ = ctx.Respond()
 	return b.HandleRoll(ctx)
 }
