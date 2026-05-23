@@ -13,8 +13,6 @@ func NewPostgresRepo(db *sql.DB) *PostgresRepo {
 }
 
 func (r *PostgresRepo) GetAllActiveChatIDs() ([]int64, error) {
-	return []int64{348389728, 5327833165}, nil // test
-
 	var chatIDs []int64
 	rows, err := r.db.Query("SELECT telegram_id FROM users WHERE telegram_id IS NOT NULL")
 	if err != nil {
