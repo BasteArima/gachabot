@@ -1,9 +1,13 @@
 package discord
 
 import (
+	"bytes"
 	"gachabot/internal/models"
+	"io"
 	"log"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -148,32 +152,68 @@ func (b *Bot) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	if reward.PremiumRolls > 0 {
 		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
 	}
-
-	var embeds []*discordgo.MessageEmbed
-
 	if len(cards) > 0 {
 		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", len(cards)) + "\n")
 		for _, c := range cards {
 			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
 		}
+	}
 
+	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: sb.String(),
+		},
+	})
+	if err != nil {
+		log.Printf("[DISCORD] Failed to respond to interaction: %v", err)
+		return
+	}
+
+	if len(cards) > 0 {
 		imgLimit := len(cards)
 		if imgLimit > 10 {
 			imgLimit = 10
 		}
 
+		var files []*discordgo.File
+		httpClient := &http.Client{Timeout: 5 * time.Second}
+
 		for j := 0; j < imgLimit; j++ {
-			embeds = append(embeds, &discordgo.MessageEmbed{
-				Image: &discordgo.MessageEmbedImage{URL: cards[j].ImageURL},
+			resp, err := httpClient.Get(cards[j].ImageURL)
+			if err != nil {
+				log.Printf("[DISCORD] Failed to download image %s: %v", cards[j].ImageURL, err)
+				continue
+			}
+
+			imgData, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err != nil {
+				log.Printf("[DISCORD] Failed to read image data: %v", err)
+				continue
+			}
+
+			fileName := "card.png"
+			if strings.HasSuffix(cards[j].ImageURL, ".jpg") || strings.HasSuffix(cards[j].ImageURL, ".jpeg") {
+				fileName = "card.jpg"
+			} else if strings.HasSuffix(cards[j].ImageURL, ".webp") {
+				fileName = "card.webp"
+			}
+
+			files = append(files, &discordgo.File{
+				Name:        fileName,
+				ContentType: resp.Header.Get("Content-Type"),
+				Reader:      bytes.NewReader(imgData),
 			})
 		}
-	}
 
-	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: sb.String(),
-			Embeds:  embeds,
-		},
-	})
+		if len(files) > 0 {
+			_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+				Files: files,
+			})
+			if err != nil {
+				log.Printf("[DISCORD] Failed to send images as attachments: %v", err)
+			}
+		}
+	}
 }
