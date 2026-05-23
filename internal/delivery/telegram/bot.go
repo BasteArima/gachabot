@@ -81,6 +81,8 @@ func (b *Bot) Start() {
 }
 
 func (b *Bot) setupRoutes() {
+	b.bot.Use(b.AdminStateMiddleware)
+
 	b.bot.Handle("/start", b.HandleStart)
 	b.bot.Handle("/roll", b.HandleRoll)
 	b.bot.Handle("/profile", b.HandleProfile)
@@ -151,6 +153,11 @@ func (b *Bot) setupRoutes() {
 	b.bot.Handle(&tele.Btn{Unique: "profile_menu"}, b.HandleProfileMenu)
 	b.bot.Handle(&tele.Btn{Unique: "start_menu"}, b.HandleStartMenu)
 	b.bot.Handle(&tele.Btn{Unique: "help_menu"}, b.HandleHelpMenu)
+
+	// Global message
+	b.bot.Handle("/globalmsg", b.HandleGlobalMsg)
+	b.bot.Handle("\fglobal_cancel", b.HandleGlobalCancel)
+	b.bot.Handle("\fglobal_send", b.HandleGlobalSend)
 }
 
 // Implementing the LinkProvider interface for a Discord bot
