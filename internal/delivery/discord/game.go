@@ -141,44 +141,39 @@ func (b *Bot) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	}
 
 	var sb strings.Builder
+	sb.WriteString("**" + b.loc.Translate(lang, "promo_success_title") + "**\n\n")
 	if reward.Points > 0 {
 		sb.WriteString(b.loc.Translate(lang, "promo_reward_points", reward.Points) + "\n")
 	}
 	if reward.PremiumRolls > 0 {
 		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
 	}
+
+	var embeds []*discordgo.MessageEmbed
+
 	if len(cards) > 0 {
 		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", len(cards)) + "\n")
 		for _, c := range cards {
 			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
 		}
-	}
 
-	embeds := []*discordgo.MessageEmbed{
-		{
-			Title:       b.loc.Translate(lang, "promo_success_title"),
-			Description: sb.String(),
-			Color:       0x2ecc71,
-		},
-	}
+		imgLimit := len(cards)
+		if imgLimit > 10 {
+			imgLimit = 10
+		}
 
-	imgLimit := len(cards)
-	if imgLimit > 9 {
-		imgLimit = 9
-	}
-
-	for j := 0; j < imgLimit; j++ {
-		embeds = append(embeds, &discordgo.MessageEmbed{
-			Title: "🃏 " + cards[j].Name,
-			Image: &discordgo.MessageEmbedImage{URL: cards[j].ImageURL},
-			Color: 0x3498db,
-		})
+		for j := 0; j < imgLimit; j++ {
+			embeds = append(embeds, &discordgo.MessageEmbed{
+				Image: &discordgo.MessageEmbedImage{URL: cards[j].ImageURL},
+			})
+		}
 	}
 
 	_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Embeds: embeds,
+			Content: sb.String(),
+			Embeds:  embeds,
 		},
 	})
 }
