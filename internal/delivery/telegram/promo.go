@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"gachabot/internal/i18n"
 	"strings"
 
 	tele "gopkg.in/telebot.v3"
@@ -39,15 +40,15 @@ func (b *Bot) HandlePromo(ctx tele.Context) error {
 	sb.WriteString("<b>" + b.loc.Translate(lang, "promo_success_title") + "</b>\n\n")
 
 	if reward.Points > 0 {
-		sb.WriteString(b.loc.Translate(lang, "promo_reward_points", reward.Points) + "\n")
+		sb.WriteString(b.loc.Translate(lang, "promo_reward_points", i18n.Args{"points": reward.Points}) + "\n")
 	}
 	if reward.PremiumRolls > 0 {
-		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
+		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", i18n.Args{"rolls": reward.PremiumRolls}) + "\n")
 	}
 	if len(cards) > 0 {
-		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", len(cards)) + "\n")
+		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", i18n.Args{"count": len(cards)}) + "\n")
 		for _, c := range cards {
-			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
+			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", i18n.Args{"name": c.Name, "power": c.PowerLevel}) + "\n")
 		}
 	}
 
@@ -78,7 +79,7 @@ func (b *Bot) HandlePromo(ctx tele.Context) error {
 	// Sets from promo
 	if len(reward.CompletedSets) > 0 {
 		for _, set := range reward.CompletedSets {
-			msg := b.loc.Translate(lang, "set_completed_msg", set.Name, set.Reward)
+			msg := b.loc.Translate(lang, "set_completed_msg", i18n.Args{"name": set.Name, "reward": set.Reward})
 			_ = ctx.Reply(msg, tele.ModeHTML)
 		}
 	}

@@ -5,20 +5,33 @@ CREATE TABLE rarities (
     drop_chance NUMERIC(5, 2) NOT NULL,
     base_reward INTEGER NOT NULL DEFAULT 0,
     pity_threshold INTEGER NOT NULL DEFAULT 0,
-    craft_cost INTEGER NOT NULL DEFAULT 0
+    craft_cost INTEGER NOT NULL DEFAULT 0,
+    -- A normal roll of this rarity yields a fragment instead of the card itself.
+    requires_fragments BOOLEAN NOT NULL DEFAULT FALSE,
+    -- How many fragments are needed to assemble a card of this rarity.
+    fragments_required INTEGER NOT NULL DEFAULT 0
 );
 
--- 2. Таблица Карточек
+-- 2. Таблица коллекций (объявляется до cards и users, т.к. на неё ссылаются их FK)
+CREATE TABLE IF NOT EXISTS card_sets (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    buff_type VARCHAR(50) NOT NULL,
+    buff_value INT NOT NULL DEFAULT 0,
+    reward_points INT NOT NULL DEFAULT 0
+    );
+
+-- 3. Таблица Карточек
 CREATE TABLE cards (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     rarity_id INTEGER NOT NULL REFERENCES rarities(id) ON DELETE RESTRICT,
     image_url TEXT,
     power_level INTEGER NOT NULL DEFAULT 1,
-    set_id INTEGER REFERENCES card_sets(id) ON DELETE SET NULL,
+    set_id INTEGER REFERENCES card_sets(id) ON DELETE SET NULL
 );
 
--- 3. Таблица Пользователей (Игроков) - ГЛОБАЛЬНАЯ
+-- 4. Таблица Пользователей (Игроков) - ГЛОБАЛЬНАЯ
 CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY, -- Единый внутренний ID бота
     telegram_id BIGINT UNIQUE, -- ID в Telegram (может быть NULL, если юзер только из Discord)
@@ -38,7 +51,7 @@ CREATE TABLE users (
     is_adult BOOLEAN DEFAULT NULL
 );
 
--- 4. Таблица Инвентаря (Связь Игроков и Карточек)
+-- 5. Таблица Инвентаря (Связь Игроков и Карточек)
 CREATE TABLE user_inventory (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
@@ -46,7 +59,7 @@ CREATE TABLE user_inventory (
     PRIMARY KEY (user_id, card_id)
 );
 
--- 5. Таблица Осколков (для крафта Мифических карт)
+-- 6. Таблица Осколков (для крафта Мифических карт)
 CREATE TABLE user_fragments (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
@@ -54,7 +67,7 @@ CREATE TABLE user_fragments (
     PRIMARY KEY (user_id, card_id)
 );
 
--- 6. Таблица Гарантов
+-- 7. Таблица Гарантов
 CREATE TABLE user_pity (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     rarity_id INTEGER NOT NULL REFERENCES rarities(id) ON DELETE CASCADE,
@@ -62,14 +75,14 @@ CREATE TABLE user_pity (
     PRIMARY KEY (user_id, rarity_id)
 );
 
--- 7. Таблица активности в чатах
+-- 8. Таблица активности в чатах
 CREATE TABLE user_chats (
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     chat_id BIGINT NOT NULL,
     PRIMARY KEY (user_id, chat_id)
 );
 
--- 8. Таблица промокодов
+-- 9. Таблица промокодов
 CREATE TABLE IF NOT EXISTS promocodes (
     code VARCHAR(50) PRIMARY KEY,
     reward_json JSONB NOT NULL,
@@ -79,21 +92,12 @@ CREATE TABLE IF NOT EXISTS promocodes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
 
--- 9. Таблица использованных промокодов
+-- 10. Таблица использованных промокодов
 CREATE TABLE IF NOT EXISTS promocode_usages (
     user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
     promocode VARCHAR(50) REFERENCES promocodes(code) ON DELETE CASCADE,
     used_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (user_id, promocode)
-    );
-
--- 10. Таблица коллекций
-CREATE TABLE IF NOT EXISTS card_sets (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    buff_type VARCHAR(50) NOT NULL,
-    buff_value INT NOT NULL DEFAULT 0,
-    reward_points INT NOT NULL DEFAULT 0
     );
 
 -- 11. Таблица отслеживания разблокированных сетов и прогресса

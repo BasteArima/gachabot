@@ -2,14 +2,13 @@ package telegram
 
 import (
 	"context"
+	"gachabot/internal/config"
 	"gachabot/internal/i18n"
 	"gachabot/internal/repository"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/suggest"
 	"log"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -29,26 +28,13 @@ type Bot struct {
 	backupChatID   int64
 	require18Plus  bool
 	groupLink      string
+	startBannerURL string
 }
 
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, loc *i18n.Localizer, adminID int64) (*Bot, error) {
+func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
 	pref := tele.Settings{
-		Token:  token,
+		Token:  cfg.Token,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
-	}
-
-	rawAdminChatID := os.Getenv("ADMIN_TG_SUGGESTS_GROUP_ID")
-	adminChatIDParsed, err := strconv.ParseInt(rawAdminChatID, 10, 64)
-	if err != nil {
-		log.Printf("Warning: ADMIN_TG_SUGGESTS_GROUP_ID is not a valid number: %v. Setting to 0.", err)
-		adminChatIDParsed = 0
-	}
-
-	rawBackupChatID := os.Getenv("ADMIN_TG_BACKUP_GROUP_ID")
-	backupID, err := strconv.ParseInt(rawBackupChatID, 10, 64)
-	if err != nil {
-		log.Printf("Warning: ADMIN_TG_BACKUP_GROUP_ID is not a valid number: %v. Setting to 0.", err)
-		backupID = 0
 	}
 
 	b, err := tele.NewBot(pref)
@@ -64,11 +50,13 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 		loc:            loc,
 		rdb:            rdb,
 		suggestService: ss,
-		adminID:        adminID,
-		adminChatID:    -adminChatIDParsed,
-		backupChatID:   -backupID,
-		require18Plus:  os.Getenv("REQUIRE_18_PLUS_CONFIRM") == "true",
-		groupLink:      os.Getenv("BOT_GROUP_LINK"),
+		adminID:        cfg.AdminID,
+		// Telegram supergroup IDs are negative; env stores the positive part.
+		adminChatID:    -cfg.SuggestsGroupID,
+		backupChatID:   -cfg.BackupGroupID,
+		require18Plus:  cfg.Require18Plus,
+		groupLink:      cfg.GroupLink,
+		startBannerURL: cfg.StartBannerURL,
 	}
 
 	tgBot.setupRoutes()
@@ -127,7 +115,7 @@ func (b *Bot) setupRoutes() {
 	// Suggest
 	b.bot.Handle("\fsuggest_start", b.HandleSuggestStart)
 	b.bot.Handle(tele.OnPhoto, b.HandleMediaSuggest)
-	b.bot.Handle(tele.OnDocument, b.HandleMediaSuggest)
+	b.bot.Handle(tele.OnDocument, b.HandleDocument)
 
 	// Suggest quiz
 	b.bot.Handle("\fs_q1_yes", b.HandleSuggestQuiz)
@@ -158,6 +146,13 @@ func (b *Bot) setupRoutes() {
 	b.bot.Handle("/globalmsg", b.HandleGlobalMsg)
 	b.bot.Handle("\fglobal_cancel", b.HandleGlobalCancel)
 	b.bot.Handle("\fglobal_send", b.HandleGlobalSend)
+
+	// Admin: content themes & help
+	b.bot.Handle("/admin", b.HandleAdminHelp)
+	b.bot.Handle("/theme_export", b.HandleThemeExport)
+	b.bot.Handle("/theme_import", b.HandleThemeImport)
+	b.bot.Handle("\ftheme_apply", b.HandleThemeApply)
+	b.bot.Handle("\ftheme_cancel", b.HandleThemeCancel)
 }
 
 // Implementing the LinkProvider interface for a Discord bot

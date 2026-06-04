@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 
 	tele "gopkg.in/telebot.v3"
@@ -93,7 +94,7 @@ func (b *Bot) HandleSetsList(ctx tele.Context) error {
 		pBar := generateProgressBar(sp.CollectedCards, sp.TotalCards)
 
 		btnText := fmt.Sprintf("%s %s [%s]%s", pBar, sp.SetName, status, activeMark)
-		btnView := menu.Data(b.loc.Translate(lang, "btn_set_view", btnText), "set_view", strconv.Itoa(sp.SetID))
+		btnView := menu.Data(b.loc.Translate(lang, "btn_set_view", i18n.Args{"name": btnText}), "set_view", strconv.Itoa(sp.SetID))
 		rows = append(rows, menu.Row(btnView))
 	}
 
@@ -147,13 +148,13 @@ func (b *Bot) HandleSetView(ctx tele.Context) error {
 	buffName := b.loc.Translate(lang, "buff_type_"+currentSet.BuffType)
 	buffDesc := fmt.Sprintf("+%d%% (%s)", currentSet.BuffValue, buffName)
 
-	sb.WriteString(b.loc.Translate(lang, "set_view_title", currentSet.SetName, currentSet.RewardPoints, buffDesc))
+	sb.WriteString(b.loc.Translate(lang, "set_view_title", i18n.Args{"name": currentSet.SetName, "reward": currentSet.RewardPoints, "buff": buffDesc}))
 
 	for i, c := range cards {
 		if c.Name != "" {
-			sb.WriteString(b.loc.Translate(lang, "set_card_owned", i+1, c.Name) + "\n")
+			sb.WriteString(b.loc.Translate(lang, "set_card_owned", i18n.Args{"num": i + 1, "name": c.Name}) + "\n")
 		} else {
-			sb.WriteString(b.loc.Translate(lang, "set_card_unknown", i+1) + "\n")
+			sb.WriteString(b.loc.Translate(lang, "set_card_unknown", i18n.Args{"num": i + 1}) + "\n")
 		}
 	}
 

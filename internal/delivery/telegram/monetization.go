@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"gachabot/internal/i18n"
 	"log"
 	"strings"
 
@@ -138,9 +139,10 @@ func (b *Bot) HandlePayment(ctx tele.Context) error {
 		epicCard, err := b.repo.GetRandomCard(4)
 		if err == nil {
 			fragCount, _ := b.repo.AddFragment(dbUser.ID, epicCard.ID)
-			bonusText = b.loc.Translate(lang, "payment_bonus_frag", epicCard.Name, fragCount)
+			bonusText = b.loc.Translate(lang, "payment_bonus_frag", i18n.Args{"name": epicCard.Name, "fragments": fragCount})
 
-			if fragCount >= 10 {
+			threshold := b.service.FragmentsRequiredFor(epicCard.RarityID)
+			if threshold > 0 && fragCount >= threshold {
 				_ = b.repo.ClearFragments(dbUser.ID, epicCard.ID)
 				_ = b.repo.AddCardToInventory(dbUser.ID, epicCard.ID)
 				bonusText += b.loc.Translate(lang, "payment_bonus_assembled")
@@ -162,6 +164,6 @@ func (b *Bot) HandlePayment(ctx tele.Context) error {
 		}
 	}
 
-	successMsg := b.loc.Translate(lang, "payment_success", rollsToAdd, bonusText)
+	successMsg := b.loc.Translate(lang, "payment_success", i18n.Args{"rolls": rollsToAdd, "bonus": bonusText})
 	return ctx.Send(successMsg, tele.ModeHTML)
 }

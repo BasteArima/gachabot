@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ func (b *Bot) handleDuel(s *discordgo.Session, i *discordgo.InteractionCreate, c
 		},
 	}}
 
-	b.respondWithComponents(s, i, b.loc.Translate(lang, "duel_challenge", challenger.Username, targetDB.Username, amount), buttons)
+	b.respondWithComponents(s, i, b.loc.Translate(lang, "duel_challenge", i18n.Args{"challenger": challenger.Username, "target": targetDB.Username, "amount": amount}), buttons)
 }
 
 func (b *Bot) handleLink(s *discordgo.Session, i *discordgo.InteractionCreate, dsUser *models.User, lang string) {
@@ -69,7 +70,9 @@ func (b *Bot) handleLink(s *discordgo.Session, i *discordgo.InteractionCreate, d
 	rCtx := context.Background()
 	b.rdb.Set(rCtx, fmt.Sprintf("pending_link:%d", dsUser.ID), tgInternalID, 10*time.Minute)
 
-	msg := b.loc.Translate(lang, "link_choice_msg", tgProfile.Balance, tgProfile.UniqueCardsCount, dsProfile.Balance, dsProfile.UniqueCardsCount)
+	msg := b.loc.Translate(lang, "link_choice_msg", i18n.Args{
+		"tg_balance": tgProfile.Balance, "tg_cards": tgProfile.UniqueCardsCount,
+		"ds_balance": dsProfile.Balance, "ds_cards": dsProfile.UniqueCardsCount})
 
 	buttons := []discordgo.MessageComponent{discordgo.ActionsRow{
 		Components: []discordgo.MessageComponent{

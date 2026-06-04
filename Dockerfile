@@ -9,12 +9,14 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o gachabot ./cmd/bot/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o seed ./cmd/seed/main.go
 
 FROM alpine:latest
 
 WORKDIR /root/
 
 COPY --from=builder /app/gachabot .
+COPY --from=builder /app/seed .
 COPY --from=builder /app/locales ./locales
 
 CMD ["./gachabot"]

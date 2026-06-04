@@ -1,7 +1,7 @@
 package telegram
 
 import (
-	"fmt"
+	"gachabot/internal/i18n"
 	"strings"
 
 	tele "gopkg.in/telebot.v3"
@@ -109,8 +109,8 @@ func (b *Bot) HandleMediaSuggest(ctx tele.Context) error {
 		return ctx.Send(b.loc.Translate(lang, "suggest_err_funds"))
 	}
 
-	adminMsg := fmt.Sprintf(b.loc.Translate(lang, "suggest_admin_msg"),
-		tgUser.Username, tgUser.ID, dbUser.ID, caption)
+	adminMsg := b.loc.Translate(lang, "suggest_admin_msg", i18n.Args{
+		"username": tgUser.Username, "user_id": tgUser.ID, "db_id": dbUser.ID, "description": caption})
 
 	adminChat := &tele.Chat{ID: b.adminChatID}
 

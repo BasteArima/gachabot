@@ -37,6 +37,10 @@ type Rarity struct {
 	BaseReward    int
 	PityThreshold int
 	CraftCost     int
+	// RequiresFragments: a normal roll of this rarity yields a fragment instead of the card itself.
+	RequiresFragments bool
+	// FragmentsRequired: how many fragments are needed to assemble a card of this rarity.
+	FragmentsRequired int
 }
 
 type UserProfile struct {

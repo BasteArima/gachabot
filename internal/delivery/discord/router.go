@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"gachabot/internal/i18n"
 	"log"
 	"strconv"
 	"strings"
@@ -180,7 +181,7 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 				return
 			}
 			b.duelService.PopDuel(duelID)
-			b.updateWithComponents(s, i, b.loc.Translate(lang, "duel_cancelled", duel.ChallengerName, duel.TargetName), []discordgo.MessageComponent{})
+			b.updateWithComponents(s, i, b.loc.Translate(lang, "duel_cancelled", i18n.Args{"challenger": duel.ChallengerName, "target": duel.TargetName}), []discordgo.MessageComponent{})
 			return
 		}
 
@@ -199,22 +200,22 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 
 			mainEmbed := &discordgo.MessageEmbed{
 				Title:       b.loc.Translate(lang, "duel_ds_title"),
-				Description: b.loc.Translate(lang, "duel_ds_desc", res.Roll, res.WinnerName, res.AmountWon*2),
+				Description: b.loc.Translate(lang, "duel_ds_desc", i18n.Args{"roll": fmt.Sprintf("%.1f", res.Roll), "winner": res.WinnerName, "amount": res.AmountWon * 2}),
 				Color:       0xe67e22,
 			}
 
 			challengerEmbed := &discordgo.MessageEmbed{
-				Author:      &discordgo.MessageEmbedAuthor{Name: b.loc.Translate(lang, "duel_ds_attacker", duel.ChallengerName)},
+				Author:      &discordgo.MessageEmbedAuthor{Name: b.loc.Translate(lang, "duel_ds_attacker", i18n.Args{"challenger": duel.ChallengerName})},
 				Title:       res.CardChallenger.Name,
-				Description: b.loc.Translate(lang, "duel_ds_stats", res.CardChallenger.PowerLevel, res.ChanceChallenger),
+				Description: b.loc.Translate(lang, "duel_ds_stats", i18n.Args{"power": res.CardChallenger.PowerLevel, "chance": fmt.Sprintf("%.1f", res.ChanceChallenger)}),
 				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: res.CardChallenger.ImageURL},
 				Color:       0x3498db,
 			}
 
 			targetEmbed := &discordgo.MessageEmbed{
-				Author:      &discordgo.MessageEmbedAuthor{Name: b.loc.Translate(lang, "duel_ds_defender", duel.TargetName)},
+				Author:      &discordgo.MessageEmbedAuthor{Name: b.loc.Translate(lang, "duel_ds_defender", i18n.Args{"target": duel.TargetName})},
 				Title:       res.CardTarget.Name,
-				Description: b.loc.Translate(lang, "duel_ds_stats", res.CardTarget.PowerLevel, res.ChanceTarget),
+				Description: b.loc.Translate(lang, "duel_ds_stats", i18n.Args{"power": res.CardTarget.PowerLevel, "chance": fmt.Sprintf("%.1f", res.ChanceTarget)}),
 				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: res.CardTarget.ImageURL},
 				Color:       0xe74c3c,
 			}

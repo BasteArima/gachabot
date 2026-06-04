@@ -65,7 +65,7 @@ func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error
 		StreakUpdated: streakUpdated,
 	}
 
-	if err := s.processCardDrop(internalUserID, card, result); err != nil {
+	if err := s.processCardDrop(internalUserID, card, selectedRarity, result); err != nil {
 		return nil, err
 	}
 
@@ -167,8 +167,8 @@ func (s *GachaService) updatePities(pities map[int]int, rarities []models.Rarity
 	}
 }
 
-func (s *GachaService) processCardDrop(internalUserID int64, card *models.Card, result *models.RollResult) error {
-	if card.RarityID == 6 {
+func (s *GachaService) processCardDrop(internalUserID int64, card *models.Card, rarity models.Rarity, result *models.RollResult) error {
+	if rarity.RequiresFragments {
 		result.IsFragment = true
 		currentFragments, err := s.repo.AddFragment(internalUserID, card.ID)
 		if err != nil {
@@ -176,7 +176,7 @@ func (s *GachaService) processCardDrop(internalUserID int64, card *models.Card, 
 		}
 		result.FragmentsCount = currentFragments
 
-		if currentFragments >= 10 {
+		if rarity.FragmentsRequired > 0 && currentFragments >= rarity.FragmentsRequired {
 			result.CardAssembled = true
 			_ = s.repo.ClearFragments(internalUserID, card.ID)
 			_ = s.repo.AddCardToInventory(internalUserID, card.ID)

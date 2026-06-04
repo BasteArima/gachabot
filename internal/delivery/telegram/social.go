@@ -3,6 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"gachabot/internal/i18n"
 	"log"
 	"math/rand/v2"
 	"strings"
@@ -37,7 +38,7 @@ func (b *Bot) buildTopMessage(criteria string, scope string, chatID int64, lang 
 		critName, emoji = b.loc.Translate(lang, "top_crit_streak"), "🔥"
 	}
 
-	text := b.loc.Translate(lang, "top_header", scopeName, critName)
+	text := b.loc.Translate(lang, "top_header", i18n.Args{"scope": scopeName, "crit": critName})
 	if len(board) == 0 {
 		text += b.loc.Translate(lang, "top_empty")
 	} else {
@@ -56,7 +57,7 @@ func (b *Bot) buildTopMessage(criteria string, scope string, chatID int64, lang 
 				displayName = fmt.Sprintf("%s  [✨ %s]", entry.DisplayName, entry.ActiveAura)
 			}
 
-			text += b.loc.Translate(lang, "top_entry", medal, displayName, entry.Value, emoji)
+			text += b.loc.Translate(lang, "top_entry", i18n.Args{"medal": medal, "name": displayName, "value": entry.Value, "emoji": emoji})
 		}
 	}
 	text += "</blockquote>"
@@ -151,7 +152,7 @@ func (b *Bot) HandleLinkStart(ctx tele.Context) error {
 		return ctx.Send("Ошибка генерации кода.")
 	}
 
-	msg := b.loc.Translate(lang, "link_code_msg", code, code)
+	msg := b.loc.Translate(lang, "link_code_msg", i18n.Args{"code": code})
 	return ctx.Send(msg, tele.ModeHTML)
 }
 

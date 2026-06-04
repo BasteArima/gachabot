@@ -6,7 +6,9 @@ import (
 
 func (r *PostgresRepo) GetRarities() ([]models.Rarity, error) {
 	var rarities []models.Rarity
-	rows, err := r.db.Query("SELECT id, name, drop_chance, base_reward, pity_threshold, COALESCE(craft_cost, 0) FROM rarities ORDER BY id ASC")
+	rows, err := r.db.Query(`SELECT id, name, drop_chance, base_reward, pity_threshold, COALESCE(craft_cost, 0),
+		COALESCE(requires_fragments, false), COALESCE(fragments_required, 0)
+		FROM rarities ORDER BY id ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -14,7 +16,8 @@ func (r *PostgresRepo) GetRarities() ([]models.Rarity, error) {
 
 	for rows.Next() {
 		var rarity models.Rarity
-		if err := rows.Scan(&rarity.ID, &rarity.Name, &rarity.DropChance, &rarity.BaseReward, &rarity.PityThreshold, &rarity.CraftCost); err != nil {
+		if err := rows.Scan(&rarity.ID, &rarity.Name, &rarity.DropChance, &rarity.BaseReward, &rarity.PityThreshold, &rarity.CraftCost,
+			&rarity.RequiresFragments, &rarity.FragmentsRequired); err != nil {
 			return nil, err
 		}
 		rarities = append(rarities, rarity)

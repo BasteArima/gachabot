@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 
 	"github.com/bwmarrin/discordgo"
@@ -34,11 +35,13 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	var desc string
 	if card.SetName != "" {
-		desc = b.loc.Translate(lang, "card_nav_caption_with_set",
-			card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+		desc = b.loc.Translate(lang, "card_nav_caption_with_set", i18n.Args{
+			"set": card.SetName, "rarity": b.loc.Rarity(lang, card.RarityName),
+			"power": card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	} else {
-		desc = b.loc.Translate(lang, "card_nav_caption",
-			card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+		desc = b.loc.Translate(lang, "card_nav_caption", i18n.Args{
+			"rarity": b.loc.Rarity(lang, card.RarityName),
+			"power":  card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	}
 
 	embed := &discordgo.MessageEmbed{
@@ -80,9 +83,13 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 	profile, _ := b.service.GetUserProfile(user.ID)
 
 	desc := fmt.Sprintf("**%s**\n\n", user.Username)
-	desc += b.loc.Translate(lang, "profile_stats",
-		profile.UniqueCardsCount, profile.TotalCardsCount,
-		profile.DuplicatesCount, profile.Balance, profile.StreakDays)
+	desc += b.loc.Translate(lang, "profile_stats", i18n.Args{
+		"unique":     profile.UniqueCardsCount,
+		"total":      profile.TotalCardsCount,
+		"duplicates": profile.DuplicatesCount,
+		"balance":    profile.Balance,
+		"streak":     profile.StreakDays,
+	})
 
 	embed := &discordgo.MessageEmbed{
 		Title:       b.loc.Translate(lang, "profile_title"),
@@ -100,7 +107,7 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 					Emoji:    &discordgo.ComponentEmoji{Name: "🎴"},
 				},
 				discordgo.Button{
-					Label:    b.loc.Translate(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets),
+					Label:    b.loc.Translate(lang, "btn_my_sets", i18n.Args{"completed": profile.CompletedSets, "total": profile.TotalSets}),
 					Style:    discordgo.SuccessButton,
 					CustomID: "sets_nav:0",
 					Emoji:    &discordgo.ComponentEmoji{Name: "📚"},

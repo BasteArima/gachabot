@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GachaBot Theme Editor</title>
+<style>
+  :root { --bg:#16181d; --panel:#1f232b; --line:#2c313c; --text:#e6e8ec; --muted:#9aa3b2;
+          --accent:#4f8cff; --ok:#3fb950; --warn:#d29922; --err:#f85149; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--panel); border-bottom:1px solid var(--line);
+           padding:12px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:6px; padding:7px 12px; cursor:pointer; font-size:13px; }
+  button.secondary { background:#323845; }
+  button.danger { background:#3a2326; color:#ff9b95; }
+  button:hover { filter:brightness(1.1); }
+  .spacer { flex:1; }
+  main { padding:16px; max-width:1200px; margin:0 auto; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; margin-bottom:18px; overflow:hidden; }
+  section > h2 { margin:0; padding:11px 14px; font-size:14px; background:#232833; border-bottom:1px solid var(--line);
+                 display:flex; align-items:center; gap:10px; }
+  section > h2 .badge { font-size:12px; color:var(--muted); font-weight:400; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { padding:6px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  input[type=text], input[type=number], select {
+    background:var(--bg); border:1px solid var(--line); color:var(--text); border-radius:5px; padding:5px 7px; width:100%; font-size:13px; }
+  input[type=number] { width:90px; }
+  input:focus, select:focus { outline:1px solid var(--accent); border-color:var(--accent); }
+  td.num input { width:80px; }
+  .row-actions { padding:10px 14px; }
+  .del { background:transparent; color:var(--err); padding:2px 8px; font-size:16px; line-height:1; }
+  .preview { width:34px; height:34px; object-fit:cover; border-radius:5px; background:#000; border:1px solid var(--line); }
+  #issues { padding:0 16px; }
+  .issue { padding:8px 12px; border-radius:6px; margin-bottom:8px; font-size:13px; }
+  .issue.err { background:#3a1d1f; color:#ffb4ae; border:1px solid #5c2a2a; }
+  .issue.warn { background:#352c16; color:#f0d28a; border:1px solid #5c4a22; }
+  .issue.ok { background:#1a2e1e; color:#9be3a8; border:1px solid #2c5132; }
+  code { background:#000; padding:1px 5px; border-radius:4px; color:#cdd3dc; }
+  .hint { color:var(--muted); font-size:12px; padding:0 16px 12px; }
+  input.invalid { border-color:var(--err); }
+  .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:20; align-items:center; justify-content:center; }
+  .modal { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; width:min(640px,92vw); }
+  .modal h3 { margin:0 0 10px; font-size:15px; }
+  .modal textarea { width:100%; height:300px; background:var(--bg); color:var(--text); border:1px solid var(--line);
+                    border-radius:6px; padding:10px; font:12px/1.4 ui-monospace,Consolas,monospace; resize:vertical; }
+  .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🃏 Theme Editor</h1>
+  <button onclick="loadFile()">📂 Загрузить</button>
+  <input type="file" id="file" accept=".json,application/json" style="display:none" onchange="onFile(event)">
+  <button class="secondary" onclick="pasteJSON()">📋 Вставить JSON</button>
+  <button class="secondary" onclick="newTheme()">📄 Новый</button>
+  <div class="spacer"></div>
+  <button onclick="exportFile()">💾 Скачать theme.json</button>
+</header>
+
+<main>
+  <div id="issues"></div>
+  <p class="hint">Карты ссылаются на редкости и сеты <b>по имени</b>. Применить файл к БД: <code>go run ./cmd/seed import theme.json</code> (добавит/обновит, ничего не удаляя).</p>
+
+  <section>
+    <h2>Редкости <span class="badge" id="rar-sum"></span></h2>
+    <table>
+      <thead><tr>
+        <th>name (код)</th><th>drop %</th><th>base reward</th><th>pity</th><th>craft cost</th><th>осколки?</th><th>нужно осколков</th><th></th>
+      </tr></thead>
+      <tbody id="rarities"></tbody>
+    </table>
+    <div class="row-actions"><button class="secondary" onclick="addRarity()">+ Редкость</button></div>
+  </section>
+
+  <section>
+    <h2>Сеты (коллекции) <span class="badge" id="set-count"></span></h2>
+    <table>
+      <thead><tr><th>name</th><th>buff_type</th><th>buff_value</th><th>reward_points</th><th></th></tr></thead>
+      <tbody id="sets"></tbody>
+    </table>
+    <div class="row-actions"><button class="secondary" onclick="addSet()">+ Сет</button></div>
+  </section>
+
+  <section>
+    <h2>Карты <span class="badge" id="card-count"></span></h2>
+    <table>
+      <thead><tr><th></th><th>name</th><th>rarity</th><th>power</th><th>image_url</th><th>set</th><th></th></tr></thead>
+      <tbody id="cards"></tbody>
+    </table>
+    <div class="row-actions"><button class="secondary" onclick="addCard()">+ Карта</button></div>
+  </section>
+</main>
+
+<div class="overlay" id="paste-modal">
+  <div class="modal">
+    <h3>Вставить JSON темы</h3>
+    <p class="hint" style="padding:0 0 8px">Например вывод <code>./seed export -</code> из консоли контейнера.</p>
+    <textarea id="paste-area" placeholder='{ "rarities": [...], "sets": [...], "cards": [...] }'></textarea>
+    <div class="actions">
+      <button class="secondary" onclick="pasteCancel()">Отмена</button>
+      <button onclick="pasteApply()">Загрузить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let state = { rarities: [], sets: [], cards: [] };
+
+// ---------- io ----------
+function loadFile() { document.getElementById('file').click(); }
+function onFile(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => loadFromString(r.result);
+  r.readAsText(f);
+  e.target.value = '';
+}
+function loadFromString(text) {
+  try {
+    const d = JSON.parse(text);
+    state = {
+      rarities: (d.rarities||[]).map(normRarity),
+      sets: (d.sets||[]).map(normSet),
+      cards: (d.cards||[]).map(normCard),
+    };
+    renderAll();
+    return true;
+  } catch (err) { alert('Не удалось разобрать JSON: ' + err.message); return false; }
+}
+function pasteJSON() {
+  const overlay = document.getElementById('paste-modal');
+  document.getElementById('paste-area').value = '';
+  overlay.style.display = 'flex';
+  document.getElementById('paste-area').focus();
+}
+function pasteCancel() { document.getElementById('paste-modal').style.display = 'none'; }
+function pasteApply() {
+  const text = document.getElementById('paste-area').value.trim();
+  if (!text) { pasteCancel(); return; }
+  if (loadFromString(text)) pasteCancel();
+}
+function newTheme() {
+  if (!confirm('Создать пустую тему? Текущие данные будут потеряны.')) return;
+  state = { rarities: [], sets: [], cards: [] };
+  renderAll();
+}
+function exportFile() {
+  const out = {
+    rarities: state.rarities.map(r => ({
+      name: r.name, drop_chance: num(r.drop_chance), base_reward: int(r.base_reward),
+      pity_threshold: int(r.pity_threshold), craft_cost: int(r.craft_cost),
+      requires_fragments: !!r.requires_fragments, fragments_required: int(r.fragments_required),
+    })),
+    sets: state.sets.map(s => ({
+      name: s.name, buff_type: s.buff_type, buff_value: int(s.buff_value), reward_points: int(s.reward_points),
+    })),
+    cards: state.cards.map(c => {
+      const o = { name: c.name, rarity: c.rarity, power_level: int(c.power_level), image_url: c.image_url };
+      if (c.set) o.set = c.set;
+      return o;
+    }),
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2) + '\n'], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'theme.json'; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---------- normalizers / coercion ----------
+const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const int = v => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
+const normRarity = r => ({ name:r.name||'', drop_chance:r.drop_chance||0, base_reward:r.base_reward||0,
+  pity_threshold:r.pity_threshold||0, craft_cost:r.craft_cost||0,
+  requires_fragments:!!r.requires_fragments, fragments_required:r.fragments_required||0 });
+const normSet = s => ({ name:s.name||'', buff_type:s.buff_type||'power_percent', buff_value:s.buff_value||0, reward_points:s.reward_points||0 });
+const normCard = c => ({ name:c.name||'', rarity:c.rarity||'', power_level:c.power_level||0, image_url:c.image_url||'', set:c.set||'' });
+
+// ---------- add rows ----------
+function addRarity() { state.rarities.push(normRarity({ name:'', drop_chance:0 })); renderAll(); }
+function addSet() { state.sets.push(normSet({ name:'' })); renderAll(); }
+function addCard() { state.cards.push(normCard({ rarity: state.rarities[0]?.name || '' })); renderAll(); }
+function delAt(arr, i) { state[arr].splice(i, 1); renderAll(); }
+
+// ---------- rendering ----------
+const el = (tag, props={}, kids=[]) => { const e = document.createElement(tag); Object.assign(e, props);
+  for (const [k,v] of Object.entries(props.dataset||{})) e.dataset[k]=v; kids.forEach(k=>e.append(k)); return e; };
+
+function textInput(val, on) { const i = el('input'); i.type='text'; i.value=val; i.oninput = e=>on(e.target.value); return i; }
+function numInput(val, on) { const i = el('input'); i.type='number'; i.step='any'; i.value=val; i.oninput = e=>on(e.target.value); return i; }
+function checkBox(val, on) { const i = el('input'); i.type='checkbox'; i.checked=!!val; i.onchange = e=>on(e.target.checked); return i; }
+function selectBox(val, opts, on) {
+  const s = el('select');
+  opts.forEach(o => { const op = el('option'); op.value=o.value; op.textContent=o.label; if (o.value===val) op.selected=true; s.append(op); });
+  s.onchange = e=>on(e.target.value); return s;
+}
+function delCell(arr, i) { const b = el('button',{className:'del',textContent:'×',title:'Удалить'}); b.onclick=()=>delAt(arr,i); const td=el('td'); td.append(b); return td; }
+function cell(child) { const td = el('td'); td.append(child); return td; }
+function numCell(child) { const td = el('td',{className:'num'}); td.append(child); return td; }
+
+function renderRarities() {
+  const tb = document.getElementById('rarities'); tb.innerHTML='';
+  state.rarities.forEach((r,i) => {
+    const tr = el('tr');
+    tr.append(cell(textInput(r.name, v=>{ r.name=v; refreshCardDropdowns(); updateIssues(); })));
+    tr.append(numCell(numInput(r.drop_chance, v=>{ r.drop_chance=v; updateRaritySum(); updateIssues(); })));
+    tr.append(numCell(numInput(r.base_reward, v=>r.base_reward=v)));
+    tr.append(numCell(numInput(r.pity_threshold, v=>r.pity_threshold=v)));
+    tr.append(numCell(numInput(r.craft_cost, v=>r.craft_cost=v)));
+    tr.append(cell(checkBox(r.requires_fragments, v=>{ r.requires_fragments=v; updateIssues(); })));
+    tr.append(numCell(numInput(r.fragments_required, v=>{ r.fragments_required=v; updateIssues(); })));
+    tr.append(delCell('rarities', i));
+    tb.append(tr);
+  });
+  updateRaritySum();
+}
+
+function renderSets() {
+  const tb = document.getElementById('sets'); tb.innerHTML='';
+  state.sets.forEach((s,i) => {
+    const tr = el('tr');
+    tr.append(cell(textInput(s.name, v=>{ s.name=v; refreshCardDropdowns(); updateIssues(); })));
+    tr.append(cell(selectBox(s.buff_type, [{value:'power_percent',label:'power_percent'}], v=>s.buff_type=v)));
+    tr.append(numCell(numInput(s.buff_value, v=>s.buff_value=v)));
+    tr.append(numCell(numInput(s.reward_points, v=>s.reward_points=v)));
+    tr.append(delCell('sets', i));
+    tb.append(tr);
+  });
+  document.getElementById('set-count').textContent = state.sets.length + ' шт.';
+}
+
+function rarityOptions() { return state.rarities.map(r=>({value:r.name,label:r.name||'(без имени)'})); }
+function setOptions() { return [{value:'',label:'— нет —'}].concat(state.sets.map(s=>({value:s.name,label:s.name||'(без имени)'}))); }
+
+function renderCards() {
+  const tb = document.getElementById('cards'); tb.innerHTML='';
+  state.cards.forEach((c,i) => {
+    const tr = el('tr');
+    const img = el('img',{className:'preview'}); img.src=c.image_url||''; img.onerror=()=>img.style.visibility='hidden'; img.onload=()=>img.style.visibility='visible';
+    tr.append(cell(img));
+    tr.append(cell(textInput(c.name, v=>{ c.name=v; updateIssues(); })));
+    tr.append(cell(selectBox(c.rarity, rarityOptions(), v=>{ c.rarity=v; updateIssues(); })));
+    tr.append(numCell(numInput(c.power_level, v=>c.power_level=v)));
+    const url = textInput(c.image_url, v=>{ c.image_url=v; img.src=v; updateIssues(); });
+    tr.append(cell(url));
+    tr.append(cell(selectBox(c.set, setOptions(), v=>c.set=v)));
+    tr.append(delCell('cards', i));
+    tb.append(tr);
+  });
+  document.getElementById('card-count').textContent = state.cards.length + ' шт.';
+}
+
+function refreshCardDropdowns() { renderCards(); }
+
+function updateRaritySum() {
+  const sum = state.rarities.reduce((a,r)=>a+num(r.drop_chance),0);
+  const span = document.getElementById('rar-sum');
+  span.textContent = 'Σ drop = ' + sum.toFixed(2) + '%';
+  span.style.color = (sum>=99 && sum<=101) ? 'var(--ok)' : 'var(--warn)';
+}
+
+// ---------- validation (mirrors internal/theme Validate) ----------
+function validate() {
+  const errs = [], warns = [];
+  const rNames = new Set(), seenR = new Set();
+  state.rarities.forEach((r,i)=>{
+    if (!r.name) errs.push(`Редкость #${i+1}: пустое имя`);
+    else if (seenR.has(r.name)) errs.push(`Дубликат редкости "${r.name}"`);
+    seenR.add(r.name); rNames.add(r.name);
+    if (r.requires_fragments && int(r.fragments_required)<=0) warns.push(`Редкость "${r.name}": requires_fragments, но fragments_required = ${r.fragments_required}`);
+  });
+  const sum = state.rarities.reduce((a,r)=>a+num(r.drop_chance),0);
+  if (state.rarities.length && (sum<99||sum>101)) warns.push(`Сумма drop_chance = ${sum.toFixed(2)}, ожидается ~100`);
+
+  const sNames = new Set(), seenS = new Set();
+  state.sets.forEach((s,i)=>{ if(!s.name) errs.push(`Сет #${i+1}: пустое имя`); else if(seenS.has(s.name)) errs.push(`Дубликат сета "${s.name}"`); seenS.add(s.name); sNames.add(s.name); });
+
+  const seenC = new Set();
+  state.cards.forEach((c,i)=>{
+    const label = c.name || `#${i+1}`;
+    if (!c.name) errs.push(`Карта #${i+1}: пустое имя`);
+    else if (seenC.has(c.name)) errs.push(`Дубликат карты "${c.name}"`);
+    seenC.add(c.name);
+    if (!rNames.has(c.rarity)) errs.push(`Карта "${label}": неизвестная редкость "${c.rarity}"`);
+    if (c.set && !sNames.has(c.set)) errs.push(`Карта "${label}": неизвестный сет "${c.set}"`);
+    if (!c.image_url) warns.push(`Карта "${label}": пустой image_url`);
+  });
+  return { errs, warns };
+}
+
+function updateIssues() {
+  const { errs, warns } = validate();
+  const box = document.getElementById('issues'); box.innerHTML='';
+  if (!errs.length && !warns.length) {
+    box.append(el('div',{className:'issue ok',textContent:'✓ Тема валидна, можно применять.'}));
+  }
+  errs.forEach(m=>box.append(el('div',{className:'issue err',textContent:'✗ '+m})));
+  warns.forEach(m=>box.append(el('div',{className:'issue warn',textContent:'⚠ '+m})));
+}
+
+function renderAll() { renderRarities(); renderSets(); renderCards(); updateIssues(); }
+renderAll();
+</script>
+</body>
+</html>

@@ -2,9 +2,9 @@ package telegram
 
 import (
 	"fmt"
+	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,18 +20,18 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 	result, err := b.service.CraftCard(dbUser.ID)
 	if err != nil {
 		translatedReason := b.loc.Translate(lang, err.Error())
-		return ctx.Send(b.loc.Translate(lang, "err_craft_failed", translatedReason), tele.ModeHTML)
+		return ctx.Send(b.loc.Translate(lang, "err_craft_failed", i18n.Args{"reason": translatedReason}), tele.ModeHTML)
 	}
 
 	var caption string
 	if result.IsFragment {
 		if !result.CardAssembled {
-			caption = b.loc.Translate(lang, "craft_mythic_frag", result.CraftCost, result.Card.Name, result.FragmentsCount)
+			caption = b.loc.Translate(lang, "craft_mythic_frag", i18n.Args{"cost": result.CraftCost, "name": result.Card.Name, "fragments": result.FragmentsCount})
 		} else {
-			caption = b.loc.Translate(lang, "craft_mythic_assembled", result.CraftCost, result.Card.Name, result.Card.PowerLevel)
+			caption = b.loc.Translate(lang, "craft_mythic_assembled", i18n.Args{"cost": result.CraftCost, "name": result.Card.Name, "power": result.Card.PowerLevel})
 		}
 	} else {
-		caption = b.loc.Translate(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
+		caption = b.loc.Translate(lang, "craft_success", i18n.Args{"cost": result.CraftCost, "name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel})
 	}
 
 	photo := &tele.Photo{
@@ -43,7 +43,7 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 
 	// Separate message when collecting a set
 	if result.CompletedSetName != "" {
-		msg := b.loc.Translate(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+		msg := b.loc.Translate(lang, "set_completed_msg", i18n.Args{"name": result.CompletedSetName, "reward": result.CompletedSetReward})
 		_ = ctx.Reply(msg, tele.ModeHTML)
 	}
 
@@ -76,7 +76,7 @@ func (b *Bot) HandleDuel(ctx tele.Context) error {
 
 	targetUserDB, err := b.repo.GetUserByUsername(targetUsername)
 	if err != nil {
-		return ctx.Send(b.loc.Translate(lang, "err_duel_not_found", targetUsername))
+		return ctx.Send(b.loc.Translate(lang, "err_duel_not_found", i18n.Args{"target": targetUsername}))
 	}
 
 	if targetUserDB.ID == challengerDB.ID {
@@ -99,7 +99,7 @@ func (b *Bot) HandleDuel(ctx tele.Context) error {
 	btnCancel := menu.Data(b.loc.Translate(lang, "btn_duel_cancel"), "duel_cancel", duelID)
 	menu.Inline(menu.Row(btnAccept, btnCancel))
 
-	caption := b.loc.Translate(lang, "duel_challenge", challengerDB.FirstName, targetUsername, amount)
+	caption := b.loc.Translate(lang, "duel_challenge", i18n.Args{"challenger": challengerDB.FirstName, "target": targetUsername, "amount": amount})
 	return ctx.Send(caption, tele.ModeHTML, menu)
 }
 
@@ -125,7 +125,7 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 		}
 		b.duelService.PopDuel(duelID)
 		_ = ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "duel_cancelled_toast")})
-		return ctx.Edit(b.loc.Translate(lang, "duel_cancelled", duel.ChallengerName, duel.TargetName), tele.ModeHTML)
+		return ctx.Edit(b.loc.Translate(lang, "duel_cancelled", i18n.Args{"challenger": duel.ChallengerName, "target": duel.TargetName}), tele.ModeHTML)
 	}
 
 	if callbackUnique == "duel_accept" {
@@ -149,7 +149,7 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 		b.duelService.PopDuel(duelID)
 		result, err := b.duelService.ExecuteDuel(duel)
 		if err != nil {
-			return ctx.Edit(b.loc.Translate(lang, "err_duel_exec", err.Error()))
+			return ctx.Edit(b.loc.Translate(lang, "err_duel_exec", i18n.Args{"error": err.Error()}))
 		}
 
 		formatAura := func(aura *models.DuelAuraInfo) string {
@@ -170,10 +170,22 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 		}
 
 		// Собираем текст
-		resText := b.loc.Translate(lang, "duel_result",
-			duel.ChallengerName, cAura, result.CardChallenger.Name, result.CardChallenger.PowerLevel, result.ChanceChallenger,
-			duel.TargetName, tAura, result.CardTarget.Name, result.CardTarget.PowerLevel, result.ChanceTarget,
-			fairNote, result.Roll, result.WinnerName, result.AmountWon*2)
+		resText := b.loc.Translate(lang, "duel_result", i18n.Args{
+			"challenger":        duel.ChallengerName,
+			"challenger_aura":   cAura,
+			"challenger_card":   result.CardChallenger.Name,
+			"challenger_power":  result.CardChallenger.PowerLevel,
+			"challenger_chance": fmt.Sprintf("%.1f", result.ChanceChallenger),
+			"target":            duel.TargetName,
+			"target_aura":       tAura,
+			"target_card":       result.CardTarget.Name,
+			"target_power":      result.CardTarget.PowerLevel,
+			"target_chance":     fmt.Sprintf("%.1f", result.ChanceTarget),
+			"fair_note":         fairNote,
+			"roll":              fmt.Sprintf("%.1f", result.Roll),
+			"winner":            result.WinnerName,
+			"amount":            result.AmountWon * 2,
+		})
 
 		album := tele.Album{
 			&tele.Photo{File: tele.FromURL(result.CardChallenger.ImageURL), Caption: resText},
@@ -230,7 +242,7 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 
 	text := b.loc.Translate(lang, "start_msg")
 	banner := &tele.Photo{
-		File:    tele.FromURL(os.Getenv("START_BANNER_URL")),
+		File:    tele.FromURL(b.startBannerURL),
 		Caption: text,
 	}
 
@@ -323,10 +335,10 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	}
 
 	if result.OnCooldown {
-		msg := b.loc.Translate(lang, "roll_cooldown", result.CooldownTimeLeft)
+		msg := b.loc.Translate(lang, "roll_cooldown", i18n.Args{"time": result.CooldownTimeLeft})
 
 		if result.StreakUpdated {
-			streakMsg := b.loc.Translate(lang, "streak_kept_alive", result.StreakDays)
+			streakMsg := b.loc.Translate(lang, "streak_kept_alive", i18n.Args{"days": result.StreakDays})
 			msg = msg + "\n\n" + streakMsg
 		}
 
@@ -340,12 +352,12 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	var caption string
 	if result.IsFragment {
 		if result.CardAssembled {
-			caption = b.loc.Translate(lang, "roll_mythic_assembled", result.Card.Name, result.Card.PowerLevel, result.Reward)
+			caption = b.loc.Translate(lang, "roll_mythic_assembled", i18n.Args{"name": result.Card.Name, "power": result.Card.PowerLevel, "reward": result.Reward})
 		} else {
-			caption = b.loc.Translate(lang, "roll_mythic_fragment", result.Card.Name, result.FragmentsCount, result.Reward)
+			caption = b.loc.Translate(lang, "roll_mythic_fragment", i18n.Args{"name": result.Card.Name, "fragments": result.FragmentsCount, "reward": result.Reward})
 		}
 	} else {
-		caption = b.loc.Translate(lang, "roll_success", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
+		caption = b.loc.Translate(lang, "roll_success", i18n.Args{"name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel, "reward": result.Reward})
 	}
 
 	dynamicURL := fmt.Sprintf("%s?v=%d", result.Card.ImageURL, time.Now().Unix())
@@ -370,7 +382,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	}
 
 	if result.CompletedSetName != "" {
-		msg := b.loc.Translate(lang, "set_completed_msg", result.CompletedSetName, result.CompletedSetReward)
+		msg := b.loc.Translate(lang, "set_completed_msg", i18n.Args{"name": result.CompletedSetName, "reward": result.CompletedSetReward})
 		_ = ctx.Reply(msg, tele.ModeHTML)
 	}
 
@@ -379,7 +391,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 			_ = ctx.Send(`<tg-emoji emoji-id="4956499161319998529">🔥</tg-emoji>`, tele.ModeHTML)
 			_ = ctx.Send(b.loc.Translate(lang, "streak_started"), tele.ModeHTML)
 		} else {
-			msg := b.loc.Translate(lang, "streak_continued", result.Reward, result.StreakDays)
+			msg := b.loc.Translate(lang, "streak_continued", i18n.Args{"reward": result.Reward, "days": result.StreakDays})
 			_ = ctx.Send(msg, tele.ModeHTML)
 		}
 	}

@@ -2,6 +2,7 @@ package discord
 
 import (
 	"bytes"
+	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"io"
 	"log"
@@ -20,22 +21,22 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	}
 
 	if result.OnCooldown {
-		msg := b.loc.Translate(lang, "roll_cooldown", result.CooldownTimeLeft)
+		msg := b.loc.Translate(lang, "roll_cooldown", i18n.Args{"time": result.CooldownTimeLeft})
 		if result.StreakUpdated {
-			msg += "\n\n" + b.loc.Translate(lang, "streak_kept_alive", result.StreakDays)
+			msg += "\n\n" + b.loc.Translate(lang, "streak_kept_alive", i18n.Args{"days": result.StreakDays})
 		}
 		b.respond(s, i, msg)
 		return
 	}
 
 	title := b.loc.Translate(lang, "roll_success_title")
-	desc := b.loc.Translate(lang, "roll_success_desc", result.Card.Name, result.RarityName, result.Card.PowerLevel, result.Reward)
+	desc := b.loc.Translate(lang, "roll_success_desc", i18n.Args{"name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel, "reward": result.Reward})
 
 	if result.IsFragment {
 		if result.CardAssembled {
-			desc = b.loc.Translate(lang, "roll_mythic_assembled", result.Card.Name, result.Card.PowerLevel, result.Reward)
+			desc = b.loc.Translate(lang, "roll_mythic_assembled", i18n.Args{"name": result.Card.Name, "power": result.Card.PowerLevel, "reward": result.Reward})
 		} else {
-			desc = b.loc.Translate(lang, "roll_mythic_fragment", result.Card.Name, result.FragmentsCount, result.Reward)
+			desc = b.loc.Translate(lang, "roll_mythic_fragment", i18n.Args{"name": result.Card.Name, "fragments": result.FragmentsCount, "reward": result.Reward})
 		}
 	}
 
@@ -72,7 +73,7 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	}
 
 	if result.StreakUpdated {
-		streakMsg := b.loc.Translate(lang, "streak_continued", result.Reward, result.StreakDays)
+		streakMsg := b.loc.Translate(lang, "streak_continued", i18n.Args{"reward": result.Reward, "days": result.StreakDays})
 		if result.StreakDays == 1 {
 			streakMsg = b.loc.Translate(lang, "streak_started")
 		}
@@ -88,19 +89,19 @@ func (b *Bot) handleCraft(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	result, err := b.service.CraftCard(user.ID)
 	if err != nil {
 		translatedReason := b.loc.Translate(lang, err.Error())
-		b.respond(s, i, "❌ "+b.loc.Translate(lang, "err_craft_failed", translatedReason))
+		b.respond(s, i, "❌ "+b.loc.Translate(lang, "err_craft_failed", i18n.Args{"reason": translatedReason}))
 		return
 	}
 
 	var desc string
 	if result.IsFragment {
 		if !result.CardAssembled {
-			desc = b.loc.Translate(lang, "craft_mythic_frag", result.CraftCost, result.Card.Name, result.FragmentsCount)
+			desc = b.loc.Translate(lang, "craft_mythic_frag", i18n.Args{"cost": result.CraftCost, "name": result.Card.Name, "fragments": result.FragmentsCount})
 		} else {
-			desc = b.loc.Translate(lang, "craft_mythic_assembled", result.CraftCost, result.Card.Name, result.Card.PowerLevel)
+			desc = b.loc.Translate(lang, "craft_mythic_assembled", i18n.Args{"cost": result.CraftCost, "name": result.Card.Name, "power": result.Card.PowerLevel})
 		}
 	} else {
-		desc = b.loc.Translate(lang, "craft_success", result.CraftCost, result.Card.Name, result.RarityName, result.Card.PowerLevel)
+		desc = b.loc.Translate(lang, "craft_success", i18n.Args{"cost": result.CraftCost, "name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel})
 	}
 
 	embed := &discordgo.MessageEmbed{
@@ -147,15 +148,15 @@ func (b *Bot) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	var sb strings.Builder
 	sb.WriteString("**" + b.loc.Translate(lang, "promo_success_title") + "**\n\n")
 	if reward.Points > 0 {
-		sb.WriteString(b.loc.Translate(lang, "promo_reward_points", reward.Points) + "\n")
+		sb.WriteString(b.loc.Translate(lang, "promo_reward_points", i18n.Args{"points": reward.Points}) + "\n")
 	}
 	if reward.PremiumRolls > 0 {
-		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", reward.PremiumRolls) + "\n")
+		sb.WriteString(b.loc.Translate(lang, "promo_reward_rolls", i18n.Args{"rolls": reward.PremiumRolls}) + "\n")
 	}
 	if len(cards) > 0 {
-		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", len(cards)) + "\n")
+		sb.WriteString("\n" + b.loc.Translate(lang, "promo_reward_cards_count", i18n.Args{"count": len(cards)}) + "\n")
 		for _, c := range cards {
-			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", c.Name, c.PowerLevel) + "\n")
+			sb.WriteString(b.loc.Translate(lang, "promo_reward_card", i18n.Args{"name": c.Name, "power": c.PowerLevel}) + "\n")
 		}
 	}
 

@@ -3,22 +3,21 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"gachabot/internal/config"
+	"gachabot/internal/delivery/discord"
+	"gachabot/internal/delivery/telegram"
+	"gachabot/internal/i18n"
+	"gachabot/internal/migrations"
+	"gachabot/internal/repository"
 	"gachabot/internal/service/backup"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/suggest"
-	"log"
-	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
-	"time"
-
-	"gachabot/internal/delivery/discord"
-	"gachabot/internal/delivery/telegram"
-	"gachabot/internal/i18n"
-	"gachabot/internal/repository"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -28,46 +27,43 @@ import (
 func main() {
 	_ = godotenv.Load()
 
-	db := initPostgres()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	db := initPostgres(cfg.Postgres)
 	defer db.Close()
 
-	rdb := initRedis()
+	if err := migrations.Run(db); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
+
+	rdb := initRedis(cfg.RedisAddr)
 	defer rdb.Close()
 
-	adminIDStr := os.Getenv("ADMIN_TELEGRAM_ID")
-	adminID, _ := strconv.ParseInt(adminIDStr, 10, 64)
-
-	cooldownStr := os.Getenv("COOLDOWN_HOURS")
-	cooldownHours, _ := strconv.Atoi(cooldownStr)
-	if cooldownHours == 0 {
-		cooldownHours = 3 // Default value
-	}
-	cooldownDuration := time.Duration(cooldownHours) * time.Hour
-
 	repo := repository.NewPostgresRepo(db)
-	gachaService := gacha.NewGachaService(repo, rdb, adminID, cooldownDuration)
+	gachaService := gacha.NewGachaService(repo, rdb, cfg.Telegram.AdminID, cfg.Game.CooldownDuration)
 	duelService := duel.NewDuelService(repo, rdb)
 	suggestService := suggest.NewSuggestService(repo, rdb)
 
-	botToken := getEnvOrFatal("TELEGRAM_BOT_TOKEN")
-	tgLoc, err := i18n.NewLocalizer("locales/telegram", "ru")
+	tgLoc, err := i18n.NewLocalizer("locales/base", "locales/telegram", "ru")
 	if err != nil {
 		log.Fatalf("failed to load telegram localization: %v", err)
 	}
 
-	tgBot, err := telegram.NewBot(botToken, repo, rdb, gachaService, duelService, suggestService, tgLoc, adminID)
+	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, tgLoc, cfg.Telegram)
 	if err != nil {
 		log.Fatalf("failed to create telegram bot: %v", err)
 	}
 
-	dsToken := os.Getenv("DISCORD_TOKEN")
-	if dsToken != "" {
-		discordLoc, err := i18n.NewLocalizer("locales/discord", "ru")
+	if cfg.Discord.Token != "" {
+		discordLoc, err := i18n.NewLocalizer("locales/base", "locales/discord", "ru")
 		if err != nil {
 			log.Fatalf("failed to load discord localization: %v", err)
 		}
 
-		dsBot, err := discord.NewBot(dsToken, repo, rdb, gachaService, duelService, suggestService, discordLoc, tgBot, tgBot.NotifyAdmin)
+		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, discordLoc, tgBot, tgBot.NotifyAdmin)
 		if err != nil {
 			log.Fatalf("failed to create discord bot: %v", err)
 		}
@@ -81,13 +77,7 @@ func main() {
 		log.Println("DISCORD_TOKEN not found, skipping discord bot startup")
 	}
 
-	bHour, _ := strconv.Atoi(os.Getenv("BACKUP_TIME_HOUR"))
-	bMinute, _ := strconv.Atoi(os.Getenv("BACKUP_TIME_MINUTE"))
-	if bHour == 0 && bMinute == 0 && os.Getenv("BACKUP_TIME_HOUR") == "" {
-		bHour = 3
-		bMinute = 10
-	}
-	backupService := backup.NewBackupService(bHour, bMinute, "/backups/daily", tgBot)
+	backupService := backup.NewBackupService(cfg.Backup.Hour, cfg.Backup.Minute, "/backups/daily", tgBot)
 	backupService.Start()
 
 	go func() {
@@ -102,25 +92,8 @@ func main() {
 	log.Println("Shutting down gracefully...")
 }
 
-func initPostgres() *sql.DB {
-	host := os.Getenv("POSTGRES_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	port := os.Getenv("POSTGRES_PORT")
-	if port == "" {
-		port = "5432"
-	}
-
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		host,
-		port,
-		os.Getenv("POSTGRES_DB"),
-	)
-
-	db, err := sql.Open("postgres", connStr)
+func initPostgres(cfg config.PostgresConfig) *sql.DB {
+	db, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
 		log.Fatalf("failed to initialize db driver: %v", err)
 	}
@@ -131,12 +104,7 @@ func initPostgres() *sql.DB {
 	return db
 }
 
-func initRedis() *redis.Client {
-	addr := os.Getenv("REDIS_ADDR")
-	if addr == "" {
-		addr = "localhost:6379"
-	}
-
+func initRedis(addr string) *redis.Client {
 	rdb := redis.NewClient(&redis.Options{
 		Addr: addr,
 		DB:   0,
@@ -147,12 +115,4 @@ func initRedis() *redis.Client {
 	}
 	log.Println("Redis connected")
 	return rdb
-}
-
-func getEnvOrFatal(key string) string {
-	val := os.Getenv(key)
-	if val == "" {
-		log.Fatalf("environment variable %s is required", key)
-	}
-	return val
 }

@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"gachabot/internal/i18n"
 	"log"
 	"strconv"
 	"strings"
@@ -19,18 +20,23 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 		return ctx.Send(b.loc.Translate(lang, "profile_err_load"))
 	}
 
-	caption := b.loc.Translate(lang, "profile_caption",
-		tgUser.FirstName, tgUser.LastName,
-		profile.UniqueCardsCount, profile.TotalCardsCount,
-		profile.Balance, profile.DuplicatesCount, profile.StreakDays)
+	caption := b.loc.Translate(lang, "profile_caption", i18n.Args{
+		"first_name": tgUser.FirstName,
+		"last_name":  tgUser.LastName,
+		"unique":     profile.UniqueCardsCount,
+		"total":      profile.TotalCardsCount,
+		"balance":    profile.Balance,
+		"duplicates": profile.DuplicatesCount,
+		"streak":     profile.StreakDays,
+	})
 
 	photos, err := ctx.Bot().ProfilePhotosOf(tgUser)
 
 	menu := &tele.ReplyMarkup{}
 	var rows []tele.Row
 	if profile.UniqueCardsCount > 0 {
-		btnMyCards := menu.Data(b.loc.Translate(lang, "btn_my_cards", profile.UniqueCardsCount), "cards_nav", "0")
-		btnMySets := menu.Data(b.loc.Translate(lang, "btn_my_sets", profile.CompletedSets, profile.TotalSets), "sets_nav", "0")
+		btnMyCards := menu.Data(b.loc.Translate(lang, "btn_my_cards", i18n.Args{"count": profile.UniqueCardsCount}), "cards_nav", "0")
+		btnMySets := menu.Data(b.loc.Translate(lang, "btn_my_sets", i18n.Args{"completed": profile.CompletedSets, "total": profile.TotalSets}), "sets_nav", "0")
 
 		rows = append(rows, menu.Row(btnMyCards))
 		rows = append(rows, menu.Row(btnMySets))
@@ -86,11 +92,13 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 
 	var caption string
 	if card.SetName != "" {
-		caption = b.loc.Translate(lang, "card_nav_caption_with_set",
-			card.CardName, card.SetName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+		caption = b.loc.Translate(lang, "card_nav_caption_with_set", i18n.Args{
+			"name": card.CardName, "set": card.SetName, "rarity": b.loc.Rarity(lang, card.RarityName),
+			"power": card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	} else {
-		caption = b.loc.Translate(lang, "card_nav_caption",
-			card.CardName, card.RarityName, card.PowerLevel, card.Quantity, offset+1, total)
+		caption = b.loc.Translate(lang, "card_nav_caption", i18n.Args{
+			"name": card.CardName, "rarity": b.loc.Rarity(lang, card.RarityName),
+			"power": card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	}
 
 	menu := &tele.ReplyMarkup{}

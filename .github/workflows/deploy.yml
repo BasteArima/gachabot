@@ -28,7 +28,7 @@ jobs:
           echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env
           echo "ADMIN_TG_BACKUP_GROUP_ID=${{ secrets.ADMIN_TG_BACKUP_GROUP_ID }}" >> .env
           echo "ADMIN_TG_SUGGESTS_GROUP_ID=${{ secrets.ADMIN_TG_SUGGESTS_GROUP_ID }}" >> .env
-          echo "BOT_GROUP_LINK=${{ secrets.BOT_GROUP_LINK }}" >> .env
+          echo "ADD_BOT_TO_GROUP_LINK=${{ secrets.ADD_BOT_TO_GROUP_LINK }}" >> .env
           echo "START_BANNER_URL=${{ secrets.START_BANNER_URL }}" >> .env
           echo "BACKUP_TIME_HOUR=${{ secrets.BACKUP_TIME_HOUR }}" >> .env
           echo "BACKUP_TIME_MINUTE=${{ secrets.BACKUP_TIME_MINUTE }}" >> .env
@@ -38,4 +38,9 @@ jobs:
         run: |
           docker-compose down
           docker-compose up -d --build
+          # If a theme file is committed, apply it (additive upsert; safe for prod).
+          if [ -f theme.json ]; then
+            echo "Applying theme.json..."
+            docker-compose run --rm seed import /theme.json
+          fi
           docker image prune -f

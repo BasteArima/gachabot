@@ -69,11 +69,12 @@ func (s *GachaService) CraftCard(internalUserID int64) (*models.RollResult, erro
 	}
 
 	// Distribution logic (shards or map)
-	if card.RarityID == 6 {
+	targetRarity := findRarity(rarities, targetRarityID)
+	if targetRarity != nil && targetRarity.RequiresFragments {
 		result.IsFragment = true
 		currentFragments, _ := s.repo.AddFragment(internalUserID, card.ID)
 		result.FragmentsCount = currentFragments
-		if currentFragments >= 10 {
+		if targetRarity.FragmentsRequired > 0 && currentFragments >= targetRarity.FragmentsRequired {
 			result.CardAssembled = true
 			_ = s.repo.ClearFragments(internalUserID, card.ID)
 			_ = s.repo.AddCardToInventory(internalUserID, card.ID)

@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"strconv"
 	"strings"
@@ -163,13 +164,13 @@ func (b *Bot) renderSetView(s *discordgo.Session, i *discordgo.InteractionCreate
 	buffName := b.loc.Translate(lang, "buff_type_"+currentSet.BuffType)
 	buffDesc := fmt.Sprintf("+%d%% (%s)", currentSet.BuffValue, buffName)
 
-	desc := b.loc.Translate(lang, "set_view_title", currentSet.SetName, currentSet.RewardPoints, buffDesc)
+	desc := b.loc.Translate(lang, "set_view_title", i18n.Args{"name": currentSet.SetName, "reward": currentSet.RewardPoints, "buff": buffDesc})
 
 	for j, c := range cards {
 		if c.Name != "" {
-			desc += b.loc.Translate(lang, "set_card_owned", j+1, c.Name) + "\n"
+			desc += b.loc.Translate(lang, "set_card_owned", i18n.Args{"num": j + 1, "name": c.Name}) + "\n"
 		} else {
-			desc += b.loc.Translate(lang, "set_card_unknown", j+1) + "\n"
+			desc += b.loc.Translate(lang, "set_card_unknown", i18n.Args{"num": j + 1}) + "\n"
 		}
 	}
 

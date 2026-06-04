@@ -1,0 +1,18 @@
+{
+  "rarities": [
+    { "name": "common",    "drop_chance": 59.5, "base_reward": 10,  "pity_threshold": 0,  "craft_cost": 5,  "requires_fragments": false, "fragments_required": 0 },
+    { "name": "uncommon",  "drop_chance": 25,   "base_reward": 25,  "pity_threshold": 0,  "craft_cost": 5,  "requires_fragments": false, "fragments_required": 0 },
+    { "name": "rare",      "drop_chance": 10,   "base_reward": 75,  "pity_threshold": 0,  "craft_cost": 4,  "requires_fragments": false, "fragments_required": 0 },
+    { "name": "epic",      "drop_chance": 4,    "base_reward": 200, "pity_threshold": 30, "craft_cost": 3,  "requires_fragments": false, "fragments_required": 10 },
+    { "name": "legendary", "drop_chance": 1,    "base_reward": 500, "pity_threshold": 90, "craft_cost": 2,  "requires_fragments": false, "fragments_required": 0 },
+    { "name": "mythic",    "drop_chance": 0.5,  "base_reward": 1500,"pity_threshold": 0,  "craft_cost": 0,  "requires_fragments": true,  "fragments_required": 10 }
+  ],
+  "sets": [
+    { "name": "Starter Collection", "buff_type": "power_percent", "buff_value": 10, "reward_points": 500 }
+  ],
+  "cards": [
+    { "name": "Sample Common", "rarity": "common", "power_level": 10,  "image_url": "https://example.com/cards/common/sample.webp" },
+    { "name": "Sample Epic",   "rarity": "epic",   "power_level": 400, "image_url": "https://example.com/cards/epic/sample.webp", "set": "Starter Collection" },
+    { "name": "Sample Mythic", "rarity": "mythic", "power_level": 2000,"image_url": "https://example.com/cards/mythic/sample.webp" }
+  ]
+}

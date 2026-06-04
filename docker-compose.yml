@@ -52,6 +52,25 @@ services:
     volumes:
       - /opt/gachabot/backups:/backups:ro
 
+  # One-shot tool to apply/export a theme. Does NOT start with `up` (profile).
+  # Apply a committed theme:  docker-compose run --rm seed import /theme.json
+  # Export current DB:        docker-compose run --rm seed export -
+  seed:
+    build: .
+    profiles: ["tools"]
+    depends_on:
+      - db
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - ./theme.json:/theme.json:ro
+    entrypoint: ["./seed"]
+    command: ["validate", "/theme.json"]
+
   pgbackups:
     image: prodrigestivill/postgres-backup-local
     restart: always
