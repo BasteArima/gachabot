@@ -22,5 +22,6 @@
   "rarity_mythic": "Мифическая",
   "rarity_rare": "Редкая",
   "rarity_uncommon": "Необычная",
-  "suggest_cancelled": "🛑 Предложение карточки отменено."
+  "suggest_cancelled": "🛑 Предложение карточки отменено.",
+  "craft_disabled": "Крафт отключён: дубликаты карт выключены."
 }

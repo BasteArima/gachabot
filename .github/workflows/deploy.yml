@@ -25,6 +25,7 @@ jobs:
           echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> .env
           echo "REQUIRE_18_PLUS_CONFIRM=${{ secrets.REQUIRE_18_PLUS_CONFIRM }}" >> .env
           echo "COOLDOWN_HOURS=${{ secrets.COOLDOWN_HOURS }}" >> .env
+          echo "ENABLE_DUPLICATES=${{ vars.ENABLE_DUPLICATES }}" >> .env
           echo "ADMIN_TELEGRAM_ID=${{ secrets.ADMIN_TELEGRAM_ID }}" >> .env
           echo "ADMIN_TG_BACKUP_GROUP_ID=${{ secrets.ADMIN_TG_BACKUP_GROUP_ID }}" >> .env
           echo "ADMIN_TG_SUGGESTS_GROUP_ID=${{ secrets.ADMIN_TG_SUGGESTS_GROUP_ID }}" >> .env

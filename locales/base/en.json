@@ -22,5 +22,6 @@
   "rarity_mythic": "Mythic",
   "rarity_rare": "Rare",
   "rarity_uncommon": "Uncommon",
-  "suggest_cancelled": "🛑 Card suggestion cancelled."
+  "suggest_cancelled": "🛑 Card suggestion cancelled.",
+  "craft_disabled": "Crafting is disabled: duplicate cards are turned off."
 }

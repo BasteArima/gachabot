@@ -6,6 +6,11 @@ import (
 )
 
 func (s *GachaService) CraftCard(internalUserID int64) (*models.RollResult, error) {
+	if !s.duplicatesEnabled {
+		// Crafting consumes duplicates, which don't exist in no-duplicates mode.
+		return nil, fmt.Errorf("craft_disabled")
+	}
+
 	dupCounts, err := s.repo.GetAvailableCrafts(internalUserID)
 	if err != nil {
 		return nil, err

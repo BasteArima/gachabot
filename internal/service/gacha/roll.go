@@ -49,9 +49,15 @@ func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error
 		return nil, fmt.Errorf("failed to save pities: %w", err)
 	}
 
-	card, err := s.repo.GetRandomCard(selectedRarity.ID)
+	card, allCollected, err := s.pickCard(internalUserID, selectedRarity, rarities)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get card: %w", err)
+		return nil, err
+	}
+	if card != nil {
+		// If we fell back to an unowned card of another rarity, follow its rarity.
+		if r := findRarity(rarities, card.RarityID); r != nil {
+			selectedRarity = *r
+		}
 	}
 
 	bonus := int(math.Sqrt(float64(newStreak)) + 5)
@@ -63,13 +69,15 @@ func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error
 		Reward:        finalReward,
 		StreakDays:    newStreak,
 		StreakUpdated: streakUpdated,
+		AllCollected:  allCollected,
 	}
 
-	if err := s.processCardDrop(internalUserID, card, selectedRarity, result); err != nil {
-		return nil, err
+	if card != nil {
+		if err := s.processCardDrop(internalUserID, card, selectedRarity, result); err != nil {
+			return nil, err
+		}
+		s.processSetCompletion(internalUserID, card, result)
 	}
-
-	s.processSetCompletion(internalUserID, card, result)
 
 	userDb.Balance += result.Reward
 	userDb.StreakDays = newStreak
@@ -86,6 +94,40 @@ func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error
 	}
 
 	return result, nil
+}
+
+// pickCard selects the card a roll awards. With duplicates enabled it returns a
+// random card of the rolled rarity. With duplicates disabled it returns a random
+// unowned card (preferring the rolled rarity, then any rarity); if the player owns
+// everything it returns (nil, true, nil) to signal "all collected".
+func (s *GachaService) pickCard(userID int64, selectedRarity models.Rarity, rarities []models.Rarity) (*models.Card, bool, error) {
+	if s.duplicatesEnabled {
+		card, err := s.repo.GetRandomCard(selectedRarity.ID)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to get card: %w", err)
+		}
+		return card, false, nil
+	}
+
+	card, err := s.repo.GetRandomUnownedCard(userID, selectedRarity.ID)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get unowned card: %w", err)
+	}
+	if card != nil {
+		return card, false, nil
+	}
+
+	// Rolled rarity fully owned — award any unowned card instead so the player
+	// keeps progressing until everything is collected.
+	card, err = s.repo.GetRandomUnownedCardAny(userID)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get unowned card: %w", err)
+	}
+	if card != nil {
+		return card, false, nil
+	}
+
+	return nil, true, nil // everything collected
 }
 
 func (s *GachaService) todayMidnight() time.Time {

@@ -9,6 +9,19 @@ import (
 	tele "gopkg.in/telebot.v3"
 )
 
+// cardCaptionKey picks the card-browser caption key, switching to the
+// "_no_dupes" variant (no "owned: N pcs" line) when duplicates are disabled.
+func (b *Bot) cardCaptionKey(withSet bool) string {
+	key := "card_nav_caption"
+	if withSet {
+		key = "card_nav_caption_with_set"
+	}
+	if !b.service.DuplicatesEnabled() {
+		key += "_no_dupes"
+	}
+	return key
+}
+
 func (b *Bot) HandleProfile(ctx tele.Context) error {
 	tgUser := ctx.Sender()
 	dbUser, _ := b.repo.GetOrCreateUserByTelegramID(tgUser.ID, tgUser.Username, tgUser.FirstName, tgUser.LastName)
@@ -20,7 +33,11 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 		return ctx.Send(b.loc.Translate(lang, "profile_err_load"))
 	}
 
-	caption := b.loc.Translate(lang, "profile_caption", i18n.Args{
+	profileKey := "profile_caption"
+	if !b.service.DuplicatesEnabled() {
+		profileKey = "profile_caption_no_dupes"
+	}
+	caption := b.loc.Translate(lang, profileKey, i18n.Args{
 		"first_name": tgUser.FirstName,
 		"last_name":  tgUser.LastName,
 		"unique":     profile.UniqueCardsCount,
@@ -92,11 +109,11 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 
 	var caption string
 	if card.SetName != "" {
-		caption = b.loc.Translate(lang, "card_nav_caption_with_set", i18n.Args{
+		caption = b.loc.Translate(lang, b.cardCaptionKey(true), i18n.Args{
 			"name": card.CardName, "set": card.SetName, "rarity": b.loc.Rarity(lang, card.RarityName),
 			"power": card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	} else {
-		caption = b.loc.Translate(lang, "card_nav_caption", i18n.Args{
+		caption = b.loc.Translate(lang, b.cardCaptionKey(false), i18n.Args{
 			"name": card.CardName, "rarity": b.loc.Rarity(lang, card.RarityName),
 			"power": card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	}

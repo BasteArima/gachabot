@@ -121,6 +121,10 @@ type RollResult struct {
 
 	CompletedSetName   string
 	CompletedSetReward int
+
+	// AllCollected is set (when duplicates are disabled) if the player already owns
+	// every card: no card is awarded, only points and streak.
+	AllCollected bool
 }
 
 type DuelAuraInfo struct {

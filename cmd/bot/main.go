@@ -43,7 +43,7 @@ func main() {
 	defer rdb.Close()
 
 	repo := repository.NewPostgresRepo(db)
-	gachaService := gacha.NewGachaService(repo, rdb, cfg.Telegram.AdminID, cfg.Game.CooldownDuration)
+	gachaService := gacha.NewGachaService(repo, rdb, cfg.Telegram.AdminID, cfg.Game.CooldownDuration, cfg.Game.DuplicatesEnabled)
 	duelService := duel.NewDuelService(repo, rdb)
 	suggestService := suggest.NewSuggestService(repo, rdb)
 

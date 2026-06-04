@@ -142,5 +142,9 @@
   "btn_adult_yes": "✅ Да, мне есть 18",
   "btn_adult_no": "⛔️ Нет, мне меньше 18",
   "adult_rejected_msg": "🔞 Извини, но этот бот предназначен только для пользователей старше 18 лет. Возвращайся, когда подрастешь!",
-  "backup_caption": "📦 <b>Автоматический бэкап базы данных GachaBot</b>\n\nФайл можно использовать для восстановления через команду:\n<code>gunzip -c backup.sql.gz | docker exec -i gachabot_db psql -U postgres -d postgres</code>"
+  "backup_caption": "📦 <b>Автоматический бэкап базы данных GachaBot</b>\n\nФайл можно использовать для восстановления через команду:\n<code>gunzip -c backup.sql.gz | docker exec -i gachabot_db psql -U postgres -d postgres</code>",
+  "profile_caption_no_dupes": "<blockquote>👤 Ты - {first_name} {last_name}\n\n<tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> У тебя {unique} карточек\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> У тебя {balance} очков\n\n<tg-emoji emoji-id=\"4956499161319998529\">🔥</tg-emoji> Твой стрик составляет {streak} {streak:день|дня|дней}</blockquote>",
+  "card_nav_caption_no_dupes": "<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>{name}</b>\n\n✨ Редкость: <b>{rarity}</b>\n⚔️ Сила: <b>{power}</b>\n\n<i>Карточка {num} из {total}</i></blockquote>",
+  "card_nav_caption_with_set_no_dupes": "<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>{name}</b>\n📚 Сет: <b>«{set}»</b>\n\n✨ Редкость: <b>{rarity}</b>\n⚔️ Сила: <b>{power}</b>\n\n<i>Карточка {num} из {total}</i></blockquote>",
+  "roll_all_collected": "🎉 <b>Поздравляем!</b> Ты собрал все доступные карты!\n\nНовых пока нет — ты получаешь <b>+{reward}</b> очков, стрик: <b>{days} {days:день|дня|дней}</b>. Загляни позже за новыми картами!"
 }

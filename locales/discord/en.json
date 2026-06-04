@@ -97,5 +97,9 @@
   "btn_equip_aura": "✨ Equip Buff",
   "btn_unequip_aura": "🛑 Unequip Buff",
   "btn_back_to_sets": "⬅️ Back to lists",
-  "help_sets": "📚 **Collections & Buffs**\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 **Reward:** As soon as you collect all cards in a set, you will receive a large bonus in 🪙 **Points**.\n\n✨ **Buffs:** For each completed set, you unlock a unique Buff. This is a passive boost that increases the **Power** of your cards in duels.\n\n⚙️ **How to use:**\n1. Go to `/profile`.\n2. Press the **“📚 Collections”** button.\n3. Select a completed set and press **“✨ Equip”**.\n\n⚠️ *Important: only one Buff can be active at a time!*"
+  "help_sets": "📚 **Collections & Buffs**\n\nCards in the game are grouped into thematic sets. Completing a full collection unlocks access to unique bonuses!\n\n🎁 **Reward:** As soon as you collect all cards in a set, you will receive a large bonus in 🪙 **Points**.\n\n✨ **Buffs:** For each completed set, you unlock a unique Buff. This is a passive boost that increases the **Power** of your cards in duels.\n\n⚙️ **How to use:**\n1. Go to `/profile`.\n2. Press the **“📚 Collections”** button.\n3. Select a completed set and press **“✨ Equip”**.\n\n⚠️ *Important: only one Buff can be active at a time!*",
+  "profile_stats_no_dupes": "> **Cards:** {unique}\n> **Balance:** {balance} 🪙\n> **Streak:** {streak} 🔥",
+  "card_nav_caption_no_dupes": "> ✨ Rarity: **{rarity}**\n> ⚔️ Power: **{power}**\n> \n> *Card {num} of {total}*",
+  "card_nav_caption_with_set_no_dupes": "📚 Set: **\"{set}\"**\n\n✨ Rarity: **{rarity}**\n⚔️ Power: **{power}**\n\n*Card {num} of {total}*",
+  "roll_all_collected": "🎉 **Congrats!** You’ve collected every available card!\n\nNo new ones yet — you earn **+{reward}** points, streak: **{days} {days:day|days}**. Check back when new cards are added!"
 }

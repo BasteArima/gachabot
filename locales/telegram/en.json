@@ -142,5 +142,9 @@
   "btn_adult_yes": "✅ Yes, I am 18+",
   "btn_adult_no": "⛔️ No, I am under 18",
   "adult_rejected_msg": "🔞 Sorry, but this bot is strictly for users over 18 years old. Come back when you're older!",
-  "backup_caption": "📦 <b>Automatic backup of the GachaBot database</b>\n\nThe file can be used for recovery via the command:\n<code>gunzip -c backup.sql.gz | docker exec -i gachabot_db psql -U postgres -d postgres</code>"
+  "backup_caption": "📦 <b>Automatic backup of the GachaBot database</b>\n\nThe file can be used for recovery via the command:\n<code>gunzip -c backup.sql.gz | docker exec -i gachabot_db psql -U postgres -d postgres</code>",
+  "profile_caption_no_dupes": "<blockquote>👤 You are - {first_name} {last_name}\n\n<tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> You have {unique} cards\n<tg-emoji emoji-id=\"4918300654197277832\">🪙</tg-emoji> You have {balance} points\n\n<tg-emoji emoji-id=\"4956499161319998529\">🔥</tg-emoji> Your streak is {streak} {streak:day|days}</blockquote>",
+  "card_nav_caption_no_dupes": "<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>{name}</b>\n\n✨ Rarity: <b>{rarity}</b>\n⚔️ Power: <b>{power}</b>\n\n<i>Card {num} of {total}</i></blockquote>",
+  "card_nav_caption_with_set_no_dupes": "<blockquote><tg-emoji emoji-id=\"4956525562483967357\">🃏</tg-emoji> <b>{name}</b>\n📚 Set: <b>“{set}”</b>\n\n✨ Rarity: <b>{rarity}</b>\n⚔️ Power: <b>{power}</b>\n\n<i>Card {num} of {total}</i></blockquote>",
+  "roll_all_collected": "🎉 <b>Congrats!</b> You’ve collected every available card!\n\nNo new ones yet — you earn <b>+{reward}</b> points, streak: <b>{days} {days:day|days}</b>. Check back when new cards are added!"
 }

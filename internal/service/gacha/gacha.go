@@ -9,22 +9,30 @@ import (
 )
 
 type GachaService struct {
-	repo          *repository.PostgresRepo
-	rdb           *redis.Client
-	loc           *time.Location
-	adminID       int64
-	cooldownHours time.Duration
+	repo              *repository.PostgresRepo
+	rdb               *redis.Client
+	loc               *time.Location
+	adminID           int64
+	cooldownHours     time.Duration
+	duplicatesEnabled bool
 }
 
-func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID int64, cooldown time.Duration) *GachaService {
+func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID int64, cooldown time.Duration, duplicatesEnabled bool) *GachaService {
 	loc := time.FixedZone("MSK", 3*60*60)
 	return &GachaService{
-		repo:          repo,
-		rdb:           rdb,
-		loc:           loc,
-		adminID:       adminID,
-		cooldownHours: cooldown,
+		repo:              repo,
+		rdb:               rdb,
+		loc:               loc,
+		adminID:           adminID,
+		cooldownHours:     cooldown,
+		duplicatesEnabled: duplicatesEnabled,
 	}
+}
+
+// DuplicatesEnabled reports whether duplicate cards are allowed (used by the
+// delivery layer to hide duplicate-related UI when off).
+func (s *GachaService) DuplicatesEnabled() bool {
+	return s.duplicatesEnabled
 }
 
 // findRarity returns a pointer to the rarity with the given ID, or nil if not found.

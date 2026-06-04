@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"database/sql"
+
 	"gachabot/internal/models"
 )
 
@@ -29,6 +31,45 @@ func (r *PostgresRepo) GetRandomCard(rarityID int) (*models.Card, error) {
 	query := `SELECT id, name, rarity_id, image_url, power_level, set_id FROM cards WHERE rarity_id = $1 ORDER BY RANDOM() LIMIT 1`
 	var c models.Card
 	err := r.db.QueryRow(query, rarityID).Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// GetRandomUnownedCard returns a random card of the given rarity that the user
+// does not yet own. Returns (nil, nil) if the user owns every card of that rarity.
+func (r *PostgresRepo) GetRandomUnownedCard(userID int64, rarityID int) (*models.Card, error) {
+	query := `
+		SELECT id, name, rarity_id, image_url, power_level, set_id
+		FROM cards
+		WHERE rarity_id = $1
+		  AND id NOT IN (SELECT card_id FROM user_inventory WHERE user_id = $2)
+		ORDER BY RANDOM() LIMIT 1`
+	var c models.Card
+	err := r.db.QueryRow(query, rarityID, userID).Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// GetRandomUnownedCardAny returns a random card of any rarity the user does not
+// own. Returns (nil, nil) when the user has collected every card.
+func (r *PostgresRepo) GetRandomUnownedCardAny(userID int64) (*models.Card, error) {
+	query := `
+		SELECT id, name, rarity_id, image_url, power_level, set_id
+		FROM cards
+		WHERE id NOT IN (SELECT card_id FROM user_inventory WHERE user_id = $1)
+		ORDER BY RANDOM() LIMIT 1`
+	var c models.Card
+	err := r.db.QueryRow(query, userID).Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}

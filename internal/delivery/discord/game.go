@@ -29,6 +29,11 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		return
 	}
 
+	if result.AllCollected {
+		b.respond(s, i, b.loc.Translate(lang, "roll_all_collected", i18n.Args{"reward": result.Reward, "days": result.StreakDays}))
+		return
+	}
+
 	title := b.loc.Translate(lang, "roll_success_title")
 	desc := b.loc.Translate(lang, "roll_success_desc", i18n.Args{"name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel, "reward": result.Reward})
 

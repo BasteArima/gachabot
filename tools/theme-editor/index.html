@@ -47,6 +47,31 @@
   .modal textarea { width:100%; height:300px; background:var(--bg); color:var(--text); border:1px solid var(--line);
                     border-radius:6px; padding:10px; font:12px/1.4 ui-monospace,Consolas,monospace; resize:vertical; }
   .modal .actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+  /* cards toolbar */
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:8px 14px; background:#1c2027; border-bottom:1px solid var(--line); }
+  .toolbar label { display:flex; gap:5px; align-items:center; font-size:12px; color:var(--muted); }
+  .toolbar select, .toolbar input[type=range] { width:auto; }
+  /* grid view */
+  .grid { display:flex; flex-wrap:wrap; gap:10px; padding:14px; }
+  .rgroup { padding:10px 14px; }
+  .rgroup h4 { margin:0 0 8px; font-size:13px; color:var(--muted); display:flex; gap:8px; align-items:center; }
+  .cards-wrap { display:flex; flex-wrap:wrap; gap:10px; min-height:44px; padding:6px; border:1px dashed transparent; border-radius:8px; }
+  .cards-wrap.dragover { border-color:var(--accent); background:rgba(79,140,255,.08); }
+  .gcard { width:var(--gsize,96px); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px; position:relative; }
+  .gcard[draggable=true] { cursor:grab; }
+  .gcard.dragging { opacity:.35; }
+  .gcard img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:5px; background:#000; display:block; cursor:zoom-in; }
+  .gcard .gname { font-size:11px; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gcard .gpow { font-size:11px; color:var(--muted); }
+  .gcard .gdel { position:absolute; top:3px; right:3px; background:#000a; color:var(--err); border-radius:4px; width:18px; height:18px;
+                 line-height:16px; text-align:center; font-size:14px; cursor:pointer; opacity:0; transition:opacity .1s; }
+  .gcard:hover .gdel { opacity:1; }
+  td .preview { cursor:zoom-in; }
+  /* lightbox + hover preview */
+  #lightbox { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:30; align-items:center; justify-content:center; cursor:zoom-out; }
+  #lightbox img { max-width:90vw; max-height:90vh; border-radius:10px; box-shadow:0 8px 40px #000; }
+  #hoverprev { display:none; position:fixed; z-index:25; pointer-events:none; width:230px; height:230px; object-fit:contain;
+               background:#000c; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 28px #000b; }
 </style>
 </head>
 <body>
@@ -72,7 +97,10 @@
       </tr></thead>
       <tbody id="rarities"></tbody>
     </table>
-    <div class="row-actions"><button class="secondary" onclick="addRarity()">+ Редкость</button></div>
+    <div class="row-actions">
+      <button class="secondary" onclick="addRarity()">+ Редкость</button>
+      <button class="secondary" onclick="normalizeRarities()" title="Пропорционально привести сумму drop % к 100">⚖️ Нормализовать до 100%</button>
+    </div>
   </section>
 
   <section>
@@ -86,13 +114,51 @@
 
   <section>
     <h2>Карты <span class="badge" id="card-count"></span></h2>
-    <table>
-      <thead><tr><th></th><th>name</th><th>rarity</th><th>power</th><th>image_url</th><th>set</th><th></th></tr></thead>
-      <tbody id="cards"></tbody>
-    </table>
-    <div class="row-actions"><button class="secondary" onclick="addCard()">+ Карта</button></div>
+    <div class="toolbar">
+      <label>Вид
+        <select id="card-view" onchange="setCardView(this.value)">
+          <option value="table">Таблица</option>
+          <option value="grid">Сетка</option>
+        </select>
+      </label>
+      <label>Сортировка
+        <select id="card-sort" onchange="sortCards(this.value)">
+          <option value="">—</option>
+          <option value="rarity">по редкости ↑</option>
+          <option value="rarity_desc">по редкости ↓</option>
+          <option value="power_desc">по силе ↓</option>
+          <option value="power">по силе ↑</option>
+          <option value="name">по имени</option>
+        </select>
+      </label>
+      <label id="grid-group-wrap" style="display:none"><input type="checkbox" id="grid-group" onchange="renderCards()"> группировать по редкости</label>
+      <label id="grid-size-wrap" style="display:none">размер <input type="range" id="grid-size" min="64" max="200" value="96" oninput="setGridSize(this.value)"></label>
+    </div>
+    <div id="cards-host"></div>
+    <div class="row-actions">
+      <button class="secondary" onclick="addCard()">+ Карта</button>
+      <button class="secondary" onclick="autoPowerOpen()" title="Авто-заполнить силу карт по диапазону редкости">⚡ Авто-сила</button>
+    </div>
   </section>
 </main>
+
+<div class="overlay" id="ap-modal">
+  <div class="modal">
+    <h3>Авто-сила карт</h3>
+    <p class="hint" style="padding:0 0 8px">Для каждой редкости — базовая сила и разброс ±%. Сила карты считается детерминированно из её имени (повтор даёт тот же результат).</p>
+    <div id="ap-body"></div>
+    <label style="display:flex;gap:6px;align-items:center;margin-top:10px;font-size:13px">
+      <input type="checkbox" id="ap-empty"> только пустые (power = 0)
+    </label>
+    <div class="actions">
+      <button class="secondary" onclick="apCancel()">Отмена</button>
+      <button onclick="autoPowerApply()">Применить</button>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox" onclick="this.style.display='none'"><img alt=""></div>
+<img id="hoverprev" alt="">
 
 <div class="overlay" id="paste-modal">
   <div class="modal">
@@ -234,25 +300,178 @@ function renderSets() {
 function rarityOptions() { return state.rarities.map(r=>({value:r.name,label:r.name||'(без имени)'})); }
 function setOptions() { return [{value:'',label:'— нет —'}].concat(state.sets.map(s=>({value:s.name,label:s.name||'(без имени)'}))); }
 
+// ---------- card view ----------
+let cardView = 'table';
+let gridSize = 96;
+
+function setCardView(v) {
+  cardView = v;
+  const grid = v === 'grid';
+  document.getElementById('grid-group-wrap').style.display = grid ? 'flex' : 'none';
+  document.getElementById('grid-size-wrap').style.display = grid ? 'flex' : 'none';
+  renderCards();
+}
+function setGridSize(v) { gridSize = +v; document.documentElement.style.setProperty('--gsize', gridSize + 'px'); }
+
 function renderCards() {
-  const tb = document.getElementById('cards'); tb.innerHTML='';
-  state.cards.forEach((c,i) => {
+  document.getElementById('card-count').textContent = state.cards.length + ' шт.';
+  const host = document.getElementById('cards-host'); host.innerHTML = '';
+  if (cardView === 'grid') renderCardsGrid(host); else renderCardsTable(host);
+}
+function refreshCardDropdowns() { renderCards(); }
+
+function cardThumb(c, big) {
+  const img = el('img', { className: big ? '' : 'preview', alt: c.name || '' });
+  img.src = c.image_url || '';
+  img.onerror = () => img.style.visibility = 'hidden';
+  img.onload = () => img.style.visibility = 'visible';
+  img.onclick = () => { if (c.image_url) openLightbox(c.image_url); };
+  attachHover(img, () => c.image_url);
+  return img;
+}
+
+function renderCardsTable(host) {
+  const table = el('table');
+  const thead = el('thead');
+  thead.innerHTML = '<tr><th></th><th>name</th><th>rarity</th><th>power</th><th>image_url</th><th>set</th><th></th></tr>';
+  table.append(thead);
+  const tb = el('tbody');
+  state.cards.forEach((c, i) => {
     const tr = el('tr');
-    const img = el('img',{className:'preview'}); img.src=c.image_url||''; img.onerror=()=>img.style.visibility='hidden'; img.onload=()=>img.style.visibility='visible';
-    tr.append(cell(img));
-    tr.append(cell(textInput(c.name, v=>{ c.name=v; updateIssues(); })));
-    tr.append(cell(selectBox(c.rarity, rarityOptions(), v=>{ c.rarity=v; updateIssues(); })));
-    tr.append(numCell(numInput(c.power_level, v=>c.power_level=v)));
-    const url = textInput(c.image_url, v=>{ c.image_url=v; img.src=v; updateIssues(); });
-    tr.append(cell(url));
-    tr.append(cell(selectBox(c.set, setOptions(), v=>c.set=v)));
+    const thumb = cardThumb(c, false);
+    tr.append(cell(thumb));
+    tr.append(cell(textInput(c.name, v => { c.name = v; updateIssues(); })));
+    tr.append(cell(selectBox(c.rarity, rarityOptions(), v => { c.rarity = v; updateIssues(); })));
+    tr.append(numCell(numInput(c.power_level, v => c.power_level = v)));
+    tr.append(cell(textInput(c.image_url, v => { c.image_url = v; thumb.src = v; updateIssues(); })));
+    tr.append(cell(selectBox(c.set, setOptions(), v => c.set = v)));
     tr.append(delCell('cards', i));
     tb.append(tr);
   });
-  document.getElementById('card-count').textContent = state.cards.length + ' шт.';
+  table.append(tb);
+  host.append(table);
 }
 
-function refreshCardDropdowns() { renderCards(); }
+function gridCard(c, i, draggable) {
+  const card = el('div', { className: 'gcard' });
+  if (draggable) {
+    card.draggable = true;
+    card.ondragstart = e => { e.dataTransfer.setData('text/plain', String(i)); card.classList.add('dragging'); };
+    card.ondragend = () => card.classList.remove('dragging');
+  }
+  card.append(cardThumb(c, true));
+  card.append(el('div', { className: 'gname', textContent: c.name || '(без имени)', title: c.name }));
+  card.append(el('div', { className: 'gpow', textContent: '⚔️ ' + int(c.power_level) }));
+  const del = el('div', { className: 'gdel', textContent: '×', title: 'Удалить' });
+  del.onclick = e => { e.stopPropagation(); const idx = state.cards.indexOf(c); if (idx >= 0) delAt('cards', idx); };
+  card.append(del);
+  return card;
+}
+
+function renderCardsGrid(host) {
+  document.documentElement.style.setProperty('--gsize', gridSize + 'px');
+  if (!document.getElementById('grid-group').checked) {
+    const wrap = el('div', { className: 'grid' });
+    state.cards.forEach(c => wrap.append(gridCard(c)));
+    host.append(wrap);
+    return;
+  }
+  // grouped by rarity with drag & drop between groups
+  const drawGroup = (title, rarityName, indices) => {
+    const group = el('div', { className: 'rgroup' });
+    group.append(el('h4', { textContent: title + ' · ' + indices.length }));
+    const wrap = el('div', { className: 'cards-wrap' });
+    if (rarityName !== null) {
+      wrap.ondragover = e => { e.preventDefault(); wrap.classList.add('dragover'); };
+      wrap.ondragleave = () => wrap.classList.remove('dragover');
+      wrap.ondrop = e => {
+        e.preventDefault(); wrap.classList.remove('dragover');
+        const idx = +e.dataTransfer.getData('text/plain');
+        if (!isNaN(idx) && state.cards[idx]) { state.cards[idx].rarity = rarityName; renderCards(); updateIssues(); }
+      };
+    }
+    indices.forEach(i => wrap.append(gridCard(state.cards[i], i, true)));
+    group.append(wrap); host.append(group);
+  };
+  state.rarities.forEach(r => {
+    const idx = state.cards.map((c, i) => [c, i]).filter(([c]) => c.rarity === r.name).map(([, i]) => i);
+    drawGroup(r.name || '(без имени)', r.name, idx);
+  });
+  const orphans = state.cards.map((c, i) => [c, i]).filter(([c]) => !state.rarities.some(r => r.name === c.rarity)).map(([, i]) => i);
+  if (orphans.length) drawGroup('⚠ неизвестная редкость', null, orphans);
+}
+
+// ---------- lightbox + hover preview ----------
+function openLightbox(src) { const lb = document.getElementById('lightbox'); lb.querySelector('img').src = src; lb.style.display = 'flex'; }
+function attachHover(img, getSrc) {
+  const h = () => document.getElementById('hoverprev');
+  img.addEventListener('mouseenter', () => { const s = getSrc(); if (!s) return; h().src = s; h().style.display = 'block'; });
+  img.addEventListener('mousemove', e => {
+    let x = e.clientX + 18, y = e.clientY + 18;
+    if (x + 240 > innerWidth) x = e.clientX - 248;
+    if (y + 240 > innerHeight) y = e.clientY - 248;
+    h().style.left = x + 'px'; h().style.top = y + 'px';
+  });
+  img.addEventListener('mouseleave', () => h().style.display = 'none');
+}
+
+// ---------- sort ----------
+function sortCards(mode) {
+  if (!mode) return;
+  const rank = {}; state.rarities.forEach((r, i) => rank[r.name] = i);
+  const byName = (a, b) => (a.name || '').localeCompare(b.name || '');
+  state.cards.sort((a, b) => {
+    switch (mode) {
+      case 'rarity': return (rank[a.rarity] ?? 999) - (rank[b.rarity] ?? 999) || byName(a, b);
+      case 'rarity_desc': return (rank[b.rarity] ?? -1) - (rank[a.rarity] ?? -1) || byName(a, b);
+      case 'power_desc': return int(b.power_level) - int(a.power_level) || byName(a, b);
+      case 'power': return int(a.power_level) - int(b.power_level) || byName(a, b);
+      case 'name': return byName(a, b);
+    }
+    return 0;
+  });
+  renderCards();
+}
+
+// ---------- rarity balancer ----------
+function normalizeRarities() {
+  const sum = state.rarities.reduce((a, r) => a + num(r.drop_chance), 0);
+  if (sum <= 0) { alert('Сумма drop % равна 0 — нечего нормализовать.'); return; }
+  state.rarities.forEach(r => { r.drop_chance = +(num(r.drop_chance) * 100 / sum).toFixed(4); });
+  renderRarities(); updateIssues();
+}
+
+// ---------- auto power ----------
+function hash01(str) { let h = 2166136261 >>> 0; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; }
+const AP_DEFAULT_BASE = [10, 25, 75, 200, 500, 1500];
+function autoPowerOpen() {
+  if (!state.rarities.length) { alert('Сначала добавь редкости.'); return; }
+  const body = document.getElementById('ap-body'); body.innerHTML = '';
+  state.rarities.forEach((r, i) => {
+    const powers = state.cards.filter(c => c.rarity === r.name).map(c => int(c.power_level)).filter(p => p > 0).sort((a, b) => a - b);
+    const base = powers.length ? powers[Math.floor(powers.length / 2)] : (AP_DEFAULT_BASE[i] || 100);
+    const row = el('div'); row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:6px';
+    const lbl = el('div', { textContent: r.name || '(без имени)' }); lbl.style.cssText = 'flex:1;font-size:13px';
+    const b = el('input', { type: 'number', id: 'ap-base-' + i, value: base }); b.style.width = '90px';
+    const s = el('input', { type: 'number', id: 'ap-spread-' + i, value: 15 }); s.style.width = '70px';
+    row.append(lbl, el('span', { textContent: 'база' }), b, el('span', { textContent: '±%' }), s);
+    body.append(row);
+  });
+  document.getElementById('ap-modal').style.display = 'flex';
+}
+function apCancel() { document.getElementById('ap-modal').style.display = 'none'; }
+function autoPowerApply() {
+  const onlyEmpty = document.getElementById('ap-empty').checked;
+  const cfg = {};
+  state.rarities.forEach((r, i) => { cfg[r.name] = { base: num(document.getElementById('ap-base-' + i).value), spread: num(document.getElementById('ap-spread-' + i).value) }; });
+  state.cards.forEach(c => {
+    if (onlyEmpty && int(c.power_level) > 0) return;
+    const k = cfg[c.rarity]; if (!k) return;
+    const signed = hash01(c.name || '') * 2 - 1;
+    c.power_level = Math.max(0, Math.round(k.base * (1 + k.spread / 100 * signed)));
+  });
+  apCancel(); renderCards(); updateIssues();
+}
 
 function updateRaritySum() {
   const sum = state.rarities.reduce((a,r)=>a+num(r.drop_chance),0);

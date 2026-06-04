@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -63,6 +64,10 @@ func (p PostgresConfig) DSN() string {
 
 type GameConfig struct {
 	CooldownDuration time.Duration
+	// DuplicatesEnabled: if false, players never receive a card they already own —
+	// rolls yield only unowned cards (or points once everything is collected), and
+	// duplicate-based mechanics (crafting, duplicate counters) are disabled.
+	DuplicatesEnabled bool
 }
 
 type BackupConfig struct {
@@ -90,7 +95,8 @@ func Load() (*Config, error) {
 		Postgres:  PostgresFromEnv(),
 		RedisAddr: getEnv("REDIS_ADDR", "localhost:6379"),
 		Game: GameConfig{
-			CooldownDuration: time.Duration(getEnvInt("COOLDOWN_HOURS", 3)) * time.Hour,
+			CooldownDuration:  time.Duration(getEnvInt("COOLDOWN_HOURS", 3)) * time.Hour,
+			DuplicatesEnabled: getEnvBool("ENABLE_DUPLICATES", true),
 		},
 		Backup: BackupConfig{
 			Hour:   getEnvInt("BACKUP_TIME_HOUR", 3),
@@ -126,6 +132,14 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return v
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if raw == "" {
+		return fallback
+	}
+	return raw == "true" || raw == "1" || raw == "yes" || raw == "on"
 }
 
 func getEnvInt64(key string, fallback int64) int64 {

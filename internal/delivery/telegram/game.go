@@ -349,6 +349,11 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 		return ctx.Send(msg, &tele.SendOptions{ReplyTo: ctx.Message(), ParseMode: tele.ModeHTML, ReplyMarkup: menu})
 	}
 
+	if result.AllCollected {
+		msg := b.loc.Translate(lang, "roll_all_collected", i18n.Args{"reward": result.Reward, "days": result.StreakDays})
+		return ctx.Send(msg, tele.ModeHTML)
+	}
+
 	var caption string
 	if result.IsFragment {
 		if result.CardAssembled {

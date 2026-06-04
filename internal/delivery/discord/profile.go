@@ -26,6 +26,19 @@ func (b *Bot) handleProfile(s *discordgo.Session, i *discordgo.InteractionCreate
 	})
 }
 
+// cardCaptionKey picks the card caption key, switching to the "_no_dupes" variant
+// (no "owned: N pcs" line) when duplicates are disabled.
+func (b *Bot) cardCaptionKey(withSet bool) string {
+	key := "card_nav_caption"
+	if withSet {
+		key = "card_nav_caption_with_set"
+	}
+	if !b.service.DuplicatesEnabled() {
+		key += "_no_dupes"
+	}
+	return key
+}
+
 func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreate, user *models.User, lang string, offset int) {
 	card, total, err := b.service.GetUserCardPagination(user.ID, offset)
 	if err != nil || card == nil {
@@ -35,11 +48,11 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	var desc string
 	if card.SetName != "" {
-		desc = b.loc.Translate(lang, "card_nav_caption_with_set", i18n.Args{
+		desc = b.loc.Translate(lang, b.cardCaptionKey(true), i18n.Args{
 			"set": card.SetName, "rarity": b.loc.Rarity(lang, card.RarityName),
 			"power": card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	} else {
-		desc = b.loc.Translate(lang, "card_nav_caption", i18n.Args{
+		desc = b.loc.Translate(lang, b.cardCaptionKey(false), i18n.Args{
 			"rarity": b.loc.Rarity(lang, card.RarityName),
 			"power":  card.PowerLevel, "quantity": card.Quantity, "num": offset + 1, "total": total})
 	}
@@ -83,7 +96,11 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 	profile, _ := b.service.GetUserProfile(user.ID)
 
 	desc := fmt.Sprintf("**%s**\n\n", user.Username)
-	desc += b.loc.Translate(lang, "profile_stats", i18n.Args{
+	statsKey := "profile_stats"
+	if !b.service.DuplicatesEnabled() {
+		statsKey = "profile_stats_no_dupes"
+	}
+	desc += b.loc.Translate(lang, statsKey, i18n.Args{
 		"unique":     profile.UniqueCardsCount,
 		"total":      profile.TotalCardsCount,
 		"duplicates": profile.DuplicatesCount,
