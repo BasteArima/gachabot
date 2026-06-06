@@ -39,6 +39,19 @@ func (s *SpawnService) PlanStatus() PlanInfo {
 	return info
 }
 
+// ResetTodayPlan discards today's stored schedule and regenerates a fresh one
+// from the current config (new random times). Already-past times count as fired,
+// so only future slots will fire. Returns the new plan status.
+func (s *SpawnService) ResetTodayPlan() PlanInfo {
+	now := time.Now().In(s.loc)
+	date := now.Format("2006-01-02")
+	s.rdb.Del(context.Background(), planKey(date))
+	if cfg := s.loadConfig(); cfg.Enabled {
+		s.loadOrCreatePlan(cfg, now, date) // recompute + persist
+	}
+	return s.PlanStatus()
+}
+
 // Location exposes the engine timezone (for formatting in delivery).
 func (s *SpawnService) Location() *time.Location { return s.loc }
 

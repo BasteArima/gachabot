@@ -39,19 +39,32 @@ func (b *Bot) HandleSpawnPlan(ctx tele.Context) error {
 	if ctx.Sender().ID != b.adminID {
 		return nil
 	}
-	info := b.spawnService.PlanStatus()
+	return ctx.Send(formatSpawnPlan(b.spawnService.PlanStatus(), ""))
+}
+
+// HandleSpawnReset regenerates today's spawn schedule from the current config.
+// Admin only.
+func (b *Bot) HandleSpawnReset(ctx tele.Context) error {
+	if ctx.Sender().ID != b.adminID {
+		return nil
+	}
+	info := b.spawnService.ResetTodayPlan()
+	return ctx.Send(formatSpawnPlan(info, "🔄 Расписание на сегодня пересоздано.\n"))
+}
+
+func formatSpawnPlan(info spawn.PlanInfo, prefix string) string {
 	if !info.Enabled {
-		return ctx.Send("⏸ Автоспавны выключены (enabled=false). Включи через /spawn_import.")
+		return "⏸ Автоспавны выключены (enabled=false). Включи через /spawn_import."
 	}
 	if len(info.Upcoming) == 0 {
-		return ctx.Send(fmt.Sprintf("✅ На сегодня спавны отыграны (%d/%d). Новое расписание — после полуночи.", info.TodayFired, info.TodayTotal))
+		return fmt.Sprintf("%s✅ На сегодня спавнов больше нет (отыграно %d/%d). Новое расписание — после полуночи.", prefix, info.TodayFired, info.TodayTotal)
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("🗓 Спавны сегодня: отыграно %d/%d. Следующие (MSK):\n", info.TodayFired, info.TodayTotal))
+	sb.WriteString(fmt.Sprintf("%s🗓 Спавны сегодня: отыграно %d/%d. Следующие (MSK):\n", prefix, info.TodayFired, info.TodayTotal))
 	for _, t := range info.Upcoming {
 		sb.WriteString("• " + t.Format("15:04") + "\n")
 	}
-	return ctx.Send(sb.String())
+	return sb.String()
 }
 
 // HandleSpawnExport sends the current spawn config as spawn_config.json. Admin only.

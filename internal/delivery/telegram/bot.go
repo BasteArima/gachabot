@@ -143,6 +143,7 @@ func (b *Bot) setupRoutes() {
 	// Chat spawns: admin config & testing
 	b.bot.Handle("/spawnnow", b.HandleSpawnNow)
 	b.bot.Handle("/spawnplan", b.HandleSpawnPlan)
+	b.bot.Handle("/spawnreset", b.HandleSpawnReset)
 	b.bot.Handle("/spawn_export", b.HandleSpawnExport)
 	b.bot.Handle("/spawn_import", b.HandleSpawnImport)
 	b.bot.Handle("\fspawn_apply", b.HandleSpawnApply)
