@@ -67,6 +67,10 @@ func (s *Server) handleAuthTelegram(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "db error")
 		return
 	}
+	if tu.PhotoURL != "" {
+		_ = s.repo.UpdateUserAvatar(user.ID, tu.PhotoURL)
+		user.AvatarURL = tu.PhotoURL
+	}
 	token, err := s.createSession(user.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "session error")
@@ -114,7 +118,7 @@ func (s *Server) toPlayer(u *models.User) playerDTO {
 	return playerDTO{
 		ID:         strconv.FormatInt(u.ID, 10),
 		Username:   name,
-		AvatarURL:  "",
+		AvatarURL:  u.AvatarURL,
 		Coins:      u.Balance,
 		StreakDays: u.StreakDays,
 		IsAdmin:    s.isAdmin(u),

@@ -61,6 +61,11 @@ func (s *Server) handleAuthDiscord(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "db error")
 		return
 	}
+	if du.Avatar != "" {
+		avatarURL := fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", du.ID, du.Avatar)
+		_ = s.repo.UpdateUserAvatar(user.ID, avatarURL)
+		user.AvatarURL = avatarURL
+	}
 	token, err := s.createSession(user.ID)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "session error")
@@ -106,6 +111,7 @@ type discordUser struct {
 	ID         string `json:"id"`
 	Username   string `json:"username"`
 	GlobalName string `json:"global_name"`
+	Avatar     string `json:"avatar"`
 }
 
 func discordFetchUser(accessToken string) (*discordUser, error) {

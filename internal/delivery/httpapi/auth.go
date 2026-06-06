@@ -28,6 +28,7 @@ type tgAuthUser struct {
 	Username  string
 	FirstName string
 	LastName  string
+	PhotoURL  string
 }
 
 // validateInitData verifies a Telegram Mini App initData string (HMAC key derived
@@ -60,11 +61,12 @@ func validateInitData(initData, botToken string) (tgAuthUser, error) {
 		Username  string `json:"username"`
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
+		PhotoURL  string `json:"photo_url"`
 	}
 	if err := json.Unmarshal([]byte(userJSON), &p); err != nil {
 		return u, fmt.Errorf("bad user payload")
 	}
-	return tgAuthUser{ID: p.ID, Username: p.Username, FirstName: p.FirstName, LastName: p.LastName}, nil
+	return tgAuthUser{ID: p.ID, Username: p.Username, FirstName: p.FirstName, LastName: p.LastName, PhotoURL: p.PhotoURL}, nil
 }
 
 // validateLoginWidget verifies Telegram Login Widget data (flat fields; HMAC key
@@ -90,7 +92,7 @@ func validateLoginWidget(fields map[string]string, botToken string) (tgAuthUser,
 	if id == 0 {
 		return u, fmt.Errorf("missing id")
 	}
-	return tgAuthUser{ID: id, Username: fields["username"], FirstName: fields["first_name"], LastName: fields["last_name"]}, nil
+	return tgAuthUser{ID: id, Username: fields["username"], FirstName: fields["first_name"], LastName: fields["last_name"], PhotoURL: fields["photo_url"]}, nil
 }
 
 // dataCheckString builds Telegram's check string: all fields except omit, sorted

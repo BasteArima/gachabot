@@ -29,6 +29,7 @@ type User struct {
 	LanguageCode   string
 	ActiveSetID    *int `db:"active_set_id"`
 	IsAdult        sql.NullBool
+	AvatarURL      string
 }
 
 type Rarity struct {

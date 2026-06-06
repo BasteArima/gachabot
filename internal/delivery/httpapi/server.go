@@ -58,6 +58,7 @@ func (s *Server) Start() {
 			r.Use(s.authMiddleware)
 			r.Get("/me", s.handleMe)
 			r.Get("/inventory", s.handleInventory)
+			r.Get("/rarities", s.handleRarities)
 			r.Get("/daily-hub", s.handleDailyHub)
 			r.Get("/leaderboard", s.handleLeaderboard)
 			r.Post("/actions/roll", s.handleRoll)

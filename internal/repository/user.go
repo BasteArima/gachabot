@@ -9,18 +9,24 @@ import (
 func (r *PostgresRepo) GetUserByID(internalID int64) (*models.User, error) {
 	user := &models.User{}
 	query := `
-		SELECT id, telegram_id, discord_id, username, 
-           COALESCE(first_name, '') as first_name, 
-           COALESCE(last_name, '') as last_name, 
-           balance, streak_days, last_roll_time, last_streak_date, 
-           premium_rolls, COALESCE(language_code, ''), is_adult
+		SELECT id, telegram_id, discord_id, username,
+           COALESCE(first_name, '') as first_name,
+           COALESCE(last_name, '') as last_name,
+           balance, streak_days, last_roll_time, last_streak_date,
+           premium_rolls, COALESCE(language_code, ''), is_adult, COALESCE(avatar_url, '')
 		FROM users WHERE id=$1 LIMIT 1
 	`
 	err := r.db.QueryRow(query, internalID).Scan(
 		&user.ID, &user.TelegramID, &user.DiscordID, &user.Username, &user.FirstName, &user.LastName,
-		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode, &user.IsAdult,
+		&user.Balance, &user.StreakDays, &user.LastRollTime, &user.LastStreakDate, &user.PremiumRolls, &user.LanguageCode, &user.IsAdult, &user.AvatarURL,
 	)
 	return user, err
+}
+
+// UpdateUserAvatar stores the player's avatar URL (from the auth provider).
+func (r *PostgresRepo) UpdateUserAvatar(internalID int64, url string) error {
+	_, err := r.db.Exec(`UPDATE users SET avatar_url = $1 WHERE id = $2`, url, internalID)
+	return err
 }
 
 func (r *PostgresRepo) GetUserByTelegramID(tgID int64) (*models.User, error) {

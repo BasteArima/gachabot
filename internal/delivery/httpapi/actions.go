@@ -33,6 +33,20 @@ func (s *Server) handleDailyHub(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// GET /api/rarities — rarity names in display order, for the inventory filter tabs.
+func (s *Server) handleRarities(w http.ResponseWriter, _ *http.Request) {
+	rarities, err := s.repo.GetRarities()
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "db error")
+		return
+	}
+	names := make([]string, 0, len(rarities))
+	for _, r := range rarities {
+		names = append(names, r.Name)
+	}
+	writeJSON(w, http.StatusOK, names)
+}
+
 // GET /api/leaderboard — global top by balance.
 func (s *Server) handleLeaderboard(w http.ResponseWriter, _ *http.Request) {
 	board, err := s.gacha.GetLeaderboard("balance", 0)
