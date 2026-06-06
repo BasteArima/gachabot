@@ -7,6 +7,7 @@ import (
 	"gachabot/internal/repository"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 	"log"
 	"time"
@@ -23,6 +24,7 @@ type Bot struct {
 	loc            *i18n.Localizer
 	rdb            *redis.Client
 	suggestService *suggest.SuggestService
+	spawnService   *spawn.SpawnService
 	adminID        int64
 	adminChatID    int64
 	backupChatID   int64
@@ -31,7 +33,7 @@ type Bot struct {
 	startBannerURL string
 }
 
-func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
+func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
 	pref := tele.Settings{
 		Token:  cfg.Token,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
@@ -50,6 +52,7 @@ func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaSer
 		loc:            loc,
 		rdb:            rdb,
 		suggestService: ss,
+		spawnService:   sp,
 		adminID:        cfg.AdminID,
 		// Telegram supergroup IDs are negative; env stores the positive part.
 		adminChatID:    -cfg.SuggestsGroupID,
@@ -129,6 +132,20 @@ func (b *Bot) setupRoutes() {
 	// Suggest close
 	b.bot.Handle("\fs_cancel", b.HandleSuggestCancel)
 	b.bot.Handle("\fs_close", b.HandleSuggestClose)
+
+	// Chat registry (spawns/broadcasts): track add/remove of the bot in groups
+	b.bot.Handle(tele.OnMyChatMember, b.HandleMyChatMember)
+
+	// Chat spawns
+	b.bot.Handle("/claim", b.HandleClaimCommand)
+	b.bot.Handle("\fspawn_claim", b.HandleSpawnClaim)
+
+	// Chat spawns: admin config & testing
+	b.bot.Handle("/spawnnow", b.HandleSpawnNow)
+	b.bot.Handle("/spawn_export", b.HandleSpawnExport)
+	b.bot.Handle("/spawn_import", b.HandleSpawnImport)
+	b.bot.Handle("\fspawn_apply", b.HandleSpawnApply)
+	b.bot.Handle("\fspawn_cancel", b.HandleSpawnCancel)
 
 	// Other
 	b.bot.Handle("/link", b.HandleLinkStart)

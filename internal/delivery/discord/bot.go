@@ -3,6 +3,7 @@ package discord
 import (
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 	"log"
 
@@ -24,12 +25,13 @@ type Bot struct {
 	duelService    *duel.DuelService
 	loc            *i18n.Localizer
 	suggestService *suggest.SuggestService
+	spawnService   *spawn.SpawnService
 	lp             LinkProvider
 	rdb            *redis.Client
 	NotifyAdmin    func(text string, imageURL string)
 }
 
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) (*Bot, error) {
+func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -45,6 +47,7 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 		duelService:    ds,
 		loc:            loc,
 		suggestService: ss,
+		spawnService:   sp,
 		lp:             lp,
 		NotifyAdmin:    notifyAdmin,
 	}
@@ -52,6 +55,8 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 	dg.AddHandler(b.HandleInteraction)
 	dg.AddHandler(b.HandleComponentInteraction)
 	dg.AddHandler(b.HandleMessageCreate)
+	dg.AddHandler(b.onGuildCreate)
+	dg.AddHandler(b.onGuildDelete)
 
 	return b, nil
 }
@@ -187,6 +192,20 @@ func (b *Bot) setupCommands() {
 					},
 					Required: true,
 				},
+			},
+		},
+		{
+			Name:        "setmainchannel",
+			Description: "Set this channel as the bot's main channel (spawns/announcements)",
+			DescriptionLocalizations: &map[discordgo.Locale]string{
+				discordgo.Russian: "Назначить этот канал основным для бота (спавны/объявления)",
+			},
+		},
+		{
+			Name:        "claim",
+			Description: "Catch the active spawned card in this channel",
+			DescriptionLocalizations: &map[discordgo.Locale]string{
+				discordgo.Russian: "Поймать активную карту-спавн в этом канале",
 			},
 		},
 	}

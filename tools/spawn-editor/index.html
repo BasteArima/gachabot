@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spawn Config Editor</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; background:#15171c; color:#e6e6e6; margin:0; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .hint { color:#8a93a2; font-size:13px; margin:0 0 20px; }
+  .wrap { display:grid; grid-template-columns:1fr 380px; gap:24px; align-items:start; }
+  .card { background:#1d2027; border:1px solid #2b2f38; border-radius:10px; padding:16px; margin-bottom:16px; }
+  .card h2 { font-size:15px; margin:0 0 12px; color:#cdd3dc; }
+  label { display:block; font-size:13px; color:#9aa3b2; margin:10px 0 4px; }
+  input, select, textarea { width:100%; box-sizing:border-box; background:#11131a; color:#e6e6e6;
+    border:1px solid #333a45; border-radius:7px; padding:8px 10px; font-size:14px; font-family:inherit; }
+  textarea { min-height:54px; resize:vertical; }
+  .row { display:flex; gap:10px; }
+  .row > * { flex:1; }
+  .inline { display:flex; align-items:center; gap:8px; }
+  .inline input[type=checkbox] { width:auto; }
+  button { background:#3a6df0; color:#fff; border:0; border-radius:7px; padding:9px 14px; font-size:14px; cursor:pointer; }
+  button.ghost { background:#2b2f38; }
+  button.tiny { padding:4px 9px; font-size:12px; }
+  .weekday-item, .weight-row { border:1px dashed #333a45; border-radius:8px; padding:10px; margin-top:10px; }
+  .weekday-head { display:flex; gap:10px; align-items:center; }
+  .side { position:sticky; top:24px; }
+  pre { background:#0d0f14; border:1px solid #2b2f38; border-radius:10px; padding:14px; font-size:12px;
+    white-space:pre-wrap; word-break:break-word; max-height:60vh; overflow:auto; }
+  .err { color:#ff7a7a; font-size:13px; min-height:18px; }
+  .ok  { color:#67d28a; font-size:13px; min-height:18px; }
+  .toolbar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .muted { color:#8a93a2; font-size:12px; }
+</style>
+</head>
+<body>
+  <h1>🃏 Spawn Config Editor</h1>
+  <p class="hint">Статичная страница. Собирает <code>spawn_config.json</code> для бота:
+     <code>/spawn_export</code> → правка здесь → прислать боту с подписью <code>/spawn_import</code>.</p>
+
+  <div class="toolbar">
+    <input type="file" id="file" accept="application/json" style="max-width:280px">
+    <button id="download">⬇️ Скачать spawn_config.json</button>
+    <button class="ghost" id="loadDefault">Загрузить дефолт</button>
+  </div>
+
+  <div class="wrap">
+    <div>
+      <div class="card">
+        <h2>Общее</h2>
+        <div class="inline"><input type="checkbox" id="enabled" checked><label style="margin:0">Спавны включены</label></div>
+        <div class="row">
+          <div><label>Окно ловли (сек, 5–3600)</label><input type="number" id="window" value="90" min="5" max="3600"></div>
+          <div><label>Награда мин</label><input type="number" id="coinMin" value="20" min="0"></div>
+          <div><label>Награда макс</label><input type="number" id="coinMax" value="60" min="0"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Пул карт</h2>
+        <label>Режим</label>
+        <select id="poolMode">
+          <option value="weighted_rarity">weighted_rarity — по редкостям</option>
+          <option value="card_list">card_list — список карт</option>
+        </select>
+
+        <div id="poolWeighted">
+          <label>Веса редкостей <span class="muted">(пусто = использовать дроп-шансы)</span></label>
+          <div id="weights"></div>
+          <button class="ghost tiny" id="addWeight" style="margin-top:8px">+ редкость</button>
+        </div>
+
+        <div id="poolList" style="display:none">
+          <label>ID карт (через пробел/запятую)</label>
+          <textarea id="cardIds" placeholder="12 34 56"></textarea>
+        </div>
+
+        <label>Исключить ID карт (через пробел/запятую, опционально)</label>
+        <textarea id="excludeIds" placeholder=""></textarea>
+      </div>
+
+      <div class="card">
+        <h2>Расписание</h2>
+        <label>Часовой пояс</label><input type="text" id="tz" value="MSK">
+        <h2 style="margin-top:14px">Будни (default)</h2>
+        <div id="defaultSchedule"></div>
+
+        <h2 style="margin-top:14px">Переопределения по дням недели</h2>
+        <div id="weekdays"></div>
+        <button class="ghost tiny" id="addWeekday" style="margin-top:10px">+ день недели</button>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>Предпросмотр JSON</h2>
+        <div id="err" class="err"></div>
+        <div id="status" class="ok"></div>
+        <pre id="preview"></pre>
+      </div>
+    </div>
+  </div>
+
+<script>
+const WEEKDAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+const $ = s => document.querySelector(s);
+
+// ---------- Day-schedule sub-editor ----------
+function dayScheduleHTML() {
+  return `
+    <label>Режим</label>
+    <select class="ds-mode">
+      <option value="random_per_day">random_per_day — N случайных</option>
+      <option value="fixed_times">fixed_times — точные часы</option>
+      <option value="interval">interval — каждые N часов</option>
+    </select>
+    <div class="ds-random">
+      <div class="row">
+        <div><label>Кол-во</label><input type="number" class="ds-count" value="3" min="0"></div>
+        <div><label>Окно с</label><input type="text" class="ds-wstart" value="10:00"></div>
+        <div><label>Окно до</label><input type="text" class="ds-wend" value="23:00"></div>
+      </div>
+    </div>
+    <div class="ds-fixed" style="display:none">
+      <label>Часы (через запятую, HH:MM)</label><input type="text" class="ds-times" value="12:00, 18:00, 22:00">
+    </div>
+    <div class="ds-interval" style="display:none">
+      <div class="row">
+        <div><label>Каждые (часов)</label><input type="number" class="ds-interval-h" value="3" step="0.5" min="0.5"></div>
+        <div><label>Окно с</label><input type="text" class="ds-iwstart" value="10:00"></div>
+        <div><label>Окно до</label><input type="text" class="ds-iwend" value="23:00"></div>
+      </div>
+    </div>`;
+}
+function wireDaySchedule(container) {
+  const mode = container.querySelector(".ds-mode");
+  const sync = () => {
+    container.querySelector(".ds-random").style.display   = mode.value === "random_per_day" ? "" : "none";
+    container.querySelector(".ds-fixed").style.display    = mode.value === "fixed_times"     ? "" : "none";
+    container.querySelector(".ds-interval").style.display = mode.value === "interval"        ? "" : "none";
+    render();
+  };
+  mode.addEventListener("change", sync);
+  container.addEventListener("input", render);
+  sync();
+}
+function readDaySchedule(container) {
+  const mode = container.querySelector(".ds-mode").value;
+  const ds = { mode };
+  if (mode === "fixed_times") {
+    ds.times = splitList(container.querySelector(".ds-times").value);
+  } else if (mode === "interval") {
+    ds.interval_hours = parseFloat(container.querySelector(".ds-interval-h").value) || 0;
+    ds.window = [container.querySelector(".ds-iwstart").value.trim(), container.querySelector(".ds-iwend").value.trim()];
+  } else {
+    ds.count = parseInt(container.querySelector(".ds-count").value) || 0;
+    ds.window = [container.querySelector(".ds-wstart").value.trim(), container.querySelector(".ds-wend").value.trim()];
+  }
+  return ds;
+}
+function fillDaySchedule(container, ds) {
+  if (!ds) return;
+  container.querySelector(".ds-mode").value = ds.mode || "random_per_day";
+  if (ds.times) container.querySelector(".ds-times").value = ds.times.join(", ");
+  if (ds.mode === "interval") {
+    if (ds.interval_hours != null) container.querySelector(".ds-interval-h").value = ds.interval_hours;
+    if (ds.window) { container.querySelector(".ds-iwstart").value = ds.window[0]||""; container.querySelector(".ds-iwend").value = ds.window[1]||""; }
+  } else {
+    if (ds.count != null) container.querySelector(".ds-count").value = ds.count;
+    if (ds.window) { container.querySelector(".ds-wstart").value = ds.window[0]||""; container.querySelector(".ds-wend").value = ds.window[1]||""; }
+  }
+  container.querySelector(".ds-mode").dispatchEvent(new Event("change"));
+}
+
+// ---------- weights ----------
+function addWeightRow(name="", weight="") {
+  const div = document.createElement("div");
+  div.className = "weight-row row";
+  div.innerHTML = `<input class="w-name" placeholder="Common" value="${esc(name)}">
+                   <input class="w-val" type="number" step="0.1" placeholder="50" value="${weight}">
+                   <button class="ghost tiny w-del" style="flex:0 0 auto">✕</button>`;
+  div.querySelector(".w-del").onclick = () => { div.remove(); render(); };
+  div.addEventListener("input", render);
+  $("#weights").appendChild(div);
+}
+
+// ---------- weekdays ----------
+function addWeekdayItem(day="saturday", ds=null) {
+  const item = document.createElement("div");
+  item.className = "weekday-item";
+  const opts = WEEKDAYS.map(d => `<option value="${d}" ${d===day?"selected":""}>${d}</option>`).join("");
+  item.innerHTML = `<div class="weekday-head">
+      <select class="wd-day" style="flex:1">${opts}</select>
+      <button class="ghost tiny wd-del" style="flex:0 0 auto">✕ удалить</button>
+    </div>
+    <div class="wd-sched" style="margin-top:8px">${dayScheduleHTML()}</div>`;
+  item.querySelector(".wd-del").onclick = () => { item.remove(); render(); };
+  item.querySelector(".wd-day").addEventListener("change", render);
+  $("#weekdays").appendChild(item);
+  wireDaySchedule(item.querySelector(".wd-sched"));
+  if (ds) fillDaySchedule(item.querySelector(".wd-sched"), ds);
+}
+
+// ---------- helpers ----------
+function esc(s){ return String(s).replace(/"/g,"&quot;"); }
+function splitList(s){ return s.split(/[\s,]+/).map(x=>x.trim()).filter(Boolean); }
+function splitInts(s){ return splitList(s).map(Number).filter(n=>Number.isFinite(n)); }
+
+// ---------- serialize ----------
+function buildConfig() {
+  const cfg = {
+    enabled: $("#enabled").checked,
+    claim_window_seconds: parseInt($("#window").value) || 0,
+    reward_coins: { min: parseInt($("#coinMin").value)||0, max: parseInt($("#coinMax").value)||0 },
+    schedule: {
+      timezone: $("#tz").value.trim() || "MSK",
+      default: readDaySchedule($("#defaultSchedule")),
+    },
+    pool: { mode: $("#poolMode").value },
+  };
+
+  // per_weekday
+  const wd = {};
+  document.querySelectorAll(".weekday-item").forEach(item => {
+    wd[item.querySelector(".wd-day").value] = readDaySchedule(item.querySelector(".wd-sched"));
+  });
+  if (Object.keys(wd).length) cfg.schedule.per_weekday = wd;
+
+  // pool
+  if (cfg.pool.mode === "card_list") {
+    cfg.pool.card_ids = splitInts($("#cardIds").value);
+  } else {
+    const weights = {};
+    document.querySelectorAll(".weight-row").forEach(r => {
+      const n = r.querySelector(".w-name").value.trim();
+      const v = parseFloat(r.querySelector(".w-val").value);
+      if (n && Number.isFinite(v)) weights[n] = v;
+    });
+    if (Object.keys(weights).length) cfg.pool.rarity_weights = weights;
+  }
+  const ex = splitInts($("#excludeIds").value);
+  if (ex.length) cfg.pool.exclude_card_ids = ex;
+
+  return cfg;
+}
+
+function validate(cfg) {
+  const errs = [];
+  if (cfg.claim_window_seconds < 5 || cfg.claim_window_seconds > 3600) errs.push("Окно ловли должно быть 5–3600 сек.");
+  if (cfg.reward_coins.min < 0 || cfg.reward_coins.max < cfg.reward_coins.min) errs.push("Диапазон награды некорректен.");
+  if (cfg.pool.mode === "card_list" && (!cfg.pool.card_ids || !cfg.pool.card_ids.length)) errs.push("Режим card_list требует список ID карт.");
+  return errs;
+}
+
+function render() {
+  const cfg = buildConfig();
+  $("#poolWeighted").style.display = cfg.pool.mode === "weighted_rarity" ? "" : "none";
+  $("#poolList").style.display     = cfg.pool.mode === "card_list" ? "" : "none";
+  $("#preview").textContent = JSON.stringify(cfg, null, 2);
+  const errs = validate(cfg);
+  $("#err").textContent = errs.join(" ");
+  $("#status").textContent = errs.length ? "" : "✓ Конфиг валиден";
+}
+
+// ---------- load ----------
+function loadConfig(cfg) {
+  $("#enabled").checked = cfg.enabled !== false;
+  $("#window").value = cfg.claim_window_seconds ?? 90;
+  $("#coinMin").value = cfg.reward_coins?.min ?? 20;
+  $("#coinMax").value = cfg.reward_coins?.max ?? 60;
+  $("#tz").value = cfg.schedule?.timezone || "MSK";
+
+  fillDaySchedule($("#defaultSchedule"), cfg.schedule?.default);
+
+  $("#weekdays").innerHTML = "";
+  const wd = cfg.schedule?.per_weekday || {};
+  Object.keys(wd).forEach(day => addWeekdayItem(day, wd[day]));
+
+  $("#poolMode").value = cfg.pool?.mode || "weighted_rarity";
+  $("#weights").innerHTML = "";
+  const w = cfg.pool?.rarity_weights || {};
+  Object.keys(w).forEach(n => addWeightRow(n, w[n]));
+  $("#cardIds").value = (cfg.pool?.card_ids || []).join(" ");
+  $("#excludeIds").value = (cfg.pool?.exclude_card_ids || []).join(" ");
+  render();
+}
+
+const DEFAULT = {
+  enabled: true, claim_window_seconds: 90, reward_coins: { min: 20, max: 60 },
+  schedule: { timezone: "MSK", default: { mode: "random_per_day", count: 3, window: ["10:00","23:00"] } },
+  pool: { mode: "weighted_rarity" },
+};
+
+// ---------- wire up ----------
+$("#defaultSchedule").innerHTML = dayScheduleHTML();
+wireDaySchedule($("#defaultSchedule"));
+["enabled","window","coinMin","coinMax","tz","poolMode","cardIds","excludeIds"].forEach(id =>
+  $("#"+id).addEventListener("input", render));
+$("#addWeight").onclick = () => { addWeightRow(); render(); };
+$("#addWeekday").onclick = () => { addWeekdayItem(); render(); };
+$("#loadDefault").onclick = () => loadConfig(DEFAULT);
+
+$("#download").onclick = () => {
+  const cfg = buildConfig();
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "spawn_config.json"; a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("#file").onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { loadConfig(JSON.parse(r.result)); } catch(err){ $("#err").textContent = "Не удалось прочитать JSON: "+err.message; } };
+  r.readAsText(f);
+};
+
+loadConfig(DEFAULT);
+</script>
+</body>
+</html>

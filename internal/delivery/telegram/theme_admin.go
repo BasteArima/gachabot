@@ -145,8 +145,13 @@ func (b *Bot) HandleThemeCancel(ctx tele.Context) error {
 // regular card-suggestion flow.
 func (b *Bot) HandleDocument(ctx tele.Context) error {
 	caption := strings.TrimSpace(ctx.Message().Caption)
-	if ctx.Sender() != nil && ctx.Sender().ID == b.adminID && strings.HasPrefix(caption, "/theme_import") {
-		return b.HandleThemeImport(ctx)
+	if ctx.Sender() != nil && ctx.Sender().ID == b.adminID {
+		if strings.HasPrefix(caption, "/theme_import") {
+			return b.HandleThemeImport(ctx)
+		}
+		if strings.HasPrefix(caption, "/spawn_import") {
+			return b.HandleSpawnImport(ctx)
+		}
 	}
 	return b.HandleMediaSuggest(ctx)
 }
@@ -167,6 +172,11 @@ func (b *Bot) HandleAdminHelp(ctx tele.Context) error {
 		"<b>Промокоды:</b>",
 		"/addpromo КОД ОЧКИ КРУТКИ МАКС_ЮЗОВ — простой промокод",
 		"/createpromo КОД ЛИМИТ ЧАСЫ {json} — промокод из JSON",
+		"",
+		"<b>Спавны карт:</b>",
+		"/spawn_export — выгрузить текущий конфиг спавнов файлом",
+		"/spawn_import — применить конфиг: прикрепи spawn_config.json с этой подписью",
+		"/spawnnow — (в группе) сразу заспавнить карту в этом чате для теста",
 		"",
 		"<b>Рассылка:</b>",
 		"/globalmsg — одноразовое сообщение во все чаты",

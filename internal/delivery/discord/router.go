@@ -59,6 +59,10 @@ func (b *Bot) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleLocale(s, i, dbUser, lang)
 	case "promo":
 		b.handlePromo(s, i, dbUser, lang)
+	case "setmainchannel":
+		b.handleSetMainChannel(s, i, lang)
+	case "claim":
+		b.handleClaimCommand(s, i, dbUser, lang)
 	}
 }
 
@@ -81,6 +85,13 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 
 	if data.CustomID == "roll_again" {
 		b.handleRollAgainCallback(s, i, dbUser, lang)
+		return
+	}
+
+	// Chat spawn claim
+	if strings.HasPrefix(data.CustomID, "spawn_claim:") {
+		spawnID, _ := strconv.ParseInt(strings.TrimPrefix(data.CustomID, "spawn_claim:"), 10, 64)
+		b.handleSpawnClaimComponent(s, i, dbUser, lang, spawnID)
 		return
 	}
 

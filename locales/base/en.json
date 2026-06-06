@@ -23,5 +23,19 @@
   "rarity_rare": "Rare",
   "rarity_uncommon": "Uncommon",
   "suggest_cancelled": "🛑 Card suggestion cancelled.",
-  "craft_disabled": "Crafting is disabled: duplicate cards are turned off."
+  "craft_disabled": "Crafting is disabled: duplicate cards are turned off.",
+  "btn_spawn_claim": "🃏 Catch!",
+  "spawn_title": "🌟 Wild card!",
+  "spawn_appeared": "🌟 <b>A wild card appeared!</b>\n🃏 <b>{name}</b> ({rarity})\n\n⏳ Catch it within {seconds}s — hit the button!",
+  "spawn_claimed": "🎉 <b>{winner}</b> caught the card!\n🃏 <b>{name}</b> ({rarity})\n🪙 +{coins}",
+  "spawn_claimed_fragment": "🎉 <b>{winner}</b> caught a fragment!\n🧩 <b>{name}</b> — fragments: {fragments}\n🪙 +{coins}",
+  "spawn_claimed_assembled": "🎉 <b>{winner}</b> assembled a card from fragments!\n🧩➡️🃏 <b>{name}</b>\n🪙 +{coins}",
+  "spawn_claimed_duplicate": "🎉 <b>{winner}</b> caught the card (duplicate)!\n🃏 <b>{name}</b> ({rarity})\n🪙 +{coins}",
+  "spawn_expired": "🌫 The card <b>{name}</b> slipped away… nobody made it.",
+  "spawn_toast_won": "🎉 Caught! +{coins} 🪙",
+  "spawn_toast_taken": "😢 Someone already caught this card!",
+  "spawn_toast_already": "✋ You already caught this card in another chat.",
+  "spawn_toast_expired": "🌫 Too late — the card already slipped away.",
+  "spawn_no_active": "🌫 Nothing to catch right now — wait for the next spawn.",
+  "spawn_group_only": "🃏 Spawns can only be caught in group chats."
 }

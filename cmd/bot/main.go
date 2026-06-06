@@ -17,6 +17,7 @@ import (
 	"gachabot/internal/service/backup"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 
 	"github.com/joho/godotenv"
@@ -46,16 +47,18 @@ func main() {
 	gachaService := gacha.NewGachaService(repo, rdb, cfg.Telegram.AdminID, cfg.Game.CooldownDuration, cfg.Game.DuplicatesEnabled)
 	duelService := duel.NewDuelService(repo, rdb)
 	suggestService := suggest.NewSuggestService(repo, rdb)
+	spawnService := spawn.NewSpawnService(repo, rdb, gachaService)
 
 	tgLoc, err := i18n.NewLocalizer("locales/base", "locales/telegram", "ru")
 	if err != nil {
 		log.Fatalf("failed to load telegram localization: %v", err)
 	}
 
-	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, tgLoc, cfg.Telegram)
+	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, spawnService, tgLoc, cfg.Telegram)
 	if err != nil {
 		log.Fatalf("failed to create telegram bot: %v", err)
 	}
+	spawnService.RegisterSpawner(spawn.PlatformTelegram, tgBot)
 
 	if cfg.Discord.Token != "" {
 		discordLoc, err := i18n.NewLocalizer("locales/base", "locales/discord", "ru")
@@ -63,10 +66,11 @@ func main() {
 			log.Fatalf("failed to load discord localization: %v", err)
 		}
 
-		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, discordLoc, tgBot, tgBot.NotifyAdmin)
+		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, discordLoc, tgBot, tgBot.NotifyAdmin)
 		if err != nil {
 			log.Fatalf("failed to create discord bot: %v", err)
 		}
+		spawnService.RegisterSpawner(spawn.PlatformDiscord, dsBot)
 
 		if err := dsBot.Start(); err != nil {
 			log.Printf("failed to start discord bot: %v", err)
@@ -84,6 +88,8 @@ func main() {
 		log.Println("Telegram bot is running...")
 		tgBot.Start()
 	}()
+
+	spawnService.Start()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

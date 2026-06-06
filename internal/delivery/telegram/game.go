@@ -327,6 +327,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	}
 
 	b.service.TrackChat(dbUser.ID, ctx.Chat().ID)
+	b.lazyRegisterChat(ctx)
 
 	result, err := b.service.RollCard(dbUser.ID)
 	if err != nil {

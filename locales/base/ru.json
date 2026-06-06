@@ -23,5 +23,19 @@
   "rarity_rare": "Редкая",
   "rarity_uncommon": "Необычная",
   "suggest_cancelled": "🛑 Предложение карточки отменено.",
-  "craft_disabled": "Крафт отключён: дубликаты карт выключены."
+  "craft_disabled": "Крафт отключён: дубликаты карт выключены.",
+  "btn_spawn_claim": "🃏 Поймать!",
+  "spawn_title": "🌟 Дикая карта!",
+  "spawn_appeared": "🌟 <b>Появилась дикая карта!</b>\n🃏 <b>{name}</b> ({rarity})\n\n⏳ Успей поймать за {seconds} сек — жми кнопку!",
+  "spawn_claimed": "🎉 <b>{winner}</b> поймал(а) карту!\n🃏 <b>{name}</b> ({rarity})\n🪙 +{coins}",
+  "spawn_claimed_fragment": "🎉 <b>{winner}</b> поймал(а) осколок!\n🧩 <b>{name}</b> — осколков: {fragments}\n🪙 +{coins}",
+  "spawn_claimed_assembled": "🎉 <b>{winner}</b> собрал(а) карту из осколков!\n🧩➡️🃏 <b>{name}</b>\n🪙 +{coins}",
+  "spawn_claimed_duplicate": "🎉 <b>{winner}</b> поймал(а) карту (дубликат)!\n🃏 <b>{name}</b> ({rarity})\n🪙 +{coins}",
+  "spawn_expired": "🌫 Карта <b>{name}</b> ускользнула… Никто не успел.",
+  "spawn_toast_won": "🎉 Поймал! +{coins} 🪙",
+  "spawn_toast_taken": "😢 Кто-то уже схватил эту карту!",
+  "spawn_toast_already": "✋ Ты уже поймал(а) эту карту в другом чате.",
+  "spawn_toast_expired": "🌫 Поздно — карта уже ускользнула.",
+  "spawn_no_active": "🌫 Сейчас ловить нечего — подожди следующего спавна.",
+  "spawn_group_only": "🃏 Спавны ловятся только в групповых чатах."
 }

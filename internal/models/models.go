@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"time"
 )
 
 type Card struct {
@@ -80,6 +81,43 @@ type PromoReward struct {
 	Cards         []int              `json:"cards,omitempty"`
 	RandomCards   map[string]int     `json:"random_cards,omitempty"`
 	CompletedSets []CompletedSetInfo `json:"-"`
+}
+
+// Spawn is one card drop in one chat (part of a wave). Hot claim state lives in
+// Redis; this mirrors the DB audit row.
+type Spawn struct {
+	ID        int64
+	WaveID    int64
+	Platform  string
+	ChatID    int64
+	CardID    int
+	MessageID sql.NullInt64
+	ExpiresAt time.Time
+	ClaimedBy sql.NullInt64
+}
+
+// SpawnReward is the outcome of granting a spawned (or otherwise awarded) card:
+// reuses the roll pipeline, so it carries fragment/set info too.
+type SpawnReward struct {
+	Coins              int
+	IsFragment         bool
+	FragmentsCount     int
+	CardAssembled      bool
+	IsDuplicate        bool // duplicates disabled and already owned: coins only
+	CompletedSetName   string
+	CompletedSetReward int
+	StreakDays         int
+	StreakUpdated      bool
+}
+
+// Chat is a registered place the bot posts to (group / main channel), used by
+// spawns and broadcasts. GuildID is set only for Discord.
+type Chat struct {
+	Platform     string
+	ChatID       int64
+	GuildID      sql.NullInt64
+	Title        string
+	SpawnEnabled bool
 }
 
 type CardSet struct {
