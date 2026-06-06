@@ -88,6 +88,16 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 		return
 	}
 
+	// Launch the embedded Discord Activity (interaction callback type 12 =
+	// LAUNCH_ACTIVITY; not yet a named constant in discordgo v0.29). Requires the
+	// app to have an Activity configured in the Developer Portal.
+	if data.CustomID == "launch_app" {
+		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseType(12),
+		})
+		return
+	}
+
 	// Chat spawn claim
 	if strings.HasPrefix(data.CustomID, "spawn_claim:") {
 		spawnID, _ := strconv.ParseInt(strings.TrimPrefix(data.CustomID, "spawn_claim:"), 10, 64)
