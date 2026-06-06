@@ -28,10 +28,11 @@ type Bot struct {
 	spawnService   *spawn.SpawnService
 	lp             LinkProvider
 	rdb            *redis.Client
+	webAppURL      string
 	NotifyAdmin    func(text string, imageURL string)
 }
 
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, lp LinkProvider, notifyAdmin func(string, string)) (*Bot, error) {
+func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, lp LinkProvider, webAppURL string, notifyAdmin func(string, string)) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -49,6 +50,7 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 		suggestService: ss,
 		spawnService:   sp,
 		lp:             lp,
+		webAppURL:      webAppURL,
 		NotifyAdmin:    notifyAdmin,
 	}
 
@@ -210,10 +212,16 @@ func (b *Bot) setupCommands() {
 		},
 	}
 
-	_, err := b.session.ApplicationCommandBulkOverwrite(b.session.State.User.ID, "", commands)
-	if err != nil {
-		log.Printf("[DISCORD ERROR] Error registering commands: %v", err)
-	} else {
-		log.Println("[DISCORD] Slash commands are registered!")
+	// Register commands one by one (upsert) instead of BulkOverwrite: the latter
+	// fails if the app has an auto-created Entry Point command (from enabling an
+	// Activity), because bulk overwrite would remove it (HTTP 400, code 50240).
+	registered := 0
+	for _, cmd := range commands {
+		if _, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, "", cmd); err != nil {
+			log.Printf("[DISCORD ERROR] register %q failed: %v", cmd.Name, err)
+		} else {
+			registered++
+		}
 	}
+	log.Printf("[DISCORD] %d/%d slash commands registered", registered, len(commands))
 }

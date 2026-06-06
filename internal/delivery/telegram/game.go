@@ -374,7 +374,13 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 
 	menu := &tele.ReplyMarkup{}
 	btnRoll := menu.Data(b.loc.Translate(lang, "btn_roll_again"), "roll_again")
-	menu.Inline(menu.Row(btnRoll))
+	if b.bot.Me != nil && b.bot.Me.Username != "" {
+		// Opens the Telegram Mini App (requires Main Mini App enabled in BotFather).
+		btnApp := menu.URL(b.loc.Translate(lang, "btn_open_app"), "https://t.me/"+b.bot.Me.Username+"?startapp")
+		menu.Inline(menu.Row(btnRoll, btnApp))
+	} else {
+		menu.Inline(menu.Row(btnRoll))
+	}
 
 	err = ctx.Send(photo, &tele.SendOptions{
 		ParseMode:   tele.ModeHTML,

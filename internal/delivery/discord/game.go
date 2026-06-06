@@ -52,16 +52,22 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		Color:       0x00ff00,
 	}
 
-	components := []discordgo.MessageComponent{
-		discordgo.ActionsRow{
-			Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					CustomID: "roll_again",
-					Label:    b.loc.Translate(lang, "btn_roll_again"),
-					Style:    discordgo.PrimaryButton,
-				},
-			},
+	rollButtons := []discordgo.MessageComponent{
+		discordgo.Button{
+			CustomID: "roll_again",
+			Label:    b.loc.Translate(lang, "btn_roll_again"),
+			Style:    discordgo.PrimaryButton,
 		},
+	}
+	if b.webAppURL != "" {
+		rollButtons = append(rollButtons, discordgo.Button{
+			Label: b.loc.Translate(lang, "btn_open_app"),
+			Style: discordgo.LinkButton,
+			URL:   b.webAppURL,
+		})
+	}
+	components := []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: rollButtons},
 	}
 
 	err = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

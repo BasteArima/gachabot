@@ -67,7 +67,7 @@ func main() {
 			log.Fatalf("failed to load discord localization: %v", err)
 		}
 
-		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, discordLoc, tgBot, tgBot.NotifyAdmin)
+		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, discordLoc, tgBot, cfg.HTTP.WebAppURL, tgBot.NotifyAdmin)
 		if err != nil {
 			log.Fatalf("failed to create discord bot: %v", err)
 		}
