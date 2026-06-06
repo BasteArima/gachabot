@@ -8,6 +8,10 @@ README.md
 
 _content_helpers/
 
+# Frontend submodule: ship only source; build artifacts are produced in-image.
+web/node_modules
+web/dist
+
 *.exe
 *.bin
 gachabot
