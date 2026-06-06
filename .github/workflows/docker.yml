@@ -14,14 +14,22 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          # `web` (gacha-nova) and `_content_helpers` are submodules. If either repo
-          # is PRIVATE, create a classic PAT with repo scope and add it as the
-          # secret SUBMODULE_PAT; public submodules work with the default token.
-          submodules: recursive
-          token: ${{ secrets.SUBMODULE_PAT || github.token }}
+          # Don't keep the repo-scoped token as a git extraheader, or it would
+          # override the PAT below when cloning the (private) web submodule.
+          persist-credentials: false
+
+      # Fetch ONLY the `web` submodule (the image needs the frontend; it does NOT
+      # need `_content_helpers`/arts, which is excluded via .dockerignore and is a
+      # large private repo). gacha-nova is private, so the default Actions token
+      # can't clone it — provide a PAT with read access via the SUBMODULE_PAT secret
+      # (classic PAT with `repo` scope, or fine-grained with Contents: Read on gacha-nova).
+      - name: Fetch web submodule
+        run: |
+          git config --global url."https://x-access-token:${{ secrets.SUBMODULE_PAT }}@github.com/".insteadOf "https://github.com/"
+          git submodule update --init web
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
