@@ -92,7 +92,7 @@ func main() {
 
 	spawnService.Start()
 
-	webServer := httpapi.NewServer(repo, rdb, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP)
+	webServer := httpapi.NewServer(repo, rdb, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord)
 	webServer.Start()
 
 	quit := make(chan os.Signal, 1)

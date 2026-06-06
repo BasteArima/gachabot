@@ -27,10 +27,11 @@ type Server struct {
 	botToken string
 	adminID  int64
 	cfg      config.HTTPConfig
+	discord  config.DiscordConfig
 }
 
-func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, botToken string, adminID int64, cfg config.HTTPConfig) *Server {
-	return &Server{repo: repo, rdb: rdb, botToken: botToken, adminID: adminID, cfg: cfg}
+func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig) *Server {
+	return &Server{repo: repo, rdb: rdb, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord}
 }
 
 // Start builds the router and serves in a background goroutine.
@@ -47,6 +48,7 @@ func (s *Server) Start() {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/auth/telegram", s.handleAuthTelegram)
+		r.Post("/auth/discord", s.handleAuthDiscord)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.authMiddleware)
