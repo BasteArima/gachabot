@@ -14,6 +14,8 @@ import (
 
 	"gachabot/internal/config"
 	"gachabot/internal/repository"
+	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/spawn"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -24,14 +26,16 @@ import (
 type Server struct {
 	repo     *repository.PostgresRepo
 	rdb      *redis.Client
+	gacha    *gacha.GachaService
+	spawn    *spawn.SpawnService
 	botToken string
 	adminID  int64
 	cfg      config.HTTPConfig
 	discord  config.DiscordConfig
 }
 
-func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig) *Server {
-	return &Server{repo: repo, rdb: rdb, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord}
+func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig) *Server {
+	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord}
 }
 
 // Start builds the router and serves in a background goroutine.
@@ -54,6 +58,17 @@ func (s *Server) Start() {
 			r.Use(s.authMiddleware)
 			r.Get("/me", s.handleMe)
 			r.Get("/inventory", s.handleInventory)
+			r.Get("/daily-hub", s.handleDailyHub)
+			r.Get("/leaderboard", s.handleLeaderboard)
+			r.Post("/actions/roll", s.handleRoll)
+			r.Post("/actions/craft", s.handleCraft)
+
+			r.Group(func(r chi.Router) {
+				r.Use(s.adminMiddleware)
+				r.Get("/admin/overview", s.handleAdminOverview)
+				r.Get("/admin/spawn-config", s.handleGetSpawnConfig)
+				r.Put("/admin/spawn-config", s.handlePutSpawnConfig)
+			})
 		})
 	})
 

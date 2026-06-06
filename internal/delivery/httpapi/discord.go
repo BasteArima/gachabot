@@ -66,7 +66,7 @@ func (s *Server) handleAuthDiscord(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "session error")
 		return
 	}
-	writeJSON(w, http.StatusOK, authResponse{Token: token, Player: playerFromUser(user)})
+	writeJSON(w, http.StatusOK, authResponse{Token: token, Player: s.toPlayer(user)})
 }
 
 func (s *Server) discordExchangeCode(code, redirect string) (string, error) {

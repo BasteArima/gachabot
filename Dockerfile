@@ -8,7 +8,9 @@ COPY web/ ./
 # (same-origin, since Go serves both). Pass the bot username for the browser
 # Telegram Login Widget via build arg if needed.
 ARG VITE_TG_BOT_USERNAME=""
+ARG VITE_DISCORD_CLIENT_ID=""
 ENV VITE_TG_BOT_USERNAME=$VITE_TG_BOT_USERNAME
+ENV VITE_DISCORD_CLIENT_ID=$VITE_DISCORD_CLIENT_ID
 RUN npm run build
 
 # ---- Backend: build the Go binaries ----

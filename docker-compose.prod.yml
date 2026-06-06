@@ -1,3 +1,10 @@
+# Production stack for Portainer (Web editor): pulls the prebuilt image from GHCR
+# instead of building. Paste this into Portainer → Stacks → Add stack, then fill
+# the environment variables in the UI.
+#
+# DB SAFETY: postgres_data is declared `external` and bound to the EXISTING volume
+# `gachabot_postgres_data` so your current database is reused as-is. Verify the
+# real name first with `docker volume ls` and adjust if different. See docs/deploy.md.
 services:
   db:
     image: postgres:15-alpine
@@ -8,27 +15,21 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    # NOTE: no schema.sql initdb mount here. The existing volume is already
+    # initialised; the app runs incremental migrations on startup. For a brand-new
+    # empty DB you'd need to apply schema.sql once manually (see docs/deploy.md).
 
   redis:
     image: redis:7-alpine
     container_name: gachabot_redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
 
   bot:
-    build:
-      context: .
-      args:
-        VITE_TG_BOT_USERNAME: ${VITE_TG_BOT_USERNAME}
-        VITE_DISCORD_CLIENT_ID: ${VITE_DISCORD_CLIENT_ID}
+    image: ghcr.io/bastearima/gachabot:latest
     container_name: gachabot_app
     restart: unless-stopped
     depends_on:
@@ -42,9 +43,8 @@ services:
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
       - DISCORD_OAUTH_REDIRECT=${DISCORD_OAUTH_REDIRECT}
       - HTTP_PORT=8080
-      # HTTP_STATIC_DIR is baked into the image (/root/web) by the Dockerfile.
       - WEB_APP_URL=${WEB_APP_URL}
-      - DEV_ALLOW_NO_AUTH=${DEV_ALLOW_NO_AUTH}
+      - DEV_ALLOW_NO_AUTH=false
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
@@ -63,29 +63,10 @@ services:
       - BACKUP_TIME_MINUTE=${BACKUP_TIME_MINUTE}
     expose:
       - "8080"
-    # If your reverse proxy runs on the host (not this compose network), publish it:
-    #   ports: ["8080:8080"]
+    # Point your reverse proxy (Traefik/nginx) at gachabot_app:8080 on the proxy
+    # network, or publish a host port here:  ports: ["8080:8080"]
     volumes:
       - /opt/gachabot/backups:/backups:ro
-
-  # One-shot tool to apply/export a theme. Does NOT start with `up` (profile).
-  # Apply a committed theme:  docker-compose run --rm seed import /theme.json
-  # Export current DB:        docker-compose run --rm seed export -
-  seed:
-    build: .
-    profiles: ["tools"]
-    depends_on:
-      - db
-    environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - ./theme.json:/theme.json:ro
-    entrypoint: ["./seed"]
-    command: ["validate", "/theme.json"]
 
   pgbackups:
     image: prodrigestivill/postgres-backup-local
@@ -106,4 +87,6 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: gachabot_postgres_data
   redis_data:

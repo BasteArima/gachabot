@@ -14,6 +14,7 @@ type playerDTO struct {
 	AvatarURL  string `json:"avatarUrl"`
 	Coins      int    `json:"coins"`
 	StreakDays int    `json:"streakDays"`
+	IsAdmin    bool   `json:"isAdmin"`
 }
 
 type cardDTO struct {
@@ -71,7 +72,7 @@ func (s *Server) handleAuthTelegram(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "session error")
 		return
 	}
-	writeJSON(w, http.StatusOK, authResponse{Token: token, Player: playerFromUser(user)})
+	writeJSON(w, http.StatusOK, authResponse{Token: token, Player: s.toPlayer(user)})
 }
 
 // GET /api/me — current player.
@@ -81,7 +82,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "db error")
 		return
 	}
-	writeJSON(w, http.StatusOK, playerFromUser(user))
+	writeJSON(w, http.StatusOK, s.toPlayer(user))
 }
 
 // GET /api/inventory?rarity=All|<name> — player's owned cards.
@@ -105,7 +106,7 @@ func (s *Server) handleInventory(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func playerFromUser(u *models.User) playerDTO {
+func (s *Server) toPlayer(u *models.User) playerDTO {
 	name := u.FirstName
 	if name == "" {
 		name = u.Username
@@ -116,5 +117,11 @@ func playerFromUser(u *models.User) playerDTO {
 		AvatarURL:  "",
 		Coins:      u.Balance,
 		StreakDays: u.StreakDays,
+		IsAdmin:    s.isAdmin(u),
 	}
+}
+
+// isAdmin reports whether the user is the configured bot admin (by Telegram id).
+func (s *Server) isAdmin(u *models.User) bool {
+	return u != nil && s.adminID != 0 && u.TelegramID.Valid && u.TelegramID.Int64 == s.adminID
 }
