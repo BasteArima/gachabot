@@ -110,6 +110,17 @@ type SpawnReward struct {
 	StreakUpdated      bool
 }
 
+// InventoryCard is one owned card with full display info, for the web inventory.
+type InventoryCard struct {
+	CardID     int
+	Name       string
+	RarityName string
+	ImageURL   string
+	PowerLevel int
+	Quantity   int
+	SetName    string
+}
+
 // Chat is a registered place the bot posts to (group / main channel), used by
 // spawns and broadcasts. GuildID is set only for Discord.
 type Chat struct {

@@ -19,6 +19,7 @@ type Config struct {
 	RedisAddr string
 	Game      GameConfig
 	Backup    BackupConfig
+	HTTP      HTTPConfig
 }
 
 type TelegramConfig struct {
@@ -33,6 +34,19 @@ type TelegramConfig struct {
 
 type DiscordConfig struct {
 	Token string
+	// OAuth/Activity credentials (used by the web layer, not the bot gateway).
+	ClientID      string
+	ClientSecret  string
+	OAuthRedirect string
+}
+
+// HTTPConfig configures the web/API delivery layer (TMA, Discord Activity, browser).
+type HTTPConfig struct {
+	Port      string // listen port, e.g. "8080"
+	StaticDir string // built SPA directory to serve; empty = API only
+	WebAppURL string // public HTTPS URL of the web app (for buttons/redirects)
+	// DevAllowNoAuth lets unauthenticated requests act as the admin user — local dev only.
+	DevAllowNoAuth bool
 }
 
 type PostgresConfig struct {
@@ -90,7 +104,10 @@ func Load() (*Config, error) {
 			StartBannerURL:  os.Getenv("START_BANNER_URL"),
 		},
 		Discord: DiscordConfig{
-			Token: os.Getenv("DISCORD_TOKEN"),
+			Token:         os.Getenv("DISCORD_TOKEN"),
+			ClientID:      os.Getenv("DISCORD_CLIENT_ID"),
+			ClientSecret:  os.Getenv("DISCORD_CLIENT_SECRET"),
+			OAuthRedirect: os.Getenv("DISCORD_OAUTH_REDIRECT"),
 		},
 		Postgres:  PostgresFromEnv(),
 		RedisAddr: getEnv("REDIS_ADDR", "localhost:6379"),
@@ -101,6 +118,12 @@ func Load() (*Config, error) {
 		Backup: BackupConfig{
 			Hour:   getEnvInt("BACKUP_TIME_HOUR", 3),
 			Minute: getEnvInt("BACKUP_TIME_MINUTE", 10),
+		},
+		HTTP: HTTPConfig{
+			Port:           getEnv("HTTP_PORT", "8080"),
+			StaticDir:      os.Getenv("HTTP_STATIC_DIR"),
+			WebAppURL:      os.Getenv("WEB_APP_URL"),
+			DevAllowNoAuth: getEnvBool("DEV_ALLOW_NO_AUTH", false),
 		},
 	}
 

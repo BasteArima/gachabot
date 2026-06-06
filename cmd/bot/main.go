@@ -10,6 +10,7 @@ import (
 
 	"gachabot/internal/config"
 	"gachabot/internal/delivery/discord"
+	httpapi "gachabot/internal/delivery/httpapi"
 	"gachabot/internal/delivery/telegram"
 	"gachabot/internal/i18n"
 	"gachabot/internal/migrations"
@@ -90,6 +91,9 @@ func main() {
 	}()
 
 	spawnService.Start()
+
+	webServer := httpapi.NewServer(repo, rdb, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP)
+	webServer.Start()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
