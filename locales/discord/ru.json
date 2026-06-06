@@ -11,6 +11,7 @@
   "spawn_claimed_assembled": "🎉 **{winner}** собрал(а) карту из осколков!\n🧩➡️🃏 **{name}**\n🪙 +{coins}",
   "spawn_claimed_duplicate": "🎉 **{winner}** поймал(а) карту (дубликат)!\n🃏 **{name}** ({rarity})\n🪙 +{coins}",
   "spawn_expired": "🌫 Карта **{name}** ускользнула… Никто не успел.",
+  "spawn_msg_caught": "🃏 **{name}** ({rarity}) — поймана!",
   "roll_cooldown": "⏳ Подожди! Ты сможешь крутить через: **{time}**",
   "streak_kept_alive": "🔥 Стрик продлен! Текущая серия: **{days} {days:день|дня|дней}**",
   "streak_continued": "Стрик: **+{reward} {reward:очко|очка|очков}** (Всего: **{days} {days:день|дня|дней}**)",

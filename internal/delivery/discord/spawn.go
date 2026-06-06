@@ -66,14 +66,18 @@ func (b *Bot) handleSpawnClaimComponent(s *discordgo.Session, i *discordgo.Inter
 
 	switch res.Outcome {
 	case spawn.OutcomeWon:
-		embed := b.spawnClaimedEmbed(discordDisplayName(i), res)
+		// Keep the card image in place, drop the button, mark as caught...
 		_ = s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseUpdateMessage,
 			Data: &discordgo.InteractionResponseData{
-				Embeds:     []*discordgo.MessageEmbed{embed},
+				Embeds:     []*discordgo.MessageEmbed{b.spawnCaughtEmbed(res)},
 				Components: []discordgo.MessageComponent{},
 			},
 		})
+		// ...and announce the winner + reward in a separate text message (no image).
+		if _, err := s.ChannelMessageSend(i.ChannelID, b.spawnClaimedText(discordDisplayName(i), res)); err != nil {
+			log.Printf("[DS spawn] announce send failed: %v", err)
+		}
 	case spawn.OutcomeTaken:
 		b.respondEphemeral(s, i, b.loc.Translate(lang, "spawn_toast_taken"))
 	case spawn.OutcomeAlreadyWave:
@@ -105,9 +109,12 @@ func (b *Bot) handleClaimCommand(s *discordgo.Session, i *discordgo.InteractionC
 
 	switch res.Outcome {
 	case spawn.OutcomeWon:
-		// Edit the original spawn message, confirm to the claimer privately.
+		// Drop the button + mark caught on the original, announce in a new message.
 		if res.Meta != nil {
-			b.editSpawnMessage(*res.Meta, b.spawnClaimedEmbed(discordDisplayName(i), res))
+			b.editSpawnMessage(*res.Meta, b.spawnCaughtEmbed(res))
+		}
+		if _, err := s.ChannelMessageSend(i.ChannelID, b.spawnClaimedText(discordDisplayName(i), res)); err != nil {
+			log.Printf("[DS spawn] announce send failed: %v", err)
 		}
 		b.respondEphemeral(s, i, b.loc.Translate(lang, "spawn_toast_won", i18n.Args{"coins": res.Reward.Coins}))
 	case spawn.OutcomeTaken:
@@ -119,7 +126,22 @@ func (b *Bot) handleClaimCommand(s *discordgo.Session, i *discordgo.InteractionC
 	}
 }
 
-func (b *Bot) spawnClaimedEmbed(winner string, res spawn.ClaimResult) *discordgo.MessageEmbed {
+// spawnCaughtEmbed replaces the original spawn embed: keeps the card image,
+// marks it caught (the button is removed separately).
+func (b *Bot) spawnCaughtEmbed(res spawn.ClaimResult) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Description: b.loc.Translate(spawnLang, "spawn_msg_caught", i18n.Args{
+			"name":   res.Card.Name,
+			"rarity": b.loc.Rarity(spawnLang, res.RarityName),
+		}),
+		Image: &discordgo.MessageEmbedImage{URL: res.Card.ImageURL},
+		Color: 0x2ecc71,
+	}
+}
+
+// spawnClaimedText is the separate announcement (no image) naming the winner and
+// reward.
+func (b *Bot) spawnClaimedText(winner string, res spawn.ClaimResult) string {
 	r := res.Reward
 	args := i18n.Args{
 		"winner":    winner,
@@ -139,11 +161,7 @@ func (b *Bot) spawnClaimedEmbed(winner string, res spawn.ClaimResult) *discordgo
 	default:
 		key = "spawn_claimed"
 	}
-	return &discordgo.MessageEmbed{
-		Description: b.loc.Translate(spawnLang, key, args),
-		Image:       &discordgo.MessageEmbedImage{URL: res.Card.ImageURL},
-		Color:       0x2ecc71,
-	}
+	return b.loc.Translate(spawnLang, key, args)
 }
 
 func (b *Bot) editSpawnMessage(meta spawn.SpawnMeta, embed *discordgo.MessageEmbed) {

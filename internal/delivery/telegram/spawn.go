@@ -35,11 +35,12 @@ func (b *Bot) SendSpawn(chat models.Chat, view spawn.SpawnView) (int64, error) {
 	return int64(msg.ID), nil
 }
 
-// EditSpawnExpired implements spawn.Spawner: marks a spawn as escaped.
+// EditSpawnExpired implements spawn.Spawner: marks a spawn as escaped and drops
+// the claim button.
 func (b *Bot) EditSpawnExpired(meta spawn.SpawnMeta, card *models.Card) {
 	caption := b.loc.Translate(spawnLang, "spawn_expired", i18n.Args{"name": card.Name})
 	msg := &tele.Message{ID: int(meta.MessageID), Chat: &tele.Chat{ID: meta.ChatID}}
-	if _, err := b.bot.EditCaption(msg, caption, tele.ModeHTML); err != nil {
+	if _, err := b.bot.EditCaption(msg, caption, tele.ModeHTML, &tele.ReplyMarkup{}); err != nil {
 		log.Printf("[TG spawn] edit expired failed: %v", err)
 	}
 }
@@ -65,10 +66,7 @@ func (b *Bot) HandleSpawnClaim(ctx tele.Context) error {
 
 	switch res.Outcome {
 	case spawn.OutcomeWon:
-		caption := b.formatSpawnClaimed(spawnLang, spawnDisplayName(tgUser), res)
-		if err := ctx.Edit(caption, tele.ModeHTML, &tele.ReplyMarkup{}); err != nil {
-			log.Printf("[TG spawn] edit claimed failed: %v", err)
-		}
+		b.announceSpawnClaim(res.Meta, spawnDisplayName(tgUser), res)
 		return ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "spawn_toast_won", i18n.Args{"coins": res.Reward.Coins})})
 	case spawn.OutcomeTaken:
 		return ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "spawn_toast_taken"), ShowAlert: true})
@@ -105,9 +103,8 @@ func (b *Bot) HandleClaimCommand(ctx tele.Context) error {
 
 	switch res.Outcome {
 	case spawn.OutcomeWon:
-		// Edit the original spawn message and confirm to the claimer.
-		b.EditSpawnClaimed(res.Meta, spawnDisplayName(tgUser), res)
-		return ctx.Send(b.loc.Translate(lang, "spawn_toast_won", i18n.Args{"coins": res.Reward.Coins}))
+		b.announceSpawnClaim(res.Meta, spawnDisplayName(tgUser), res)
+		return nil
 	case spawn.OutcomeTaken:
 		return ctx.Send(b.loc.Translate(lang, "spawn_toast_taken"))
 	case spawn.OutcomeAlreadyWave:
@@ -117,15 +114,26 @@ func (b *Bot) HandleClaimCommand(ctx tele.Context) error {
 	}
 }
 
-// EditSpawnClaimed rewrites the original spawn message to show the winner.
-func (b *Bot) EditSpawnClaimed(meta *spawn.SpawnMeta, winner string, res spawn.ClaimResult) {
+// announceSpawnClaim finalises a won spawn: it drops the claim button and marks
+// the original photo message as caught, then posts a separate reply naming the
+// winner and the reward — without re-sending the card image.
+func (b *Bot) announceSpawnClaim(meta *spawn.SpawnMeta, winner string, res spawn.ClaimResult) {
 	if meta == nil {
 		return
 	}
-	caption := b.formatSpawnClaimed(spawnLang, winner, res)
 	msg := &tele.Message{ID: int(meta.MessageID), Chat: &tele.Chat{ID: meta.ChatID}}
-	if _, err := b.bot.EditCaption(msg, caption, tele.ModeHTML); err != nil {
-		log.Printf("[TG spawn] edit claimed (cmd) failed: %v", err)
+
+	caught := b.loc.Translate(spawnLang, "spawn_msg_caught", i18n.Args{
+		"name":   res.Card.Name,
+		"rarity": b.loc.Rarity(spawnLang, res.RarityName),
+	})
+	if _, err := b.bot.EditCaption(msg, caught, tele.ModeHTML, &tele.ReplyMarkup{}); err != nil {
+		log.Printf("[TG spawn] edit caught failed: %v", err)
+	}
+
+	text := b.formatSpawnClaimed(spawnLang, winner, res)
+	if _, err := b.bot.Send(msg.Chat, text, tele.ModeHTML, &tele.SendOptions{ReplyTo: msg}); err != nil {
+		log.Printf("[TG spawn] send claim announce failed: %v", err)
 	}
 }
 

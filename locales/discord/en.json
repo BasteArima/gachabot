@@ -11,6 +11,7 @@
   "spawn_claimed_assembled": "🎉 **{winner}** assembled a card from fragments!\n🧩➡️🃏 **{name}**\n🪙 +{coins}",
   "spawn_claimed_duplicate": "🎉 **{winner}** caught the card (duplicate)!\n🃏 **{name}** ({rarity})\n🪙 +{coins}",
   "spawn_expired": "🌫 The card **{name}** slipped away… nobody made it.",
+  "spawn_msg_caught": "🃏 **{name}** ({rarity}) — caught!",
   "roll_cooldown": "⏳ Wait! You can roll again in: **{time}**",
   "streak_kept_alive": "🔥 Streak saved! Current streak: **{days} {days:day|days}**",
   "streak_continued": "Streak: **+{reward} {reward:point|points}** (Total: **{days} {days:day|days}**)",

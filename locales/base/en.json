@@ -32,6 +32,7 @@
   "spawn_claimed_assembled": "🎉 <b>{winner}</b> assembled a card from fragments!\n🧩➡️🃏 <b>{name}</b>\n🪙 +{coins}",
   "spawn_claimed_duplicate": "🎉 <b>{winner}</b> caught the card (duplicate)!\n🃏 <b>{name}</b> ({rarity})\n🪙 +{coins}",
   "spawn_expired": "🌫 The card <b>{name}</b> slipped away… nobody made it.",
+  "spawn_msg_caught": "🃏 <b>{name}</b> ({rarity}) — caught!",
   "spawn_toast_won": "🎉 Caught! +{coins} 🪙",
   "spawn_toast_taken": "😢 Someone already caught this card!",
   "spawn_toast_already": "✋ You already caught this card in another chat.",
