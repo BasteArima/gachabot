@@ -58,7 +58,7 @@ func (r *PostgresRepo) GetRandomCardByRarityExcluding(rarityID int, exclude []in
 	err := r.db.QueryRow(`
 		SELECT id, name, rarity_id, image_url, power_level, set_id
 		FROM cards
-		WHERE rarity_id = $1 AND (cardinality($2::bigint[]) = 0 OR id <> ALL($2))
+		WHERE rarity_id = $1 AND (COALESCE(cardinality($2::bigint[]), 0) = 0 OR id <> ALL($2))
 		ORDER BY RANDOM() LIMIT 1`,
 		rarityID, pq.Array(exclude)).
 		Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID)
@@ -78,7 +78,7 @@ func (r *PostgresRepo) GetRandomCardFromList(ids, exclude []int64) (*models.Card
 	err := r.db.QueryRow(`
 		SELECT id, name, rarity_id, image_url, power_level, set_id
 		FROM cards
-		WHERE id = ANY($1) AND (cardinality($2::bigint[]) = 0 OR id <> ALL($2))
+		WHERE id = ANY($1) AND (COALESCE(cardinality($2::bigint[]), 0) = 0 OR id <> ALL($2))
 		ORDER BY RANDOM() LIMIT 1`,
 		pq.Array(ids), pq.Array(exclude)).
 		Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID)
