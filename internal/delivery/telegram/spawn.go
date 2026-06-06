@@ -28,7 +28,7 @@ func (b *Bot) SendSpawn(chat models.Chat, view spawn.SpawnView) (int64, error) {
 	menu.Inline(menu.Row(btn))
 
 	photo := &tele.Photo{File: tele.FromURL(view.Card.ImageURL), Caption: caption}
-	msg, err := b.bot.Send(&tele.Chat{ID: chat.ChatID}, photo, tele.ModeHTML, menu)
+	msg, err := b.bot.Send(&tele.Chat{ID: chat.ChatID}, photo, &tele.SendOptions{ParseMode: tele.ModeHTML, ReplyMarkup: menu})
 	if err != nil {
 		return 0, err
 	}
@@ -40,7 +40,7 @@ func (b *Bot) SendSpawn(chat models.Chat, view spawn.SpawnView) (int64, error) {
 func (b *Bot) EditSpawnExpired(meta spawn.SpawnMeta, card *models.Card) {
 	caption := b.loc.Translate(spawnLang, "spawn_expired", i18n.Args{"name": card.Name})
 	msg := &tele.Message{ID: int(meta.MessageID), Chat: &tele.Chat{ID: meta.ChatID}}
-	if _, err := b.bot.EditCaption(msg, caption, tele.ModeHTML, &tele.ReplyMarkup{}); err != nil {
+	if _, err := b.bot.EditCaption(msg, caption, &tele.SendOptions{ParseMode: tele.ModeHTML, ReplyMarkup: &tele.ReplyMarkup{}}); err != nil {
 		log.Printf("[TG spawn] edit expired failed: %v", err)
 	}
 }
@@ -127,12 +127,15 @@ func (b *Bot) announceSpawnClaim(meta *spawn.SpawnMeta, winner string, res spawn
 		"name":   res.Card.Name,
 		"rarity": b.loc.Rarity(spawnLang, res.RarityName),
 	})
-	if _, err := b.bot.EditCaption(msg, caught, tele.ModeHTML, &tele.ReplyMarkup{}); err != nil {
+	// Pass everything via a single SendOptions: telebot's option extractor lets a
+	// *SendOptions overwrite a separately-passed ParseMode, so combining them as
+	// loose varargs silently drops HTML parsing.
+	if _, err := b.bot.EditCaption(msg, caught, &tele.SendOptions{ParseMode: tele.ModeHTML, ReplyMarkup: &tele.ReplyMarkup{}}); err != nil {
 		log.Printf("[TG spawn] edit caught failed: %v", err)
 	}
 
 	text := b.formatSpawnClaimed(spawnLang, winner, res)
-	if _, err := b.bot.Send(msg.Chat, text, tele.ModeHTML, &tele.SendOptions{ReplyTo: msg}); err != nil {
+	if _, err := b.bot.Send(msg.Chat, text, &tele.SendOptions{ParseMode: tele.ModeHTML, ReplyTo: msg}); err != nil {
 		log.Printf("[TG spawn] send claim announce failed: %v", err)
 	}
 }
