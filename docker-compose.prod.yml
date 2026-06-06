@@ -5,6 +5,10 @@
 # DB SAFETY: postgres_data is declared `external` and bound to the EXISTING volume
 # `gachabot_postgres_data` so your current database is reused as-is. Verify the
 # real name first with `docker volume ls` and adjust if different. See docs/deploy.md.
+#
+# PREREQUISITE: the shared `proxy` network must exist and Nginx Proxy Manager must
+# be attached to it (see the networks block at the bottom):
+#   docker network create proxy
 services:
   db:
     image: postgres:15-alpine
@@ -32,6 +36,9 @@ services:
     image: ghcr.io/bastearima/gachabot:latest
     container_name: gachabot_app
     restart: unless-stopped
+    networks:
+      - default
+      - proxy
     depends_on:
       - db
       - redis
@@ -63,8 +70,9 @@ services:
       - BACKUP_TIME_MINUTE=${BACKUP_TIME_MINUTE}
     expose:
       - "8080"
-    # Point your reverse proxy (Traefik/nginx) at gachabot_app:8080 on the proxy
-    # network, or publish a host port here:  ports: ["8080:8080"]
+    # No host port published — Nginx Proxy Manager reaches the bot over the shared
+    # `proxy` network by container name. In NPM set: Scheme http, Forward Hostname
+    # gachabot_app, Forward Port 8080.
     volumes:
       - /opt/gachabot/backups:/backups:ro
 
@@ -90,3 +98,14 @@ volumes:
     external: true
     name: gachabot_postgres_data
   redis_data:
+
+networks:
+  # Default network for this stack (db / redis / bot talk to each other here).
+  default:
+  # Shared external network with Nginx Proxy Manager. Create it once on the host:
+  #   docker network create proxy
+  # and attach NPM to it too (add `proxy` to NPM's networks). Then NPM forwards to
+  # gachabot_app:8080 without publishing any host port.
+  proxy:
+    external: true
+    name: proxy
