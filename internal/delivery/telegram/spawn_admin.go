@@ -34,6 +34,26 @@ func (b *Bot) HandleSpawnNow(ctx tele.Context) error {
 	return ctx.Send(fmt.Sprintf("✅ Заспавнил «%s» в этом чате. Лови!", name))
 }
 
+// HandleSpawnPlan shows today's scheduled automatic spawns. Admin only.
+func (b *Bot) HandleSpawnPlan(ctx tele.Context) error {
+	if ctx.Sender().ID != b.adminID {
+		return nil
+	}
+	info := b.spawnService.PlanStatus()
+	if !info.Enabled {
+		return ctx.Send("⏸ Автоспавны выключены (enabled=false). Включи через /spawn_import.")
+	}
+	if len(info.Upcoming) == 0 {
+		return ctx.Send(fmt.Sprintf("✅ На сегодня спавны отыграны (%d/%d). Новое расписание — после полуночи.", info.TodayFired, info.TodayTotal))
+	}
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("🗓 Спавны сегодня: отыграно %d/%d. Следующие (MSK):\n", info.TodayFired, info.TodayTotal))
+	for _, t := range info.Upcoming {
+		sb.WriteString("• " + t.Format("15:04") + "\n")
+	}
+	return ctx.Send(sb.String())
+}
+
 // HandleSpawnExport sends the current spawn config as spawn_config.json. Admin only.
 func (b *Bot) HandleSpawnExport(ctx tele.Context) error {
 	if ctx.Sender().ID != b.adminID {

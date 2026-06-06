@@ -1,11 +1,63 @@
 package spawn
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 )
+
+// PlanInfo describes today's spawn schedule for the /spawnplan admin command.
+type PlanInfo struct {
+	Enabled    bool
+	TodayTotal int
+	TodayFired int
+	Upcoming   []time.Time // remaining, future spawn times today (in engine TZ)
+}
+
+// PlanStatus reports the current day's spawn plan without mutating it.
+func (s *SpawnService) PlanStatus() PlanInfo {
+	cfg := s.loadConfig()
+	info := PlanInfo{Enabled: cfg.Enabled}
+	if !cfg.Enabled {
+		return info
+	}
+	now := time.Now().In(s.loc)
+	plan := s.peekPlan(cfg, now, now.Format("2006-01-02"))
+	info.TodayTotal = len(plan.Times)
+	for i, ts := range plan.Times {
+		if plan.Fired[i] {
+			info.TodayFired++
+			continue
+		}
+		if ts > now.Unix() {
+			info.Upcoming = append(info.Upcoming, time.Unix(ts, 0).In(s.loc))
+		}
+	}
+	return info
+}
+
+// Location exposes the engine timezone (for formatting in delivery).
+func (s *SpawnService) Location() *time.Location { return s.loc }
+
+// peekPlan returns today's stored plan, or a non-persisted preview if none exists yet.
+func (s *SpawnService) peekPlan(cfg Config, now time.Time, date string) dayPlan {
+	if raw, err := s.rdb.Get(context.Background(), planKey(date)).Result(); err == nil {
+		var p dayPlan
+		if json.Unmarshal([]byte(raw), &p) == nil && len(p.Times) == len(p.Fired) {
+			return p
+		}
+	}
+	times := cfg.planDay(now, s.loc)
+	p := dayPlan{Times: make([]int64, len(times)), Fired: make([]bool, len(times))}
+	for i, t := range times {
+		p.Times[i] = t.Unix()
+		p.Fired[i] = t.Unix() <= now.Unix()
+	}
+	return p
+}
 
 // CurrentConfigJSON returns the active config (stored or default) as pretty JSON,
 // for /spawn_export.
