@@ -64,7 +64,7 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 			discordgo.Button{
 				CustomID: "launch_app",
 				Label:    b.loc.Translate(lang, "btn_open_app"),
-				Style:    discordgo.SecondaryButton,
+				Style:    discordgo.SuccessButton,
 			},
 		}},
 	}
