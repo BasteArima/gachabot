@@ -34,6 +34,9 @@ type TelegramConfig struct {
 
 type DiscordConfig struct {
 	Token string
+	// AdminID is the service owner's Discord user id (ADMIN_DISCORD_ID) — gates
+	// owner-only Discord commands like /spawnnow. 0 = none (command disabled).
+	AdminID int64
 	// OAuth/Activity credentials (used by the web layer, not the bot gateway).
 	ClientID      string
 	ClientSecret  string
@@ -105,6 +108,7 @@ func Load() (*Config, error) {
 		},
 		Discord: DiscordConfig{
 			Token:         os.Getenv("DISCORD_TOKEN"),
+			AdminID:       getEnvInt64("ADMIN_DISCORD_ID", 0),
 			ClientID:      os.Getenv("DISCORD_CLIENT_ID"),
 			ClientSecret:  os.Getenv("DISCORD_CLIENT_SECRET"),
 			OAuthRedirect: os.Getenv("DISCORD_OAUTH_REDIRECT"),

@@ -87,6 +87,25 @@ func (b *Bot) handleSpawnClaimComponent(s *discordgo.Session, i *discordgo.Inter
 	}
 }
 
+// handleSpawnNow forces a spawn in the current channel — a service-owner command
+// (gated by ADMIN_DISCORD_ID), not a server-admin one.
+func (b *Bot) handleSpawnNow(s *discordgo.Session, i *discordgo.InteractionCreate, lang string) {
+	if !b.isOwner(i) {
+		b.respondEphemeral(s, i, b.loc.Translate(lang, "owner_only"))
+		return
+	}
+	if i.GuildID == "" {
+		b.respondEphemeral(s, i, b.loc.Translate(lang, "mainchannel_guild_only"))
+		return
+	}
+	name, err := b.spawnService.SpawnNow(spawn.PlatformDiscord, parseID(i.ChannelID))
+	if err != nil {
+		b.respondEphemeral(s, i, "❌ "+err.Error())
+		return
+	}
+	b.respondEphemeral(s, i, "✅ Заспавнил «"+name+"» в этом канале. Лови!")
+}
+
 // handleClaimCommand handles /claim — claims the active spawn in this channel.
 func (b *Bot) handleClaimCommand(s *discordgo.Session, i *discordgo.InteractionCreate, dbUser *models.User, lang string) {
 	if i.GuildID == "" {

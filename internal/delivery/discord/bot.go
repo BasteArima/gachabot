@@ -29,10 +29,11 @@ type Bot struct {
 	lp             LinkProvider
 	rdb            *redis.Client
 	webAppURL      string
+	adminID        int64 // service owner's Discord user id (owner-only commands)
 	NotifyAdmin    func(text string, imageURL string)
 }
 
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, lp LinkProvider, webAppURL string, notifyAdmin func(string, string)) (*Bot, error) {
+func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, lp LinkProvider, webAppURL string, adminID int64, notifyAdmin func(string, string)) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -51,6 +52,7 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 		spawnService:   sp,
 		lp:             lp,
 		webAppURL:      webAppURL,
+		adminID:        adminID,
 		NotifyAdmin:    notifyAdmin,
 	}
 
@@ -208,6 +210,13 @@ func (b *Bot) setupCommands() {
 			Description: "Catch the active spawned card in this channel",
 			DescriptionLocalizations: &map[discordgo.Locale]string{
 				discordgo.Russian: "Поймать активную карту-спавн в этом канале",
+			},
+		},
+		{
+			Name:        "spawnnow",
+			Description: "Spawn a test card in this channel (admins)",
+			DescriptionLocalizations: &map[discordgo.Locale]string{
+				discordgo.Russian: "Заспавнить тестовую карту в этом канале (для админов)",
 			},
 		},
 	}

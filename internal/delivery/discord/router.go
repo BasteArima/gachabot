@@ -63,6 +63,8 @@ func (b *Bot) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleSetMainChannel(s, i, lang)
 	case "claim":
 		b.handleClaimCommand(s, i, dbUser, lang)
+	case "spawnnow":
+		b.handleSpawnNow(s, i, lang)
 	}
 }
 

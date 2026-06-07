@@ -2,9 +2,10 @@ package discord
 
 import (
 	"fmt"
-	"gachabot/internal/models"
 	"log"
 	"strings"
+
+	"gachabot/internal/models"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -62,6 +63,21 @@ func parseID(idStr string) int64 {
 	var id int64
 	fmt.Sscanf(idStr, "%d", &id)
 	return id
+}
+
+// isOwner reports whether the interaction was triggered by the service owner
+// (Discord user id == ADMIN_DISCORD_ID). Used for owner-only commands.
+func (b *Bot) isOwner(i *discordgo.InteractionCreate) bool {
+	if b.adminID == 0 {
+		return false
+	}
+	var id string
+	if i.Member != nil && i.Member.User != nil {
+		id = i.Member.User.ID
+	} else if i.User != nil {
+		id = i.User.ID
+	}
+	return id != "" && parseID(id) == b.adminID
 }
 
 func (b *Bot) respond(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {

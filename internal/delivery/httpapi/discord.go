@@ -31,12 +31,10 @@ func (s *Server) handleAuthDiscord(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "missing code")
 		return
 	}
-	redirect := req.RedirectURI
-	if redirect == "" {
-		redirect = s.discord.OAuthRedirect
-	}
-
-	accessToken, err := s.discordExchangeCode(req.Code, redirect)
+	// redirect_uri matters only for the browser redirect flow (the SPA passes its
+	// own). For the Embedded App SDK (Activity) the code is not bound to a
+	// redirect_uri, so it must be omitted — sending one yields invalid_grant.
+	accessToken, err := s.discordExchangeCode(req.Code, req.RedirectURI)
 	if err != nil {
 		writeErr(w, http.StatusUnauthorized, "discord token exchange failed: "+err.Error())
 		return
@@ -80,7 +78,9 @@ func (s *Server) discordExchangeCode(code, redirect string) (string, error) {
 	form.Set("client_secret", s.discord.ClientSecret)
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
-	form.Set("redirect_uri", redirect)
+	if redirect != "" {
+		form.Set("redirect_uri", redirect)
+	}
 
 	resp, err := discordHTTP.Post(
 		"https://discord.com/api/oauth2/token",

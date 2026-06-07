@@ -39,5 +39,6 @@
   "spawn_toast_already": "✋ You already caught this card in another chat.",
   "spawn_toast_expired": "🌫 Too late — the card already slipped away.",
   "spawn_no_active": "🌫 Nothing to catch right now — wait for the next spawn.",
-  "spawn_group_only": "🃏 Spawns can only be caught in group chats."
+  "spawn_group_only": "🃏 Spawns can only be caught in group chats.",
+  "owner_only": "⛔ This command is for the bot owner only."
 }
