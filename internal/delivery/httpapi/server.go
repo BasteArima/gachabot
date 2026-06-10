@@ -70,12 +70,16 @@ func (s *Server) Start() {
 			r.Get("/artguess", s.handleArtGuess)
 			r.Post("/artguess/guess", s.handleArtGuessGuess)
 			r.Get("/artguess/image", s.handleArtGuessImage)
+			r.Post("/artguess/reset", s.handleArtGuessResetMe) // owner-only (checked in handler)
 
 			r.Group(func(r chi.Router) {
 				r.Use(s.adminMiddleware)
 				r.Get("/admin/overview", s.handleAdminOverview)
 				r.Get("/admin/spawn-config", s.handleGetSpawnConfig)
 				r.Put("/admin/spawn-config", s.handlePutSpawnConfig)
+				r.Post("/admin/artguess/reset-all", s.handleAdminArtGuessResetAll)
+				r.Post("/admin/artguess/reset-user", s.handleAdminArtGuessResetUser)
+				r.Post("/admin/artguess/reroll", s.handleAdminArtGuessReroll)
 			})
 		})
 	})

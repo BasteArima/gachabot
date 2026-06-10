@@ -88,3 +88,62 @@ type cardBriefDTO struct {
 	Rarity string `json:"rarity"`
 	Power  int    `json:"power"`
 }
+
+// POST /api/artguess/reset — owner-only: clear the caller's progress for today.
+// Lives outside the admin route group (the in-game button is on the player
+// screen), so it verifies admin here.
+func (s *Server) handleArtGuessResetMe(w http.ResponseWriter, r *http.Request) {
+	uid := userIDFrom(r)
+	u, err := s.repo.GetUserByID(uid)
+	if err != nil || !s.isAdmin(u) {
+		writeErr(w, http.StatusForbidden, "forbidden")
+		return
+	}
+	if err := s.artguess.ResetUser(r.Context(), uid); err != nil {
+		writeErr(w, http.StatusInternalServerError, "reset error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// POST /api/admin/artguess/reset-all — clear today's progress for all players.
+func (s *Server) handleAdminArtGuessResetAll(w http.ResponseWriter, r *http.Request) {
+	if err := s.artguess.ResetAll(r.Context()); err != nil {
+		writeErr(w, http.StatusInternalServerError, "reset error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// POST /api/admin/artguess/reset-user {userId} — clear one player's progress by
+// internal user id.
+func (s *Server) handleAdminArtGuessResetUser(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserID string `json:"userId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad request")
+		return
+	}
+	uid, err := strconv.ParseInt(req.UserID, 10, 64)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad userId")
+		return
+	}
+	if err := s.artguess.ResetUser(r.Context(), uid); err != nil {
+		writeErr(w, http.StatusInternalServerError, "reset error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// POST /api/admin/artguess/reroll — pick a fresh card of the day (resets all
+// progress). Returns the new card.
+func (s *Server) handleAdminArtGuessReroll(w http.ResponseWriter, r *http.Request) {
+	card, err := s.artguess.RerollDailyCard(r.Context())
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "reroll error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"card": card.Name, "cardId": strconv.Itoa(card.ID)})
+}
