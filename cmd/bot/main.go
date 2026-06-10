@@ -70,11 +70,12 @@ func main() {
 			log.Fatalf("failed to load discord localization: %v", err)
 		}
 
-		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, discordLoc, tgBot, cfg.HTTP.WebAppURL, cfg.Discord.AdminID, tgBot.NotifyAdmin)
+		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, artguessService, discordLoc, tgBot, cfg.HTTP.WebAppURL, cfg.Discord.AdminID, tgBot.NotifyAdmin)
 		if err != nil {
 			log.Fatalf("failed to create discord bot: %v", err)
 		}
 		spawnService.RegisterSpawner(spawn.PlatformDiscord, dsBot)
+		artguessService.RegisterBroadcaster(artguess.PlatformDiscord, dsBot)
 
 		if err := dsBot.Start(); err != nil {
 			log.Printf("failed to start discord bot: %v", err)

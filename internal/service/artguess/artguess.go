@@ -307,8 +307,8 @@ func (s *Service) Guess(ctx context.Context, uid int64, cardID int, launch strin
 
 	// Attribute this play to the launch chat's scoreboard, if any.
 	if launch != "" && cfg.Enabled && cfg.ChatPostEnabled {
-		if chatID, ok := s.parseLaunch(PlatformTelegram, launch); ok {
-			s.onPlay(ctx, PlatformTelegram, chatID, uid, p)
+		if platform, chatID, ok := s.resolveLaunch(ctx, launch); ok {
+			s.onPlay(ctx, platform, chatID, uid, p)
 		}
 	}
 

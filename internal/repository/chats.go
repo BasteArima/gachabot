@@ -80,6 +80,16 @@ func (r *PostgresRepo) SetDiscordMainChannel(guildID, channelID int64, title str
 	return tx.Commit()
 }
 
+// ChatExists reports whether a chat is registered (any platform), used to
+// validate an unsigned Discord launch context before posting to it.
+func (r *PostgresRepo) ChatExists(platform string, chatID int64) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM chats WHERE platform = $1 AND chat_id = $2)`,
+		platform, chatID).Scan(&exists)
+	return exists, err
+}
+
 // GetSpawnChats returns every chat with spawns enabled (used by the spawn engine).
 func (r *PostgresRepo) GetSpawnChats() ([]models.Chat, error) {
 	rows, err := r.db.Query(

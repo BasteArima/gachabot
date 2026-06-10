@@ -1,6 +1,7 @@
 package artguess
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -45,4 +46,28 @@ func (s *Service) parseLaunch(platform, raw string) (int64, bool) {
 		return 0, false
 	}
 	return chatID, true
+}
+
+// dsLaunchPrefix marks an (unsigned) Discord launch context: "ds:<channelID>".
+// Discord Activities can't carry our signed startapp value, so the channel comes
+// from the authenticated Embedded SDK; we trust it only if it's a registered chat.
+const dsLaunchPrefix = "ds:"
+
+// resolveLaunch turns a raw launch value (Telegram signed startapp, or
+// "ds:<channelID>") into the chat to attribute play to.
+func (s *Service) resolveLaunch(ctx context.Context, launch string) (platform string, chatID int64, ok bool) {
+	if strings.HasPrefix(launch, dsLaunchPrefix) {
+		id, err := strconv.ParseInt(strings.TrimPrefix(launch, dsLaunchPrefix), 10, 64)
+		if err != nil {
+			return "", 0, false
+		}
+		if exists, _ := s.repo.ChatExists(PlatformDiscord, id); !exists {
+			return "", 0, false
+		}
+		return PlatformDiscord, id, true
+	}
+	if id, valid := s.parseLaunch(PlatformTelegram, launch); valid {
+		return PlatformTelegram, id, true
+	}
+	return "", 0, false
 }

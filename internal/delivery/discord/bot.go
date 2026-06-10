@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/spawn"
@@ -26,6 +27,7 @@ type Bot struct {
 	loc            *i18n.Localizer
 	suggestService *suggest.SuggestService
 	spawnService   *spawn.SpawnService
+	artguess       *artguess.Service
 	lp             LinkProvider
 	rdb            *redis.Client
 	webAppURL      string
@@ -33,7 +35,7 @@ type Bot struct {
 	NotifyAdmin    func(text string, imageURL string)
 }
 
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, lp LinkProvider, webAppURL string, adminID int64, notifyAdmin func(string, string)) (*Bot, error) {
+func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, loc *i18n.Localizer, lp LinkProvider, webAppURL string, adminID int64, notifyAdmin func(string, string)) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -50,6 +52,7 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 		loc:            loc,
 		suggestService: ss,
 		spawnService:   sp,
+		artguess:       ag,
 		lp:             lp,
 		webAppURL:      webAppURL,
 		adminID:        adminID,
