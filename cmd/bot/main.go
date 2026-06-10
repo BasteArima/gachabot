@@ -50,18 +50,19 @@ func main() {
 	duelService := duel.NewDuelService(repo, rdb)
 	suggestService := suggest.NewSuggestService(repo, rdb)
 	spawnService := spawn.NewSpawnService(repo, rdb, gachaService)
-	artguessService := artguess.New(repo, rdb, gachaService)
+	artguessService := artguess.New(repo, rdb, gachaService, cfg.Telegram.Token)
 
 	tgLoc, err := i18n.NewLocalizer("locales/base", "locales/telegram", "ru")
 	if err != nil {
 		log.Fatalf("failed to load telegram localization: %v", err)
 	}
 
-	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, spawnService, tgLoc, cfg.Telegram)
+	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, spawnService, artguessService, tgLoc, cfg.Telegram)
 	if err != nil {
 		log.Fatalf("failed to create telegram bot: %v", err)
 	}
 	spawnService.RegisterSpawner(spawn.PlatformTelegram, tgBot)
+	artguessService.RegisterBroadcaster(artguess.PlatformTelegram, tgBot)
 
 	if cfg.Discord.Token != "" {
 		discordLoc, err := i18n.NewLocalizer("locales/base", "locales/discord", "ru")
@@ -93,6 +94,7 @@ func main() {
 	}()
 
 	spawnService.Start()
+	artguessService.Start()
 
 	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord)
 	webServer.Start()

@@ -25,17 +25,31 @@ const (
 	dayTTL            = 48 * time.Hour
 )
 
-// Service holds the game's dependencies. It needs no scheduler: the card of the
-// day is chosen lazily and deterministically per date.
+// Service holds the game's dependencies. The card of the day is chosen lazily
+// and deterministically per date; the scheduler (Start) only drives chat
+// scoreboards and the midnight summary.
 type Service struct {
-	repo  *repository.PostgresRepo
-	rdb   *redis.Client
-	gacha *gacha.GachaService
-	loc   *time.Location
+	repo         *repository.PostgresRepo
+	rdb          *redis.Client
+	gacha        *gacha.GachaService
+	loc          *time.Location
+	secret       string                 // HMAC key for deep links (the bot token)
+	broadcasters map[string]Broadcaster // platform -> delivery, for chat posts
+
+	// scheduler bookkeeping (touched only by the Start goroutine)
+	lastDate     string
+	lastPingDate string
 }
 
-func New(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService) *Service {
-	return &Service{repo: repo, rdb: rdb, gacha: gs, loc: time.FixedZone("MSK", 3*60*60)}
+func New(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, secret string) *Service {
+	return &Service{
+		repo:         repo,
+		rdb:          rdb,
+		gacha:        gs,
+		loc:          time.FixedZone("MSK", 3*60*60),
+		secret:       secret,
+		broadcasters: make(map[string]Broadcaster),
+	}
 }
 
 // --- State DTOs (JSON-encoded directly by the HTTP layer) ---
@@ -232,8 +246,9 @@ func (s *Service) GetState(ctx context.Context, uid int64) (*State, error) {
 
 // Guess records a guess and returns the updated state. A guess after the game is
 // finished, or a repeat of a card already guessed, is a no-op that returns the
-// current state.
-func (s *Service) Guess(ctx context.Context, uid int64, cardID int) (*State, error) {
+// current state. launch is the (signed) deep-link value the player entered from,
+// used to attribute play to a chat scoreboard; empty when there's no chat context.
+func (s *Service) Guess(ctx context.Context, uid int64, cardID int, launch string) (*State, error) {
 	cfg := s.Config()
 	dateStr := dateKey(s.midnight())
 	rmap, err := s.rarityMap()
@@ -289,6 +304,14 @@ func (s *Service) Guess(ctx context.Context, uid int64, cardID int) (*State, err
 	if err := s.saveProgress(ctx, uid, dateStr, p); err != nil {
 		return nil, err
 	}
+
+	// Attribute this play to the launch chat's scoreboard, if any.
+	if launch != "" && cfg.Enabled && cfg.ChatPostEnabled {
+		if chatID, ok := s.parseLaunch(PlatformTelegram, launch); ok {
+			s.onPlay(ctx, PlatformTelegram, chatID, uid, p)
+		}
+	}
+
 	return s.buildState(cfg, p, target, rmap)
 }
 

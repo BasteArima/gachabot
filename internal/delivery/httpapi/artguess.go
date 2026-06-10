@@ -20,6 +20,7 @@ func (s *Server) handleArtGuess(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleArtGuessGuess(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		CardID string `json:"cardId"`
+		Launch string `json:"launch"` // signed deep-link value (startapp), for chat attribution
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErr(w, http.StatusBadRequest, "bad request")
@@ -30,7 +31,7 @@ func (s *Server) handleArtGuessGuess(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad cardId")
 		return
 	}
-	st, err := s.artguess.Guess(r.Context(), userIDFrom(r), cardID)
+	st, err := s.artguess.Guess(r.Context(), userIDFrom(r), cardID, req.Launch)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return

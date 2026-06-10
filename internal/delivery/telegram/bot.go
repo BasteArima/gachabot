@@ -5,6 +5,7 @@ import (
 	"gachabot/internal/config"
 	"gachabot/internal/i18n"
 	"gachabot/internal/repository"
+	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/spawn"
@@ -25,6 +26,7 @@ type Bot struct {
 	rdb            *redis.Client
 	suggestService *suggest.SuggestService
 	spawnService   *spawn.SpawnService
+	artguess       *artguess.Service
 	adminID        int64
 	adminChatID    int64
 	backupChatID   int64
@@ -33,7 +35,7 @@ type Bot struct {
 	startBannerURL string
 }
 
-func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
+func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
 	pref := tele.Settings{
 		Token:  cfg.Token,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
@@ -53,6 +55,7 @@ func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaSer
 		rdb:            rdb,
 		suggestService: ss,
 		spawnService:   sp,
+		artguess:       ag,
 		adminID:        cfg.AdminID,
 		// Telegram supergroup IDs are negative; env stores the positive part.
 		adminChatID:    -cfg.SuggestsGroupID,
@@ -139,6 +142,8 @@ func (b *Bot) setupRoutes() {
 	// Chat spawns
 	b.bot.Handle("/claim", b.HandleClaimCommand)
 	b.bot.Handle("\fspawn_claim", b.HandleSpawnClaim)
+
+	b.bot.Handle("/artguess", b.HandleArtGuessCmd)
 
 	// Chat spawns: admin config & testing
 	b.bot.Handle("/spawnnow", b.HandleSpawnNow)
