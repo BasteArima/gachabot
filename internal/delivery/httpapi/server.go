@@ -14,6 +14,7 @@ import (
 
 	"gachabot/internal/config"
 	"gachabot/internal/repository"
+	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/spawn"
 
@@ -28,14 +29,15 @@ type Server struct {
 	rdb      *redis.Client
 	gacha    *gacha.GachaService
 	spawn    *spawn.SpawnService
+	artguess *artguess.Service
 	botToken string
 	adminID  int64
 	cfg      config.HTTPConfig
 	discord  config.DiscordConfig
 }
 
-func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig) *Server {
-	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord}
+func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig) *Server {
+	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord}
 }
 
 // Start builds the router and serves in a background goroutine.
@@ -61,8 +63,13 @@ func (s *Server) Start() {
 			r.Get("/rarities", s.handleRarities)
 			r.Get("/daily-hub", s.handleDailyHub)
 			r.Get("/leaderboard", s.handleLeaderboard)
+			r.Get("/cards", s.handleCards)
 			r.Post("/actions/roll", s.handleRoll)
 			r.Post("/actions/craft", s.handleCraft)
+
+			r.Get("/artguess", s.handleArtGuess)
+			r.Post("/artguess/guess", s.handleArtGuessGuess)
+			r.Get("/artguess/image", s.handleArtGuessImage)
 
 			r.Group(func(r chi.Router) {
 				r.Use(s.adminMiddleware)

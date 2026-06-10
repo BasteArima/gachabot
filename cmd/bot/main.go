@@ -15,6 +15,7 @@ import (
 	"gachabot/internal/i18n"
 	"gachabot/internal/migrations"
 	"gachabot/internal/repository"
+	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/backup"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
@@ -49,6 +50,7 @@ func main() {
 	duelService := duel.NewDuelService(repo, rdb)
 	suggestService := suggest.NewSuggestService(repo, rdb)
 	spawnService := spawn.NewSpawnService(repo, rdb, gachaService)
+	artguessService := artguess.New(repo, rdb, gachaService)
 
 	tgLoc, err := i18n.NewLocalizer("locales/base", "locales/telegram", "ru")
 	if err != nil {
@@ -92,7 +94,7 @@ func main() {
 
 	spawnService.Start()
 
-	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord)
+	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord)
 	webServer.Start()
 
 	quit := make(chan os.Signal, 1)

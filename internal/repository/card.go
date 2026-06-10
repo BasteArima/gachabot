@@ -27,6 +27,26 @@ func (r *PostgresRepo) GetRarities() ([]models.Rarity, error) {
 	return rarities, nil
 }
 
+// ListCards returns every card (used by Art Guess for the daily pool and the
+// autocomplete card list).
+func (r *PostgresRepo) ListCards() ([]models.Card, error) {
+	rows, err := r.db.Query(`SELECT id, name, rarity_id, image_url, power_level, set_id FROM cards ORDER BY id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []models.Card
+	for rows.Next() {
+		var c models.Card
+		if err := rows.Scan(&c.ID, &c.Name, &c.RarityID, &c.ImageURL, &c.PowerLevel, &c.SetID); err != nil {
+			return nil, err
+		}
+		cards = append(cards, c)
+	}
+	return cards, rows.Err()
+}
+
 func (r *PostgresRepo) GetRandomCard(rarityID int) (*models.Card, error) {
 	query := `SELECT id, name, rarity_id, image_url, power_level, set_id FROM cards WHERE rarity_id = $1 ORDER BY RANDOM() LIMIT 1`
 	var c models.Card

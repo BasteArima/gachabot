@@ -20,16 +20,18 @@ type leaderboardEntryDTO struct {
 }
 
 // GET /api/daily-hub — countdown to the next daily reset (midnight MSK). World
-// Boss / Carddle are placeholders until those features ship.
-func (s *Server) handleDailyHub(w http.ResponseWriter, _ *http.Request) {
+// Boss is a placeholder until it ships; Art Guess reports its real status.
+func (s *Server) handleDailyHub(w http.ResponseWriter, r *http.Request) {
 	loc := time.FixedZone("MSK", 3*60*60)
 	now := time.Now().In(loc)
 	next := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Add(24 * time.Hour)
 
+	agAvailable, agSolved := s.artguess.HubStatus(r.Context(), userIDFrom(r))
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"resetsInSeconds": int(next.Sub(now).Seconds()),
 		"worldBoss":       map[string]any{"available": false, "name": "Скоро"},
-		"carddle":         map[string]any{"available": false, "solvedToday": false},
+		"artguess":        map[string]any{"available": agAvailable, "solvedToday": agSolved},
 	})
 }
 

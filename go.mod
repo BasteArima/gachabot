@@ -4,11 +4,13 @@ go 1.25.5
 
 require (
 	github.com/bwmarrin/discordgo v0.29.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/go-chi/cors v1.2.2
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.0
 	github.com/redis/go-redis/v9 v9.18.0
+	golang.org/x/image v0.42.0
 	gopkg.in/telebot.v3 v3.3.8
 )
 
