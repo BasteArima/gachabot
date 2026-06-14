@@ -7,15 +7,18 @@ import (
 	"image"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/disintegration/imaging"
-	"github.com/fogleman/gg"
-	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/opentype"
 	_ "golang.org/x/image/webp" // register webp decoder for image.Decode
 )
+
+// defaultOverlayPath is where the board overlay PNG is baked into the image
+// (Dockerfile copies assets/ → /root/assets). Override with ARTGUESS_OVERLAY_PATH
+// (e.g. a bind-mounted file) to swap it without rebuilding. If the file is
+// absent, the board uses the plain blurred art with no overlay.
+const defaultOverlayPath = "assets/artguess_overlay.png"
 
 const (
 	keySrcPrefix      = "artguess:src:"      // +cardID -> original art bytes
@@ -106,46 +109,32 @@ func (s *Service) BoardImage(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("decode art: %w", err)
 	}
 
-	out := drawBoardCaption(renderLevel(img, 0, cfg.MaxAttempts)) // level 0 = most hidden
+	out := applyBoardOverlay(renderLevel(img, 0, cfg.MaxAttempts)) // level 0 = most hidden
 	var buf bytes.Buffer
-	if err := imaging.Encode(&buf, out, imaging.JPEG, imaging.JPEGQuality(82)); err != nil {
+	if err := imaging.Encode(&buf, out, imaging.JPEG, imaging.JPEGQuality(90)); err != nil {
 		return nil, err
 	}
 	_ = s.rdb.Set(ctx, key, buf.Bytes(), dayTTL).Err()
 	return buf.Bytes(), nil
 }
 
-// drawBoardCaption overlays a darkened top strip with the "GachaBot" / "Art Guess"
-// title on the blurred art, using the embedded Go Bold font (no asset file).
-func drawBoardCaption(src image.Image) image.Image {
-	b := src.Bounds()
-	w, h := float64(b.Dx()), float64(b.Dy())
-	dc := gg.NewContextForImage(src)
-
-	// Legibility scrim across the top.
-	dc.SetRGBA(0, 0, 0, 0.45)
-	dc.DrawRectangle(0, 0, w, h*0.2)
-	dc.Fill()
-
-	dc.SetRGB(1, 1, 1)
-	cx := w / 2
-	if face, err := fontFace(w / 11); err == nil {
-		dc.SetFontFace(face)
-		dc.DrawStringAnchored("GachaBot", cx, h*0.07, 0.5, 0.5)
+// applyBoardOverlay composites the configured overlay PNG (a card-sized layer
+// with transparency, e.g. a "GachaBot / Art Guess" banner) on top of the blurred
+// art. If no overlay file is configured/found, the blurred art is returned as-is.
+func applyBoardOverlay(base image.Image) image.Image {
+	path := os.Getenv("ARTGUESS_OVERLAY_PATH")
+	if path == "" {
+		path = defaultOverlayPath
 	}
-	if face, err := fontFace(w / 15); err == nil {
-		dc.SetFontFace(face)
-		dc.DrawStringAnchored("Art Guess", cx, h*0.145, 0.5, 0.5)
-	}
-	return dc.Image()
-}
-
-func fontFace(size float64) (font.Face, error) {
-	fnt, err := opentype.Parse(gobold.TTF)
+	ov, err := imaging.Open(path)
 	if err != nil {
-		return nil, err
+		return base // no overlay file -> plain blurred art
 	}
-	return opentype.NewFace(fnt, &opentype.FaceOptions{Size: size, DPI: 72})
+	b := base.Bounds()
+	if ov.Bounds().Dx() != b.Dx() || ov.Bounds().Dy() != b.Dy() {
+		ov = imaging.Resize(ov, b.Dx(), b.Dy(), imaging.Lanczos)
+	}
+	return imaging.Overlay(base, ov, image.Pt(0, 0), 1.0)
 }
 
 // sourceBytes returns the original art bytes for a card, caching the download.

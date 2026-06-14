@@ -34,6 +34,7 @@ WORKDIR /root/
 COPY --from=builder /app/gachabot .
 COPY --from=builder /app/seed .
 COPY --from=builder /app/locales ./locales
+COPY --from=builder /app/assets ./assets
 COPY --from=frontend /web/dist ./web
 
 # Go serves the built SPA from here (same origin as /api).

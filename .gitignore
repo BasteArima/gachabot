@@ -11,6 +11,7 @@
 /gachabot.bin
 /dist/
 /bin/
+/assets/artguess_overlay.png
 
 *.log
 coverage.txt

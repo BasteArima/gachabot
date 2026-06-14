@@ -78,6 +78,12 @@ services:
     # gachabot_app, Forward Port 8080.
     volumes:
       - /opt/gachabot/backups:/backups:ro
+      # Art Guess board overlay (private content — kept OUT of the repo, gitignored).
+      # Put your PNG on the host at this path FIRST, then it composites over the
+      # blurred daily art on the chat board. It maps onto the in-image default path
+      # (/root/assets/artguess_overlay.png), so no extra env is needed. Omit this
+      # line to use a plain blurred board.
+      - /opt/gachabot/artguess_overlay.png:/root/assets/artguess_overlay.png:ro
 
   pgbackups:
     image: prodrigestivill/postgres-backup-local
