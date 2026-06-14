@@ -58,14 +58,14 @@ func TestRenderBoard(t *testing.T) {
 	}
 	parts := []participant{
 		{Name: "Alice", Finished: true, Solved: true, Attempts: 3},
-		{Name: "Bob", Finished: false},
+		{Name: "Bob", Finished: false, Attempts: 2},
 	}
 	board := renderBoard(7, 6, parts)
-	if !strings.Contains(board, "🥇 Alice — 3/6") {
-		t.Errorf("missing winner line: %q", board)
+	if !strings.Contains(board, "🥇 Alice ⬛⬛🟩") {
+		t.Errorf("missing winner squares line: %q", board)
 	}
-	if !strings.Contains(board, "⏳ Bob — играет") {
-		t.Errorf("missing in-progress line: %q", board)
+	if !strings.Contains(board, "⏳ Bob ⬛⬛") {
+		t.Errorf("missing in-progress squares line: %q", board)
 	}
 	if !strings.Contains(board, "Сыграли: 2 · угадали: 1") {
 		t.Errorf("missing counts: %q", board)

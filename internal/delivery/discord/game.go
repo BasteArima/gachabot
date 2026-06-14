@@ -2,6 +2,7 @@ package discord
 
 import (
 	"bytes"
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"io"
@@ -48,7 +49,7 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 	embed := &discordgo.MessageEmbed{
 		Title:       title,
 		Description: desc,
-		Image:       &discordgo.MessageEmbedImage{URL: result.Card.ImageURL},
+		Image:       &discordgo.MessageEmbedImage{URL: cardart.Framed(result.Card.ImageURL)},
 		Color:       0x00ff00,
 	}
 
@@ -117,7 +118,7 @@ func (b *Bot) handleCraft(s *discordgo.Session, i *discordgo.InteractionCreate, 
 	embed := &discordgo.MessageEmbed{
 		Title:       "🛠 " + b.loc.Translate(lang, "craft_title"),
 		Description: desc,
-		Image:       &discordgo.MessageEmbedImage{URL: result.Card.ImageURL},
+		Image:       &discordgo.MessageEmbedImage{URL: cardart.Framed(result.Card.ImageURL)},
 		Color:       0x9b59b6,
 	}
 
@@ -191,7 +192,7 @@ func (b *Bot) handlePromo(s *discordgo.Session, i *discordgo.InteractionCreate, 
 		httpClient := &http.Client{Timeout: 5 * time.Second}
 
 		for j := 0; j < imgLimit; j++ {
-			resp, err := httpClient.Get(cards[j].ImageURL)
+			resp, err := httpClient.Get(cardart.Framed(cards[j].ImageURL))
 			if err != nil {
 				log.Printf("[DISCORD] Failed to download image %s: %v", cards[j].ImageURL, err)
 				continue

@@ -30,7 +30,10 @@ const (
 // update the chat scoreboard without knowing platform details. Text is fully
 // rendered (plain, no markup) so it reads identically on Telegram and Discord.
 type Broadcaster interface {
-	PostBoard(chat models.Chat, text, startParam string) (messageID int64, err error)
+	// PostBoard posts the scoreboard as a photo (the max-blur daily art with a
+	// "GachaBot / Art Guess" caption) plus the scoreboard text and Play button.
+	PostBoard(chat models.Chat, text, startParam string, image []byte) (messageID int64, err error)
+	// EditBoard updates the scoreboard text in place (the photo stays).
 	EditBoard(chat models.Chat, messageID int64, text, startParam string) error
 	PostSummary(chat models.Chat, text string, art *models.Card) error
 }
@@ -118,7 +121,15 @@ func (s *Service) refreshBoard(ctx context.Context, platform string, chatID int6
 		}
 		return
 	}
-	mid, err := b.PostBoard(chat, text, startParam)
+	// First board of the day for this chat: attach the blurred art. If the image
+	// can't be produced yet, skip and retry on the next play/tick (no text-only
+	// board, so EditBoard can always assume a photo message).
+	img, err := s.BoardImage(ctx)
+	if err != nil {
+		log.Printf("[artguess] board image failed: %v", err)
+		return
+	}
+	mid, err := b.PostBoard(chat, text, startParam, img)
 	if err != nil {
 		log.Printf("[artguess] post board failed (%s:%d): %v", platform, chatID, err)
 		return
@@ -200,23 +211,41 @@ func writeLines(b *strings.Builder, parts []participant, maxAttempts int) {
 	sortParts(parts)
 	firstSolved := true
 	for _, p := range parts {
-		icon, score := lineFor(p, maxAttempts, &firstSolved)
-		fmt.Fprintf(b, "%s %s — %s\n", icon, p.Name, score)
+		icon := iconFor(p, &firstSolved)
+		if sq := squaresFor(p, maxAttempts); sq != "" {
+			fmt.Fprintf(b, "%s %s %s\n", icon, p.Name, sq)
+		} else {
+			fmt.Fprintf(b, "%s %s\n", icon, p.Name)
+		}
 	}
 }
 
-func lineFor(p participant, maxAttempts int, firstSolved *bool) (icon, score string) {
-	if !p.Finished {
-		return "⏳", "играет"
-	}
-	if p.Solved {
+func iconFor(p participant, firstSolved *bool) string {
+	switch {
+	case !p.Finished:
+		return "⏳"
+	case p.Solved:
 		if *firstSolved {
 			*firstSolved = false
-			return "🥇", fmt.Sprintf("%d/%d", p.Attempts, maxAttempts)
+			return "🥇"
 		}
-		return "✅", fmt.Sprintf("%d/%d", p.Attempts, maxAttempts)
+		return "✅"
+	default:
+		return "❌"
 	}
-	return "❌", fmt.Sprintf("X/%d", maxAttempts)
+}
+
+// squaresFor renders the Wordle-style result strip: ⬛ per wrong guess, 🟩 for
+// the winning guess. In progress shows the wrong guesses made so far.
+func squaresFor(p participant, maxAttempts int) string {
+	switch {
+	case p.Finished && p.Solved:
+		return strings.Repeat("⬛", max(0, p.Attempts-1)) + "🟩"
+	case p.Finished:
+		return strings.Repeat("⬛", maxAttempts)
+	default:
+		return strings.Repeat("⬛", p.Attempts)
+	}
 }
 
 // sortParts orders solvers first (fewest attempts), then in-progress, then failed.

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"gachabot/internal/cardart"
 	"gachabot/internal/models"
 )
 
@@ -108,7 +109,7 @@ func cardFromRoll(res *models.RollResult) *cardDTO {
 		Name:     res.Card.Name,
 		Power:    res.Card.PowerLevel,
 		Rarity:   res.RarityName,
-		ImageURL: res.Card.ImageURL,
+		ImageURL: cardart.Framed(res.Card.ImageURL),
 		Quantity: 1,
 	}
 }

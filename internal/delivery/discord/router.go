@@ -3,6 +3,7 @@ package discord
 import (
 	"context"
 	"fmt"
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"log"
 	"strconv"
@@ -231,7 +232,7 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 				Author:      &discordgo.MessageEmbedAuthor{Name: b.loc.Translate(lang, "duel_ds_attacker", i18n.Args{"challenger": duel.ChallengerName})},
 				Title:       res.CardChallenger.Name,
 				Description: b.loc.Translate(lang, "duel_ds_stats", i18n.Args{"power": res.CardChallenger.PowerLevel, "chance": fmt.Sprintf("%.1f", res.ChanceChallenger)}),
-				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: res.CardChallenger.ImageURL},
+				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: cardart.Framed(res.CardChallenger.ImageURL)},
 				Color:       0x3498db,
 			}
 
@@ -239,7 +240,7 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 				Author:      &discordgo.MessageEmbedAuthor{Name: b.loc.Translate(lang, "duel_ds_defender", i18n.Args{"target": duel.TargetName})},
 				Title:       res.CardTarget.Name,
 				Description: b.loc.Translate(lang, "duel_ds_stats", i18n.Args{"power": res.CardTarget.PowerLevel, "chance": fmt.Sprintf("%.1f", res.ChanceTarget)}),
-				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: res.CardTarget.ImageURL},
+				Thumbnail:   &discordgo.MessageEmbedThumbnail{URL: cardart.Framed(res.CardTarget.ImageURL)},
 				Color:       0xe74c3c,
 			}
 

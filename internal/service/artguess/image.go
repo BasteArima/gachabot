@@ -10,15 +10,20 @@ import (
 	"time"
 
 	"github.com/disintegration/imaging"
+	"github.com/fogleman/gg"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/opentype"
 	_ "golang.org/x/image/webp" // register webp decoder for image.Decode
 )
 
 const (
-	keySrcPrefix = "artguess:src:" // +cardID -> original art bytes
-	keyImgPrefix = "artguess:img:" // +cardID:level -> rendered JPEG bytes
-	srcTTL       = 7 * 24 * time.Hour
-	maxBlur      = 14.0 // gaussian sigma at the most-hidden level
-	minPixels    = 16   // smallest pixelation grid (level 0)
+	keySrcPrefix      = "artguess:src:"      // +cardID -> original art bytes
+	keyImgPrefix      = "artguess:img:"      // +cardID:level -> rendered JPEG bytes
+	keyBoardImgPrefix = "artguess:boardimg:" // +date -> blurred board image with caption
+	srcTTL            = 7 * 24 * time.Hour
+	maxBlur           = 14.0 // gaussian sigma at the most-hidden level
+	minPixels         = 16   // smallest pixelation grid (level 0)
 )
 
 var imgClient = &http.Client{Timeout: 15 * time.Second}
@@ -71,6 +76,76 @@ func (s *Service) ImageData(ctx context.Context, uid int64, reqLevel int) ([]byt
 	}
 	_ = s.rdb.Set(ctx, imgKey, buf.Bytes(), dayTTL).Err()
 	return buf.Bytes(), nil
+}
+
+// BoardImage renders today's card at maximum blur with a "GachaBot / Art Guess"
+// caption overlay, for attaching to the chat scoreboard / morning ping. It's the
+// same for everyone and stable for the day, so it's cached per date.
+func (s *Service) BoardImage(ctx context.Context) ([]byte, error) {
+	cfg := s.Config()
+	dateStr := dateKey(s.midnight())
+	key := keyBoardImgPrefix + dateStr
+	if b, err := s.rdb.Get(ctx, key).Bytes(); err == nil {
+		return b, nil
+	}
+
+	rmap, err := s.rarityMap()
+	if err != nil {
+		return nil, err
+	}
+	targetID, err := s.dailyCardID(ctx, cfg, dateStr, rmap)
+	if err != nil {
+		return nil, err
+	}
+	src, err := s.sourceBytes(ctx, targetID)
+	if err != nil {
+		return nil, err
+	}
+	img, err := imaging.Decode(bytes.NewReader(src))
+	if err != nil {
+		return nil, fmt.Errorf("decode art: %w", err)
+	}
+
+	out := drawBoardCaption(renderLevel(img, 0, cfg.MaxAttempts)) // level 0 = most hidden
+	var buf bytes.Buffer
+	if err := imaging.Encode(&buf, out, imaging.JPEG, imaging.JPEGQuality(82)); err != nil {
+		return nil, err
+	}
+	_ = s.rdb.Set(ctx, key, buf.Bytes(), dayTTL).Err()
+	return buf.Bytes(), nil
+}
+
+// drawBoardCaption overlays a darkened top strip with the "GachaBot" / "Art Guess"
+// title on the blurred art, using the embedded Go Bold font (no asset file).
+func drawBoardCaption(src image.Image) image.Image {
+	b := src.Bounds()
+	w, h := float64(b.Dx()), float64(b.Dy())
+	dc := gg.NewContextForImage(src)
+
+	// Legibility scrim across the top.
+	dc.SetRGBA(0, 0, 0, 0.45)
+	dc.DrawRectangle(0, 0, w, h*0.2)
+	dc.Fill()
+
+	dc.SetRGB(1, 1, 1)
+	cx := w / 2
+	if face, err := fontFace(w / 11); err == nil {
+		dc.SetFontFace(face)
+		dc.DrawStringAnchored("GachaBot", cx, h*0.07, 0.5, 0.5)
+	}
+	if face, err := fontFace(w / 15); err == nil {
+		dc.SetFontFace(face)
+		dc.DrawStringAnchored("Art Guess", cx, h*0.145, 0.5, 0.5)
+	}
+	return dc.Image()
+}
+
+func fontFace(size float64) (font.Face, error) {
+	fnt, err := opentype.Parse(gobold.TTF)
+	if err != nil {
+		return nil, err
+	}
+	return opentype.NewFace(fnt, &opentype.FaceOptions{Size: size, DPI: 72})
 }
 
 // sourceBytes returns the original art bytes for a card, caching the download.

@@ -4,6 +4,7 @@ import (
 	"log"
 	"strconv"
 
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"gachabot/internal/service/spawn"
@@ -27,7 +28,7 @@ func (b *Bot) SendSpawn(chat models.Chat, view spawn.SpawnView) (int64, error) {
 	btn := menu.Data(b.loc.Translate(spawnLang, "btn_spawn_claim"), "spawn_claim", strconv.FormatInt(view.SpawnID, 10))
 	menu.Inline(menu.Row(btn))
 
-	photo := &tele.Photo{File: tele.FromURL(view.Card.ImageURL), Caption: caption}
+	photo := &tele.Photo{File: tele.FromURL(cardart.Framed(view.Card.ImageURL)), Caption: caption}
 	msg, err := b.bot.Send(&tele.Chat{ID: chat.ChatID}, photo, &tele.SendOptions{ParseMode: tele.ModeHTML, ReplyMarkup: menu})
 	if err != nil {
 		return 0, err

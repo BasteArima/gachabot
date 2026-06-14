@@ -4,6 +4,7 @@ import (
 	"log"
 	"strconv"
 
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"gachabot/internal/service/spawn"
@@ -24,7 +25,7 @@ func (b *Bot) SendSpawn(chat models.Chat, view spawn.SpawnView) (int64, error) {
 			"rarity":  b.loc.Rarity(spawnLang, view.RarityName),
 			"seconds": view.WindowSeconds,
 		}),
-		Image: &discordgo.MessageEmbedImage{URL: view.Card.ImageURL},
+		Image: &discordgo.MessageEmbedImage{URL: cardart.Framed(view.Card.ImageURL)},
 		Color: spawnColor,
 	}
 	components := []discordgo.MessageComponent{
@@ -153,7 +154,7 @@ func (b *Bot) spawnCaughtEmbed(res spawn.ClaimResult) *discordgo.MessageEmbed {
 			"name":   res.Card.Name,
 			"rarity": b.loc.Rarity(spawnLang, res.RarityName),
 		}),
-		Image: &discordgo.MessageEmbedImage{URL: res.Card.ImageURL},
+		Image: &discordgo.MessageEmbedImage{URL: cardart.Framed(res.Card.ImageURL)},
 		Color: 0x2ecc71,
 	}
 }

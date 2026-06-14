@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"bytes"
 	"strconv"
 
 	"gachabot/internal/models"
@@ -22,22 +23,36 @@ func (b *Bot) artGuessComponents() []discordgo.MessageComponent {
 	}}}
 }
 
-// PostBoard implements artguess.Broadcaster. startParam is unused on Discord
-// (the Play button launches the Activity instead of carrying a deep link).
-func (b *Bot) PostBoard(chat models.Chat, text, startParam string) (int64, error) {
-	msg, err := b.session.ChannelMessageSendComplex(strconv.FormatInt(chat.ChatID, 10), &discordgo.MessageSend{
-		Embeds:     []*discordgo.MessageEmbed{{Description: text, Color: artGuessBoardColor}},
+const artGuessBoardImage = "attachment://blur.jpg"
+
+// PostBoard implements artguess.Broadcaster: posts the scoreboard embed with the
+// blurred daily art attached. startParam is unused on Discord (the Play button
+// launches the Activity instead of carrying a deep link).
+func (b *Bot) PostBoard(chat models.Chat, text, startParam string, image []byte) (int64, error) {
+	embed := &discordgo.MessageEmbed{Description: text, Color: artGuessBoardColor}
+	send := &discordgo.MessageSend{
+		Embeds:     []*discordgo.MessageEmbed{embed},
 		Components: b.artGuessComponents(),
-	})
+	}
+	if len(image) > 0 {
+		embed.Image = &discordgo.MessageEmbedImage{URL: artGuessBoardImage}
+		send.Files = []*discordgo.File{{Name: "blur.jpg", ContentType: "image/jpeg", Reader: bytes.NewReader(image)}}
+	}
+	msg, err := b.session.ChannelMessageSendComplex(strconv.FormatInt(chat.ChatID, 10), send)
 	if err != nil {
 		return 0, err
 	}
 	return parseID(msg.ID), nil
 }
 
-// EditBoard implements artguess.Broadcaster: updates the live scoreboard in place.
+// EditBoard implements artguess.Broadcaster: updates the scoreboard text in place.
+// The embed keeps referencing the originally-attached image (retained on edit).
 func (b *Bot) EditBoard(chat models.Chat, messageID int64, text, startParam string) error {
-	embeds := []*discordgo.MessageEmbed{{Description: text, Color: artGuessBoardColor}}
+	embeds := []*discordgo.MessageEmbed{{
+		Description: text,
+		Image:       &discordgo.MessageEmbedImage{URL: artGuessBoardImage},
+		Color:       artGuessBoardColor,
+	}}
 	comps := b.artGuessComponents()
 	_, err := b.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
 		Channel:    strconv.FormatInt(chat.ChatID, 10),

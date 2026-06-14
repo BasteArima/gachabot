@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"fmt"
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 	"log"
@@ -35,7 +36,7 @@ func (b *Bot) HandleCraft(ctx tele.Context) error {
 	}
 
 	photo := &tele.Photo{
-		File:    tele.FromURL(result.Card.ImageURL),
+		File:    tele.FromURL(cardart.Framed(result.Card.ImageURL)),
 		Caption: caption,
 	}
 
@@ -188,8 +189,8 @@ func (b *Bot) HandleDuelCallback(ctx tele.Context) error {
 		})
 
 		album := tele.Album{
-			&tele.Photo{File: tele.FromURL(result.CardChallenger.ImageURL), Caption: resText},
-			&tele.Photo{File: tele.FromURL(result.CardTarget.ImageURL)},
+			&tele.Photo{File: tele.FromURL(cardart.Framed(result.CardChallenger.ImageURL)), Caption: resText},
+			&tele.Photo{File: tele.FromURL(cardart.Framed(result.CardTarget.ImageURL))},
 		}
 
 		_ = ctx.Delete()
@@ -366,7 +367,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 		caption = b.loc.Translate(lang, "roll_success", i18n.Args{"name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel, "reward": result.Reward})
 	}
 
-	dynamicURL := fmt.Sprintf("%s?v=%d", result.Card.ImageURL, time.Now().Unix())
+	dynamicURL := fmt.Sprintf("%s?v=%d", cardart.Framed(result.Card.ImageURL), time.Now().Unix())
 	photo := &tele.Photo{
 		File:    tele.FromURL(dynamicURL),
 		Caption: caption,
@@ -376,7 +377,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	btnRoll := menu.Data(b.loc.Translate(lang, "btn_roll_again"), "roll_again")
 	if b.bot.Me != nil && b.bot.Me.Username != "" {
 		// Opens the Telegram Mini App (requires Main Mini App enabled in BotFather).
-		btnApp := menu.URL(b.loc.Translate(lang, "btn_open_app"), "https://t.me/"+b.bot.Me.Username+"?startapp")
+		btnApp := menu.URL(b.loc.Translate(lang, "btn_open_app"), b.openAppURL(ctx.Chat()))
 		menu.Inline(menu.Row(btnRoll, btnApp))
 	} else {
 		menu.Inline(menu.Row(btnRoll))
