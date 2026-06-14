@@ -15,7 +15,7 @@ func (r *PostgresRepo) GetUserInventoryList(userID int64, rarityName string) ([]
 		JOIN rarities r ON c.rarity_id = r.id
 		LEFT JOIN card_sets cs ON c.set_id = cs.id
 		WHERE i.user_id = $1 AND ($2 = '' OR $2 = 'All' OR r.name = $2)
-		ORDER BY c.rarity_id DESC, c.power_level DESC, c.id ASC`
+		ORDER BY (i.quantity > 1) DESC, c.rarity_id DESC, c.power_level DESC, c.id ASC`
 
 	rows, err := r.db.Query(query, userID, rarityName)
 	if err != nil {

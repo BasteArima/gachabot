@@ -11,10 +11,16 @@ import (
 )
 
 // Deep links carry the launch chat into the web app as a Telegram `startapp`
-// value: artguess_<chatID>_<sig>. The signature (HMAC over the chat id, keyed by
+// value: <prefix><chatID>_<sig>. The signature (HMAC over the chat id, keyed by
 // the bot token) stops a user from forging a chat id to post results into a chat
-// they were never invited to play from.
-const deepLinkPrefix = "artguess_"
+// they were never invited to play from. Two prefixes, both verified the same way:
+//
+//	artguess_ — from the "Играть" button: the frontend opens Art Guess directly.
+//	agctx_    — from a roll's "Открыть приложение": just chat context, stays on hub.
+const (
+	deepLinkPrefix = "artguess_"
+	contextPrefix  = "agctx_"
+)
 
 func (s *Service) sign(platform string, chatID int64) string {
 	mac := hmac.New(sha256.New, []byte(s.secret))
@@ -22,18 +28,29 @@ func (s *Service) sign(platform string, chatID int64) string {
 	return hex.EncodeToString(mac.Sum(nil))[:16]
 }
 
-// DeepLinkParam builds the signed startapp value for a chat.
+// DeepLinkParam builds the signed "open Art Guess" startapp value (Play button).
 func (s *Service) DeepLinkParam(platform string, chatID int64) string {
 	return fmt.Sprintf("%s%d_%s", deepLinkPrefix, chatID, s.sign(platform, chatID))
 }
 
-// parseLaunch verifies a startapp value for the given platform and returns the
-// chat id it encodes.
+// ContextParam builds the signed "chat context only" startapp value (roll's
+// open-app button): carries the chat for attribution but doesn't open the game.
+func (s *Service) ContextParam(platform string, chatID int64) string {
+	return fmt.Sprintf("%s%d_%s", contextPrefix, chatID, s.sign(platform, chatID))
+}
+
+// parseLaunch verifies a startapp value (either prefix) for the given platform
+// and returns the chat id it encodes.
 func (s *Service) parseLaunch(platform, raw string) (int64, bool) {
-	if !strings.HasPrefix(raw, deepLinkPrefix) {
+	var rest string
+	switch {
+	case strings.HasPrefix(raw, deepLinkPrefix):
+		rest = strings.TrimPrefix(raw, deepLinkPrefix)
+	case strings.HasPrefix(raw, contextPrefix):
+		rest = strings.TrimPrefix(raw, contextPrefix)
+	default:
 		return 0, false
 	}
-	rest := strings.TrimPrefix(raw, deepLinkPrefix)
 	sep := strings.LastIndex(rest, "_")
 	if sep <= 0 || sep == len(rest)-1 {
 		return 0, false

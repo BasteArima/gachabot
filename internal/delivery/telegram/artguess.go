@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 
 	"gachabot/internal/models"
 	"gachabot/internal/service/artguess"
@@ -23,7 +24,9 @@ func (b *Bot) artGuessPlayURL(startParam string) string {
 func (b *Bot) openAppURL(chat *tele.Chat) string {
 	base := "https://t.me/" + b.bot.Me.Username + "?startapp"
 	if chat != nil && isGroup(chat) {
-		return base + "=" + b.artguess.DeepLinkParam(artguess.PlatformTelegram, chat.ID)
+		// Context-only param: attributes Art Guess play to this chat, but opens the
+		// hub (not the game) — unlike the board's "Играть" button.
+		return base + "=" + b.artguess.ContextParam(artguess.PlatformTelegram, chat.ID)
 	}
 	return base
 }
@@ -56,6 +59,11 @@ func (b *Bot) EditBoard(chat models.Chat, messageID int64, text, startParam stri
 	_, err := b.bot.EditCaption(msg, text, &tele.SendOptions{
 		ReplyMarkup: b.artGuessBoardMarkup(startParam),
 	})
+	// "message is not modified" just means nothing changed since the last edit
+	// (e.g. the morning ping re-rendering an unchanged board) — treat as success.
+	if err != nil && strings.Contains(err.Error(), "not modified") {
+		return nil
+	}
 	return err
 }
 
