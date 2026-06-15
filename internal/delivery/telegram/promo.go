@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"strings"
 
@@ -58,7 +59,7 @@ func (b *Bot) HandlePromo(ctx tele.Context) error {
 	if len(cards) == 0 {
 		sendErr = ctx.Send(text, tele.ModeHTML)
 	} else if len(cards) == 1 {
-		photo := &tele.Photo{File: tele.FromURL(cards[0].ImageURL), Caption: text}
+		photo := &tele.Photo{File: tele.FromURL(cardart.Framed(cards[0].ImageURL)), Caption: text}
 		sendErr = ctx.Send(photo, tele.ModeHTML)
 	} else {
 		albumLimit := len(cards)
@@ -67,7 +68,7 @@ func (b *Bot) HandlePromo(ctx tele.Context) error {
 		}
 		var album tele.Album
 		for i := 0; i < albumLimit; i++ {
-			p := &tele.Photo{File: tele.FromURL(cards[i].ImageURL)}
+			p := &tele.Photo{File: tele.FromURL(cardart.Framed(cards[i].ImageURL))}
 			if i == 0 {
 				p.Caption = text
 			}

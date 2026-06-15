@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"gachabot/internal/models"
 
@@ -60,7 +61,7 @@ func (b *Bot) handleCardsNav(s *discordgo.Session, i *discordgo.InteractionCreat
 	embed := &discordgo.MessageEmbed{
 		Title:       "🃏 " + card.CardName,
 		Description: desc,
-		Image:       &discordgo.MessageEmbedImage{URL: card.ImageURL},
+		Image:       &discordgo.MessageEmbedImage{URL: cardart.Framed(card.ImageURL)},
 		Color:       0x3498db,
 	}
 

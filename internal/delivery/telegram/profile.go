@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"gachabot/internal/cardart"
 	"gachabot/internal/i18n"
 	"log"
 	"strconv"
@@ -140,7 +141,7 @@ func (b *Bot) HandleCardsNav(ctx tele.Context) error {
 	}
 
 	photo := &tele.Photo{
-		File:    tele.FromURL(card.ImageURL),
+		File:    tele.FromURL(cardart.Framed(card.ImageURL)),
 		Caption: caption,
 	}
 
