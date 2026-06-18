@@ -82,9 +82,13 @@ func (p PostgresConfig) DSN() string {
 type GameConfig struct {
 	CooldownDuration time.Duration
 	// DuplicatesEnabled: if false, players never receive a card they already own —
-	// rolls yield only unowned cards (or points once everything is collected), and
-	// duplicate-based mechanics (crafting, duplicate counters) are disabled.
+	// rolls yield only unowned cards (or points once everything is collected). New
+	// duplicates stop dropping, but existing ones remain (and stay craftable if
+	// CraftEnabled).
 	DuplicatesEnabled bool
+	// CraftEnabled: whether crafting is available. Independent of DuplicatesEnabled
+	// so players can still burn existing duplicates while drops are off.
+	CraftEnabled bool
 }
 
 type BackupConfig struct {
@@ -118,6 +122,7 @@ func Load() (*Config, error) {
 		Game: GameConfig{
 			CooldownDuration:  time.Duration(getEnvInt("COOLDOWN_HOURS", 3)) * time.Hour,
 			DuplicatesEnabled: getEnvBool("ENABLE_DUPLICATES", true),
+			CraftEnabled:      getEnvBool("ENABLE_CRAFT", true),
 		},
 		Backup: BackupConfig{
 			Hour:   getEnvInt("BACKUP_TIME_HOUR", 3),

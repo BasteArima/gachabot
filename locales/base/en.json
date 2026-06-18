@@ -24,7 +24,7 @@
   "rarity_rare": "Rare",
   "rarity_uncommon": "Uncommon",
   "suggest_cancelled": "🛑 Card suggestion cancelled.",
-  "craft_disabled": "Crafting is disabled: duplicate cards are turned off.",
+  "craft_disabled": "Crafting is currently disabled.",
   "btn_spawn_claim": "🃏 Catch!",
   "spawn_title": "🌟 Wild card!",
   "spawn_appeared": "🌟 <b>A wild card appeared!</b>\n🃏 <b>{name}</b> ({rarity})\n\n⏳ Catch it within {seconds}s — hit the button!",

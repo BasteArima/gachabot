@@ -24,7 +24,7 @@
   "rarity_rare": "Редкая",
   "rarity_uncommon": "Необычная",
   "suggest_cancelled": "🛑 Предложение карточки отменено.",
-  "craft_disabled": "Крафт отключён: дубликаты карт выключены.",
+  "craft_disabled": "Крафт сейчас отключён.",
   "btn_spawn_claim": "🃏 Поймать!",
   "spawn_title": "🌟 Дикая карта!",
   "spawn_appeared": "🌟 <b>Появилась дикая карта!</b>\n🃏 <b>{name}</b> ({rarity})\n\n⏳ Успей поймать за {seconds} сек — жми кнопку!",

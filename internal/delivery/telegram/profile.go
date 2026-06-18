@@ -17,7 +17,7 @@ func (b *Bot) cardCaptionKey(withSet bool) string {
 	if withSet {
 		key = "card_nav_caption_with_set"
 	}
-	if !b.service.DuplicatesEnabled() {
+	if !b.service.ShowDuplicates() {
 		key += "_no_dupes"
 	}
 	return key
@@ -35,7 +35,7 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	}
 
 	profileKey := "profile_caption"
-	if !b.service.DuplicatesEnabled() {
+	if !b.service.ShowDuplicates() {
 		profileKey = "profile_caption_no_dupes"
 	}
 	caption := b.loc.Translate(lang, profileKey, i18n.Args{

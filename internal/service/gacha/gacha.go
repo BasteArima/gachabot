@@ -15,9 +15,10 @@ type GachaService struct {
 	adminID           int64
 	cooldownHours     time.Duration
 	duplicatesEnabled bool
+	craftEnabled      bool
 }
 
-func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID int64, cooldown time.Duration, duplicatesEnabled bool) *GachaService {
+func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID int64, cooldown time.Duration, duplicatesEnabled, craftEnabled bool) *GachaService {
 	loc := time.FixedZone("MSK", 3*60*60)
 	return &GachaService{
 		repo:              repo,
@@ -26,13 +27,25 @@ func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID i
 		adminID:           adminID,
 		cooldownHours:     cooldown,
 		duplicatesEnabled: duplicatesEnabled,
+		craftEnabled:      craftEnabled,
 	}
 }
 
-// DuplicatesEnabled reports whether duplicate cards are allowed (used by the
-// delivery layer to hide duplicate-related UI when off).
+// DuplicatesEnabled reports whether new duplicate cards can drop.
 func (s *GachaService) DuplicatesEnabled() bool {
 	return s.duplicatesEnabled
+}
+
+// CraftEnabled reports whether crafting is available (independent of duplicate drops).
+func (s *GachaService) CraftEnabled() bool {
+	return s.craftEnabled
+}
+
+// ShowDuplicates reports whether duplicate-related UI (owned counts, craft fuel)
+// should be shown: either duplicates drop, or crafting (which consumes existing
+// duplicates) is on. Used by the delivery layer to pick caption variants.
+func (s *GachaService) ShowDuplicates() bool {
+	return s.duplicatesEnabled || s.craftEnabled
 }
 
 // findRarity returns a pointer to the rarity with the given ID, or nil if not found.

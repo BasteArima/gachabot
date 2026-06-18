@@ -34,7 +34,7 @@ func (b *Bot) cardCaptionKey(withSet bool) string {
 	if withSet {
 		key = "card_nav_caption_with_set"
 	}
-	if !b.service.DuplicatesEnabled() {
+	if !b.service.ShowDuplicates() {
 		key += "_no_dupes"
 	}
 	return key
@@ -98,7 +98,7 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 
 	desc := fmt.Sprintf("**%s**\n\n", user.Username)
 	statsKey := "profile_stats"
-	if !b.service.DuplicatesEnabled() {
+	if !b.service.ShowDuplicates() {
 		statsKey = "profile_stats_no_dupes"
 	}
 	desc += b.loc.Translate(lang, statsKey, i18n.Args{
