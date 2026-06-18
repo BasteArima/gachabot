@@ -2,8 +2,10 @@ package repository
 
 func (r *PostgresRepo) GetAvailableCrafts(userID int64) (map[int]int, error) {
 	counts := make(map[int]int)
+	// SUM(...) over an integer column is bigint, so scan it into int64; ::int would
+	// also work but the cast risks overflow errors on huge stacks.
 	query := `
-       SELECT c.rarity_id, SUM(ui.quantity - 1) 
+       SELECT c.rarity_id, SUM(ui.quantity - 1)
        FROM user_inventory ui
        JOIN cards c ON ui.card_id = c.id
        WHERE ui.user_id = $1 AND ui.quantity > 1
@@ -16,12 +18,14 @@ func (r *PostgresRepo) GetAvailableCrafts(userID int64) (map[int]int, error) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var rarityID, dupCount int
-		if err := rows.Scan(&rarityID, &dupCount); err == nil {
-			counts[rarityID] = dupCount
+		var rarityID int
+		var dupCount int64
+		if err := rows.Scan(&rarityID, &dupCount); err != nil {
+			return nil, err
 		}
+		counts[rarityID] = int(dupCount)
 	}
-	return counts, nil
+	return counts, rows.Err()
 }
 
 func (r *PostgresRepo) ConsumeDuplicates(userID int64, rarityID int, amount int) error {

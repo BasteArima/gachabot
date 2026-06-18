@@ -233,30 +233,45 @@ func (b *Bot) HandleStart(ctx tele.Context) error {
 	btnRoll := menu.Data(b.loc.Translate(lang, "btn_roll_shortcut"), "roll_shortcut")
 	btnProfile := menu.Data(b.loc.Translate(lang, "btn_profile_menu"), "profile_menu")
 	btnHelp := menu.Data(b.loc.Translate(lang, "btn_help_menu"), "help_menu")
-	btnAddGroup := menu.URL(b.loc.Translate(lang, "btn_add_group"), b.groupLink)
 
-	menu.Inline(
-		menu.Row(btnProfile, btnHelp),
-		menu.Row(btnAddGroup),
-		menu.Row(btnRoll),
-	)
+	rows := []tele.Row{menu.Row(btnProfile, btnHelp)}
+	// URL buttons must have a non-empty URL, otherwise Telegram rejects the whole
+	// message (BUTTON_URL_INVALID) and /start silently fails to send.
+	if b.bot.Me != nil && b.bot.Me.Username != "" {
+		rows = append(rows, menu.Row(menu.URL(b.loc.Translate(lang, "btn_open_app"), b.openAppURL(ctx.Chat()))))
+	}
+	if b.groupLink != "" {
+		rows = append(rows, menu.Row(menu.URL(b.loc.Translate(lang, "btn_add_group"), b.groupLink)))
+	}
+	rows = append(rows, menu.Row(btnRoll))
+	menu.Inline(rows...)
 
 	text := b.loc.Translate(lang, "start_msg")
-	banner := &tele.Photo{
-		File:    tele.FromURL(b.startBannerURL),
-		Caption: text,
+
+	// The banner is optional and its URL may be unreachable — on any failure fall
+	// back to a plain text message so /start always responds.
+	if b.startBannerURL != "" {
+		banner := &tele.Photo{File: tele.FromURL(b.startBannerURL), Caption: text}
+		var err error
+		switch {
+		case ctx.Callback() == nil:
+			err = ctx.Send(banner, tele.ModeHTML, menu)
+		case ctx.Message() != nil && ctx.Message().Photo != nil:
+			err = ctx.Edit(banner, tele.ModeHTML, menu)
+		default:
+			_ = ctx.Delete()
+			err = ctx.Send(banner, tele.ModeHTML, menu)
+		}
+		if err == nil {
+			return nil
+		}
+		log.Printf("[TELEGRAM] /start banner failed (%q): %v — falling back to text", b.startBannerURL, err)
 	}
 
-	if ctx.Callback() == nil {
-		return ctx.Send(banner, tele.ModeHTML, menu)
+	if ctx.Callback() != nil && ctx.Message() != nil && ctx.Message().Photo != nil {
+		_ = ctx.Delete()
 	}
-
-	if ctx.Message() != nil && ctx.Message().Photo != nil {
-		return ctx.Edit(banner, tele.ModeHTML, menu)
-	}
-
-	_ = ctx.Delete()
-	return ctx.Send(banner, tele.ModeHTML, menu)
+	return ctx.Send(text, tele.ModeHTML, menu)
 }
 
 func (b *Bot) HandleAdultConfirm(ctx tele.Context) error {

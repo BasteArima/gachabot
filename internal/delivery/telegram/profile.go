@@ -64,6 +64,9 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 	btnBack := menu.Data(b.loc.Translate(lang, "btn_back_to_start"), "start_menu")
 
 	rows = append(rows, menu.Row(btnSuggest))
+	if b.bot.Me != nil && b.bot.Me.Username != "" {
+		rows = append(rows, menu.Row(menu.URL(b.loc.Translate(lang, "btn_open_app"), b.openAppURL(ctx.Chat()))))
+	}
 	rows = append(rows, menu.Row(btnBack))
 
 	menu.Inline(rows...)

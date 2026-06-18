@@ -97,7 +97,7 @@ func (r *PostgresRepo) GetUserSetsProgress(userID int64) ([]models.UserSetProgre
 		LEFT JOIN UserSetCards usc ON tsc.set_id = usc.set_id
 		LEFT JOIN user_unlocked_sets uus ON uus.user_id = $1 AND uus.set_id = cs.id
 		LEFT JOIN users u ON u.id = $1
-		ORDER BY cs.id;
+		ORDER BY (COALESCE(usc.collected_cards, 0)::float / NULLIF(tsc.total_cards, 0)) DESC NULLS LAST, cs.name;
 	`
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
