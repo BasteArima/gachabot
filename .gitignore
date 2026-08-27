@@ -12,7 +12,6 @@
 /dist/
 /bin/
 /assets/artguess_overlay.png
-/assets/frames/
 
 *.log
 coverage.txt
