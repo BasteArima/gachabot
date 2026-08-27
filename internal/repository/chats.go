@@ -34,12 +34,19 @@ func (r *PostgresRepo) EnsureChat(platform string, chatID int64, guildID *int64,
 	return err
 }
 
-// SetChatSpawnEnabled toggles spawns for a single chat.
+// SetChatSpawnEnabled toggles spawns for a single chat. Reports sql.ErrNoRows
+// when the id matches nothing, so a silent no-op can't look like a success.
 func (r *PostgresRepo) SetChatSpawnEnabled(platform string, chatID int64, enabled bool) error {
-	_, err := r.db.Exec(
+	res, err := r.db.Exec(
 		`UPDATE chats SET spawn_enabled = $1 WHERE platform = $2 AND chat_id = $3`,
 		enabled, platform, chatID)
-	return err
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // DisableGuildChats turns off spawns for every channel of a Discord guild
@@ -117,8 +124,8 @@ func (r *PostgresRepo) GetSpawnChats() ([]models.Chat, error) {
 // AdminChat is a registry row for the admin chats tool.
 type AdminChat struct {
 	Platform     string     `json:"platform"`
-	ChatID       int64      `json:"chatId"`
-	GuildID      *int64     `json:"guildId"`
+	ChatID       int64      `json:"chatId,string"`
+	GuildID      *int64     `json:"guildId,string"`
 	Title        string     `json:"title"`
 	SpawnEnabled bool       `json:"spawnEnabled"`
 	AddedAt      *time.Time `json:"addedAt"`

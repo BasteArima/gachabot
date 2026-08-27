@@ -44,7 +44,10 @@ func (s *Server) handleAdminUpdateChat(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "bad request")
 		return
 	}
-	if err := s.repo.SetChatSpawnEnabled(platform, chatID, in.SpawnEnabled); err != nil {
+	if err := s.repo.SetChatSpawnEnabled(platform, chatID, in.SpawnEnabled); err == sql.ErrNoRows {
+		writeErr(w, http.StatusNotFound, "чат не найден")
+		return
+	} else if err != nil {
 		writeErr(w, http.StatusBadRequest, "не удалось обновить чат")
 		return
 	}

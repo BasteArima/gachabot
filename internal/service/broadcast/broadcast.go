@@ -56,7 +56,7 @@ func (s *Service) AvailablePlatforms() []string {
 // Result is one chat's delivery outcome.
 type Result struct {
 	Platform string `json:"platform"`
-	ChatID   int64  `json:"chatId"`
+	ChatID   int64  `json:"chatId,string"`
 	Title    string `json:"title"`
 	OK       bool   `json:"ok"`
 	Error    string `json:"error,omitempty"`

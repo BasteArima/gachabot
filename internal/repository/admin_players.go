@@ -16,7 +16,7 @@ type AdminPlayer struct {
 	LastName     string     `json:"lastName"`
 	AvatarURL    string     `json:"avatarUrl"`
 	TelegramID   *int64     `json:"telegramId"`
-	DiscordID    *int64     `json:"discordId"`
+	DiscordID    *int64     `json:"discordId,string"`
 	Balance      int        `json:"balance"`
 	StreakDays   int        `json:"streakDays"`
 	PremiumRolls int        `json:"premiumRolls"`
