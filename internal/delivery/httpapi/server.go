@@ -100,6 +100,8 @@ func (s *Server) Start() {
 				r.Post("/admin/theme/preview", s.handleAdminThemePreview)
 				r.Post("/admin/theme/apply", s.handleAdminThemeApply)
 				r.Get("/admin/art-lint", s.handleAdminArtLint)
+				r.Get("/admin/frames", s.handleAdminListFrames)
+				r.Get("/admin/frames/{name}", s.handleAdminGetFrame)
 				r.Get("/admin/players", s.handleAdminSearchPlayers)
 				r.Get("/admin/players/{id}", s.handleAdminGetPlayer)
 				r.Post("/admin/players/{id}/action", s.handleAdminPlayerAction)
