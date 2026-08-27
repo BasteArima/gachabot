@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -29,13 +30,17 @@ func framesDir() string {
 	return defaultFramesDir
 }
 
-// GET /api/admin/frames — which frames the server actually has on disk.
+// GET /api/admin/frames — which frames the server has, and which rarity each one
+// belongs to. The panel needs the second half because the editor knows a rarity
+// id, not a frame file name.
 func (s *Server) handleAdminListFrames(w http.ResponseWriter, _ *http.Request) {
 	dir := framesDir()
+	byRarity := map[string]string{}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		// A missing folder is a normal state (nothing deployed yet), not an error.
-		writeJSON(w, http.StatusOK, map[string]any{"dir": dir, "frames": []string{}})
+		writeJSON(w, http.StatusOK, map[string]any{"dir": dir, "frames": []string{}, "byRarity": byRarity})
 		return
 	}
 
@@ -50,7 +55,19 @@ func (s *Server) handleAdminListFrames(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	sort.Strings(frames)
-	writeJSON(w, http.StatusOK, map[string]any{"dir": dir, "frames": frames})
+
+	// Tie frames to rarities through the art folders the cards already use.
+	if folders, err := s.repo.RarityArtFolders(); err == nil {
+		for rarityID, folder := range folders {
+			for _, f := range frames {
+				if strings.EqualFold(f, folder) {
+					byRarity[strconv.Itoa(rarityID)] = f
+					break
+				}
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"dir": dir, "frames": frames, "byRarity": byRarity})
 }
 
 // GET /api/admin/frames/{name} — the frame PNG itself.
