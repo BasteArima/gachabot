@@ -15,6 +15,7 @@ import (
 	"gachabot/internal/config"
 	"gachabot/internal/repository"
 	"gachabot/internal/service/artguess"
+	"gachabot/internal/service/artstore"
 	"gachabot/internal/service/broadcast"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/spawn"
@@ -32,6 +33,7 @@ type Server struct {
 	spawn     *spawn.SpawnService
 	artguess  *artguess.Service
 	broadcast *broadcast.Service
+	art       *artstore.Service
 	botToken  string
 	adminID   int64
 	cfg       config.HTTPConfig
@@ -41,8 +43,8 @@ type Server struct {
 	require18Plus bool
 }
 
-func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, bc *broadcast.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig, game config.GameConfig, require18Plus bool) *Server {
-	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, broadcast: bc, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord, game: game, require18Plus: require18Plus}
+func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, bc *broadcast.Service, art *artstore.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig, game config.GameConfig, require18Plus bool) *Server {
+	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, broadcast: bc, art: art, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord, game: game, require18Plus: require18Plus}
 }
 
 // Start builds the router and serves in a background goroutine.
@@ -100,6 +102,9 @@ func (s *Server) Start() {
 				r.Post("/admin/theme/preview", s.handleAdminThemePreview)
 				r.Post("/admin/theme/apply", s.handleAdminThemeApply)
 				r.Get("/admin/art-lint", s.handleAdminArtLint)
+				r.Get("/admin/art", s.handleAdminArtConfig)
+				r.Get("/admin/art/exists", s.handleAdminArtExists)
+				r.Post("/admin/art", s.handleAdminArtUpload)
 				r.Get("/admin/players", s.handleAdminSearchPlayers)
 				r.Get("/admin/players/{id}", s.handleAdminGetPlayer)
 				r.Post("/admin/players/{id}/action", s.handleAdminPlayerAction)

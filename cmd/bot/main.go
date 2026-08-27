@@ -16,6 +16,7 @@ import (
 	"gachabot/internal/migrations"
 	"gachabot/internal/repository"
 	"gachabot/internal/service/artguess"
+	"gachabot/internal/service/artstore"
 	"gachabot/internal/service/backup"
 	"gachabot/internal/service/broadcast"
 	"gachabot/internal/service/duel"
@@ -53,13 +54,14 @@ func main() {
 	spawnService := spawn.NewSpawnService(repo, rdb, gachaService)
 	artguessService := artguess.New(repo, rdb, gachaService, cfg.Telegram.Token)
 	broadcastService := broadcast.New(repo)
+	artStore := artstore.New(artstore.Config(cfg.Art))
 
 	// API-only (local development): serve just the HTTP API. Bots and schedulers
 	// stay down so a dev instance can't steal the production bot's long-poll
 	// updates or post spawns / Art Guess boards into real chats.
 	if cfg.HTTP.APIOnly {
 		log.Println("[DEV] HTTP_ONLY=true — starting the API only (no bots, no schedulers)")
-		webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
+		webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, artStore, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
 		webServer.Start()
 
 		quit := make(chan os.Signal, 1)
@@ -116,7 +118,7 @@ func main() {
 	spawnService.Start()
 	artguessService.Start()
 
-	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
+	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, artStore, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
 	webServer.Start()
 
 	quit := make(chan os.Signal, 1)

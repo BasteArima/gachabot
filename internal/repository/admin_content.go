@@ -177,3 +177,39 @@ func (r *PostgresRepo) UpdateSet(id int, name, buffType string, buffValue, rewar
 	}
 	return nil
 }
+
+// RarityArtFolders maps each rarity to the art folder its cards live in
+// (…/cards/<Folder>/file.webp). Rarity names in the database are localised while
+// the art folders are English, so this is the only honest bridge between them:
+// it is read off the content itself. The dominant folder wins, so one odd url
+// cannot flip the answer.
+func (r *PostgresRepo) RarityArtFolders() (map[int]string, error) {
+	rows, err := r.db.Query(`
+		SELECT rarity_id, folder FROM (
+			SELECT c.rarity_id,
+			       split_part(split_part(c.image_url, '/cards/', 2), '/', 1) AS folder,
+			       row_number() OVER (PARTITION BY c.rarity_id ORDER BY count(*) DESC) AS rn
+			FROM cards c
+			WHERE c.image_url LIKE '%/cards/%'
+			GROUP BY c.rarity_id, folder
+		) t WHERE rn = 1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[int]string)
+	for rows.Next() {
+		var (
+			id     int
+			folder string
+		)
+		if err := rows.Scan(&id, &folder); err != nil {
+			return nil, err
+		}
+		if folder != "" {
+			out[id] = folder
+		}
+	}
+	return out, rows.Err()
+}

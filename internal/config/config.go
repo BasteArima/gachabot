@@ -20,6 +20,26 @@ type Config struct {
 	Game      GameConfig
 	Backup    BackupConfig
 	HTTP      HTTPConfig
+	Art       ArtConfig
+}
+
+// ArtConfig points at the host that serves card art. The art lives apart from
+// the service (a separate openresty box), so the admin panel needs both the
+// public url it is served under and a way to write files to it.
+//
+// Driver choice: ART_SFTP_HOST set → sftp; otherwise ART_LOCAL_DIR → a plain
+// directory (development, or a fallback when SSH is unavailable); neither →
+// uploads are disabled and the panel says so.
+type ArtConfig struct {
+	PublicBase   string // e.g. https://api.baste.ru
+	LocalDir     string // ART_LOCAL_DIR
+	SFTPHost     string // host or host:port
+	SFTPUser     string
+	SFTPPassword string
+	SFTPRoot     string // e.g. /var/www/api_files
+	// SFTPHostKey pins the server key. Required with password auth: an
+	// unverified host would be handed the password.
+	SFTPHostKey string
 }
 
 type TelegramConfig struct {
@@ -131,6 +151,15 @@ func Load() (*Config, error) {
 		Backup: BackupConfig{
 			Hour:   getEnvInt("BACKUP_TIME_HOUR", 3),
 			Minute: getEnvInt("BACKUP_TIME_MINUTE", 10),
+		},
+		Art: ArtConfig{
+			PublicBase:   strings.TrimRight(os.Getenv("ART_PUBLIC_BASE"), "/"),
+			LocalDir:     os.Getenv("ART_LOCAL_DIR"),
+			SFTPHost:     os.Getenv("ART_SFTP_HOST"),
+			SFTPUser:     os.Getenv("ART_SFTP_USER"),
+			SFTPPassword: os.Getenv("ART_SFTP_PASSWORD"),
+			SFTPRoot:     getEnv("ART_SFTP_ROOT", "/var/www/api_files"),
+			SFTPHostKey:  os.Getenv("ART_SFTP_HOST_KEY"),
 		},
 		HTTP: HTTPConfig{
 			Port:           getEnv("HTTP_PORT", "8080"),
