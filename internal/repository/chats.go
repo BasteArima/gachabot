@@ -1,6 +1,9 @@
 package repository
 
 import (
+	"database/sql"
+	"time"
+
 	"gachabot/internal/models"
 )
 
@@ -109,4 +112,59 @@ func (r *PostgresRepo) GetSpawnChats() ([]models.Chat, error) {
 		chats = append(chats, c)
 	}
 	return chats, rows.Err()
+}
+
+// AdminChat is a registry row for the admin chats tool.
+type AdminChat struct {
+	Platform     string     `json:"platform"`
+	ChatID       int64      `json:"chatId"`
+	GuildID      *int64     `json:"guildId"`
+	Title        string     `json:"title"`
+	SpawnEnabled bool       `json:"spawnEnabled"`
+	AddedAt      *time.Time `json:"addedAt"`
+}
+
+// ListAllChats returns every registered chat, including disabled ones (unlike
+// GetSpawnChats, which the engines use to pick posting targets).
+func (r *PostgresRepo) ListAllChats() ([]AdminChat, error) {
+	rows, err := r.db.Query(`
+		SELECT platform, chat_id, guild_id, COALESCE(title, ''), spawn_enabled, added_at
+		FROM chats ORDER BY platform ASC, spawn_enabled DESC, title ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	chats := make([]AdminChat, 0)
+	for rows.Next() {
+		var (
+			c     AdminChat
+			guild sql.NullInt64
+			added sql.NullTime
+		)
+		if err := rows.Scan(&c.Platform, &c.ChatID, &guild, &c.Title, &c.SpawnEnabled, &added); err != nil {
+			return nil, err
+		}
+		if guild.Valid {
+			c.GuildID = &guild.Int64
+		}
+		if added.Valid {
+			c.AddedAt = &added.Time
+		}
+		chats = append(chats, c)
+	}
+	return chats, rows.Err()
+}
+
+// DeleteChat removes a chat from the registry entirely. The bot stays in the chat
+// if it is still a member — use the leave action for that.
+func (r *PostgresRepo) DeleteChat(platform string, chatID int64) error {
+	res, err := r.db.Exec(`DELETE FROM chats WHERE platform = $1 AND chat_id = $2`, platform, chatID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

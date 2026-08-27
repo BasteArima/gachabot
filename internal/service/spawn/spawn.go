@@ -28,10 +28,10 @@ const settingKey = "spawn_config"
 type Outcome int
 
 const (
-	OutcomeWon Outcome = iota
-	OutcomeTaken          // someone else already won this chat's spawn
-	OutcomeAlreadyWave    // this account already claimed the wave elsewhere
-	OutcomeExpired        // spawn gone (window passed / unknown)
+	OutcomeWon         Outcome = iota
+	OutcomeTaken               // someone else already won this chat's spawn
+	OutcomeAlreadyWave         // this account already claimed the wave elsewhere
+	OutcomeExpired             // spawn gone (window passed / unknown)
 )
 
 // SpawnView is what the delivery layer needs to render a spawn message.

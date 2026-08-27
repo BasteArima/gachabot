@@ -103,3 +103,26 @@ func parseClock(hhmm string) (int, int, bool) {
 	}
 	return h, m, true
 }
+
+// CurrentConfigJSON returns the active config (stored or default) as pretty JSON.
+func (s *Service) CurrentConfigJSON() ([]byte, error) {
+	return json.MarshalIndent(s.Config(), "", "  ")
+}
+
+// SaveConfigJSON validates and persists a new Art Guess config. The normalised
+// form is stored, so unknown/omitted fields settle on their zero values rather
+// than lingering in the database.
+func (s *Service) SaveConfigJSON(data []byte) (Config, error) {
+	cfg, err := ParseConfig(data)
+	if err != nil {
+		return Config{}, err
+	}
+	norm, err := json.Marshal(cfg)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := s.repo.SetSetting(settingKey, norm); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}

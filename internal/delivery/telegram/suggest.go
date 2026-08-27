@@ -1,8 +1,10 @@
 package telegram
 
 import (
-	"gachabot/internal/i18n"
+	"log"
 	"strings"
+
+	"gachabot/internal/i18n"
 
 	tele "gopkg.in/telebot.v3"
 )
@@ -107,6 +109,20 @@ func (b *Bot) HandleMediaSuggest(ctx tele.Context) error {
 	if err != nil {
 		b.suggestService.SetSuggestState(dbUser.ID, false)
 		return ctx.Send(b.loc.Translate(lang, "suggest_err_funds"))
+	}
+
+	// Record the submission before notifying, so a paid-for suggestion is never
+	// lost if the admin chat message fails. Telegram file URLs embed the bot
+	// token and expire, so only the file id is stored — the admin panel resolves
+	// it on demand.
+	var fileID string
+	if p := ctx.Message().Photo; p != nil {
+		fileID = p.FileID
+	} else if d := ctx.Message().Document; d != nil {
+		fileID = d.FileID
+	}
+	if _, err := b.repo.CreateSuggestion(dbUser.ID, platformTelegram, caption, fileID, ""); err != nil {
+		log.Printf("[TG suggest] failed to store suggestion from %d: %v", dbUser.ID, err)
 	}
 
 	adminMsg := b.loc.Translate(lang, "suggest_admin_msg", i18n.Args{

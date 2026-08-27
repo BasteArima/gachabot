@@ -398,6 +398,11 @@ func (b *Bot) HandleMessageCreate(s *discordgo.Session, m *discordgo.MessageCrea
 			return
 		}
 
+		// Record it before notifying, so a paid-for suggestion always leaves a trace.
+		if _, err := b.repo.CreateSuggestion(dbUser.ID, "discord", m.Content, "", m.Attachments[0].URL); err != nil {
+			log.Printf("[DS suggest] failed to store suggestion from %d: %v", dbUser.ID, err)
+		}
+
 		adminMsg := fmt.Sprintf("📩 <b>Новая предложка (Discord)!</b>\nОт: %s (DB_ID: %d)\n\nОписание:\n<i>%s</i>",
 			m.Author.Username, dbUser.ID, m.Content)
 

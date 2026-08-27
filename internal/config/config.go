@@ -50,6 +50,10 @@ type HTTPConfig struct {
 	WebAppURL string // public HTTPS URL of the web app (for buttons/redirects)
 	// DevAllowNoAuth lets unauthenticated requests act as the admin user — local dev only.
 	DevAllowNoAuth bool
+	// APIOnly runs the HTTP API without starting the Telegram/Discord bots or the
+	// schedulers. Local development only: it keeps a dev instance from stealing
+	// the production bot's long-poll updates or posting to real chats.
+	APIOnly bool
 }
 
 type PostgresConfig struct {
@@ -133,10 +137,11 @@ func Load() (*Config, error) {
 			StaticDir:      os.Getenv("HTTP_STATIC_DIR"),
 			WebAppURL:      os.Getenv("WEB_APP_URL"),
 			DevAllowNoAuth: getEnvBool("DEV_ALLOW_NO_AUTH", false),
+			APIOnly:        getEnvBool("HTTP_ONLY", false),
 		},
 	}
 
-	if cfg.Telegram.Token == "" {
+	if cfg.Telegram.Token == "" && !cfg.HTTP.APIOnly {
 		return nil, fmt.Errorf("TELEGRAM_BOT_TOKEN is required")
 	}
 	if cfg.Postgres.User == "" || cfg.Postgres.DB == "" {

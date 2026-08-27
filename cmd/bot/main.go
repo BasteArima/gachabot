@@ -17,6 +17,7 @@ import (
 	"gachabot/internal/repository"
 	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/backup"
+	"gachabot/internal/service/broadcast"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/spawn"
@@ -51,6 +52,22 @@ func main() {
 	suggestService := suggest.NewSuggestService(repo, rdb)
 	spawnService := spawn.NewSpawnService(repo, rdb, gachaService)
 	artguessService := artguess.New(repo, rdb, gachaService, cfg.Telegram.Token)
+	broadcastService := broadcast.New(repo)
+
+	// API-only (local development): serve just the HTTP API. Bots and schedulers
+	// stay down so a dev instance can't steal the production bot's long-poll
+	// updates or post spawns / Art Guess boards into real chats.
+	if cfg.HTTP.APIOnly {
+		log.Println("[DEV] HTTP_ONLY=true — starting the API only (no bots, no schedulers)")
+		webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
+		webServer.Start()
+
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		log.Println("Shutting down gracefully...")
+		return
+	}
 
 	tgLoc, err := i18n.NewLocalizer("locales/base", "locales/telegram", "ru")
 	if err != nil {
@@ -63,6 +80,7 @@ func main() {
 	}
 	spawnService.RegisterSpawner(spawn.PlatformTelegram, tgBot)
 	artguessService.RegisterBroadcaster(artguess.PlatformTelegram, tgBot)
+	broadcastService.RegisterSender(broadcast.PlatformTelegram, tgBot)
 
 	if cfg.Discord.Token != "" {
 		discordLoc, err := i18n.NewLocalizer("locales/base", "locales/discord", "ru")
@@ -76,6 +94,7 @@ func main() {
 		}
 		spawnService.RegisterSpawner(spawn.PlatformDiscord, dsBot)
 		artguessService.RegisterBroadcaster(artguess.PlatformDiscord, dsBot)
+		broadcastService.RegisterSender(broadcast.PlatformDiscord, dsBot)
 
 		if err := dsBot.Start(); err != nil {
 			log.Printf("failed to start discord bot: %v", err)
@@ -97,7 +116,7 @@ func main() {
 	spawnService.Start()
 	artguessService.Start()
 
-	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord)
+	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
 	webServer.Start()
 
 	quit := make(chan os.Signal, 1)

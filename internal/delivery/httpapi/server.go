@@ -15,6 +15,7 @@ import (
 	"gachabot/internal/config"
 	"gachabot/internal/repository"
 	"gachabot/internal/service/artguess"
+	"gachabot/internal/service/broadcast"
 	"gachabot/internal/service/gacha"
 	"gachabot/internal/service/spawn"
 
@@ -25,19 +26,23 @@ import (
 )
 
 type Server struct {
-	repo     *repository.PostgresRepo
-	rdb      *redis.Client
-	gacha    *gacha.GachaService
-	spawn    *spawn.SpawnService
-	artguess *artguess.Service
-	botToken string
-	adminID  int64
-	cfg      config.HTTPConfig
-	discord  config.DiscordConfig
+	repo      *repository.PostgresRepo
+	rdb       *redis.Client
+	gacha     *gacha.GachaService
+	spawn     *spawn.SpawnService
+	artguess  *artguess.Service
+	broadcast *broadcast.Service
+	botToken  string
+	adminID   int64
+	cfg       config.HTTPConfig
+	discord   config.DiscordConfig
+	game      config.GameConfig
+	// require18Plus mirrors the Telegram-side age gate, shown in admin settings.
+	require18Plus bool
 }
 
-func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig) *Server {
-	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord}
+func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, bc *broadcast.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig, game config.GameConfig, require18Plus bool) *Server {
+	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, broadcast: bc, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord, game: game, require18Plus: require18Plus}
 }
 
 // Start builds the router and serves in a background goroutine.
@@ -46,7 +51,7 @@ func (s *Server) Start() {
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Telegram-Init-Data"},
 		AllowCredentials: false,
 		MaxAge:           300,
@@ -74,12 +79,50 @@ func (s *Server) Start() {
 
 			r.Group(func(r chi.Router) {
 				r.Use(s.adminMiddleware)
+				r.Use(s.auditMiddleware)
 				r.Get("/admin/overview", s.handleAdminOverview)
+				r.Get("/admin/settings", s.handleAdminSettings)
 				r.Get("/admin/spawn-config", s.handleGetSpawnConfig)
 				r.Put("/admin/spawn-config", s.handlePutSpawnConfig)
+				r.Get("/admin/artguess-config", s.handleGetArtGuessConfig)
+				r.Put("/admin/artguess-config", s.handlePutArtGuessConfig)
 				r.Post("/admin/artguess/reset-all", s.handleAdminArtGuessResetAll)
 				r.Post("/admin/artguess/reset-user", s.handleAdminArtGuessResetUser)
 				r.Post("/admin/artguess/reroll", s.handleAdminArtGuessReroll)
+
+				// Content editing (cards / rarities / sets).
+				r.Get("/admin/cards", s.handleAdminListCards)
+				r.Post("/admin/cards", s.handleAdminCreateCard)
+				r.Put("/admin/cards/{id}", s.handleAdminUpdateCard)
+				r.Get("/admin/rarities", s.handleAdminListRarities)
+				r.Put("/admin/rarities/{id}", s.handleAdminUpdateRarity)
+				r.Get("/admin/theme/export", s.handleAdminThemeExport)
+				r.Post("/admin/theme/preview", s.handleAdminThemePreview)
+				r.Post("/admin/theme/apply", s.handleAdminThemeApply)
+				r.Get("/admin/art-lint", s.handleAdminArtLint)
+				r.Get("/admin/players", s.handleAdminSearchPlayers)
+				r.Get("/admin/players/{id}", s.handleAdminGetPlayer)
+				r.Post("/admin/players/{id}/action", s.handleAdminPlayerAction)
+				r.Get("/admin/stars", s.handleAdminStarTransactions)
+				r.Post("/admin/stars/refund", s.handleAdminStarRefund)
+				r.Get("/admin/promo", s.handleAdminListPromo)
+				r.Post("/admin/promo", s.handleAdminCreatePromo)
+				r.Delete("/admin/promo/{code}", s.handleAdminDeletePromo)
+				r.Get("/admin/chats", s.handleAdminListChats)
+				r.Put("/admin/chats/{platform}/{chatId}", s.handleAdminUpdateChat)
+				r.Delete("/admin/chats/{platform}/{chatId}", s.handleAdminDeleteChat)
+				r.Post("/admin/chats/{platform}/{chatId}/leave", s.handleAdminLeaveChat)
+				r.Post("/admin/broadcast", s.handleAdminBroadcast)
+				r.Get("/admin/dashboard", s.handleAdminDashboard)
+				r.Get("/admin/audit", s.handleAdminAudit)
+				r.Get("/admin/health", s.handleAdminHealth)
+				r.Get("/admin/suggestions", s.handleAdminListSuggestions)
+				r.Get("/admin/suggestions/{id}/image", s.handleAdminSuggestionImage)
+				r.Post("/admin/suggestions/{id}/approve", s.handleAdminApproveSuggestion)
+				r.Post("/admin/suggestions/{id}/reject", s.handleAdminRejectSuggestion)
+				r.Get("/admin/sets", s.handleAdminListSets)
+				r.Post("/admin/sets", s.handleAdminCreateSet)
+				r.Put("/admin/sets/{id}", s.handleAdminUpdateSet)
 			})
 		})
 	})
