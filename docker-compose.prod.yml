@@ -72,6 +72,17 @@ services:
       - START_BANNER_URL=${START_BANNER_URL}
       - BACKUP_TIME_HOUR=${BACKUP_TIME_HOUR}
       - BACKUP_TIME_MINUTE=${BACKUP_TIME_MINUTE}
+      # Card art storage: the admin panel writes new art to the host that serves
+      # it. ART_SFTP_HOST_KEY is required — with password auth an unverified host
+      # would be handed the password. Take it once with
+      #   ssh-keyscan -t ed25519 <host>
+      # and paste the whole line. Leave these empty to disable art uploads.
+      - ART_PUBLIC_BASE=${ART_PUBLIC_BASE}
+      - ART_SFTP_HOST=${ART_SFTP_HOST}
+      - ART_SFTP_USER=${ART_SFTP_USER}
+      - ART_SFTP_PASSWORD=${ART_SFTP_PASSWORD}
+      - ART_SFTP_ROOT=${ART_SFTP_ROOT}
+      - ART_SFTP_HOST_KEY=${ART_SFTP_HOST_KEY}
     expose:
       - "8080"
     # No host port published — Nginx Proxy Manager reaches the bot over the shared

@@ -28,6 +28,11 @@
 | **`DISCORD_OAUTH_REDIRECT`** *(новая)* | `https://<домен>/` — также добавь в Dev Portal → OAuth2 → Redirects |
 | **`WEB_APP_URL`** *(новая)* | `https://<домен>` (публичный HTTPS приложения) |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | креды БД (оставь те же, что сейчас!) |
+| **`ART_PUBLIC_BASE`** *(новая)* | адрес хоста с артом, напр. `https://api.example.com` |
+| **`ART_SFTP_HOST`** *(новая)* | тот же хост (или `хост:порт`) для заливки по SFTP |
+| **`ART_SFTP_USER`** / **`ART_SFTP_PASSWORD`** *(новые)* | пользователь с правом записи в каталог арта |
+| **`ART_SFTP_ROOT`** *(новая)* | каталог, который раздаёт веб-сервер, напр. `/var/www/api_files` |
+| **`ART_SFTP_HOST_KEY`** *(новая)* | вывод `ssh-keyscan -t ed25519 <хост>` целиком — обязателен, иначе пароль ушёл бы непроверенному серверу |
 | `REQUIRE_18_PLUS_CONFIRM`, `COOLDOWN_HOURS`, `ENABLE_DUPLICATES` | твои настройки |
 | `BACKUP_TIME_HOUR`, `BACKUP_TIME_MINUTE` | расписание бэкапов |
 
