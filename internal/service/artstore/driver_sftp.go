@@ -28,7 +28,7 @@ func newSFTP(cfg Config) (driver, error) {
 	if cfg.SFTPRoot == "" {
 		return nil, fmt.Errorf("не задан ART_SFTP_ROOT")
 	}
-	hostKey, err := parseHostKey(cfg.SFTPHostKey)
+	hostKey, algos, err := parseHostKey(cfg.SFTPHostKey)
 	if err != nil {
 		return nil, err
 	}
@@ -39,10 +39,15 @@ func newSFTP(cfg Config) (driver, error) {
 	}
 
 	conn, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{
-		User:            cfg.SFTPUser,
-		Auth:            []ssh.AuthMethod{ssh.Password(cfg.SFTPPassword)},
-		HostKeyCallback: hostKey,
-		Timeout:         sftpTimeout,
+		User: cfg.SFTPUser,
+		Auth: []ssh.AuthMethod{ssh.Password(cfg.SFTPPassword)},
+		// Asking for the pinned key's algorithm is what makes pinning work at
+		// all. A server usually offers rsa, ecdsa and ed25519, and Go's default
+		// preference puts ed25519 last — so it would negotiate a different key
+		// than the one pinned and report a mismatch that looks like an attack.
+		HostKeyAlgorithms: algos,
+		HostKeyCallback:   hostKey,
+		Timeout:           sftpTimeout,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ssh: %w", err)
@@ -56,25 +61,32 @@ func newSFTP(cfg Config) (driver, error) {
 	return &sftpStore{client: client, conn: conn, root: strings.TrimRight(cfg.SFTPRoot, "/")}, nil
 }
 
-// parseHostKey builds the host key check. There is deliberately no way to skip
-// it: the password would be handed to whatever answers on that address.
-func parseHostKey(raw string) (ssh.HostKeyCallback, error) {
+// parseHostKey builds the host key check and the host key algorithms to ask for.
+// There is deliberately no way to skip the check: the password would be handed
+// to whatever answers on that address.
+func parseHostKey(raw string) (ssh.HostKeyCallback, []string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"не задан ART_SFTP_HOST_KEY — сними его командой `ssh-keyscan -t ed25519 <хост>` " +
 				"и положи строку целиком, иначе пароль уйдёт непроверенному серверу")
 	}
 
-	// A "SHA256:…" fingerprint, as printed by ssh-keygen -lf.
+	// A "SHA256:…" fingerprint, as printed by ssh-keygen -lf. It does not say
+	// which key type it belongs to, so every type stays on the table and the
+	// fingerprint decides — a full ssh-keyscan line is the sturdier form.
 	if strings.HasPrefix(raw, "SHA256:") {
 		want := raw
-		return func(_ string, _ net.Addr, key ssh.PublicKey) error {
+		check := func(_ string, _ net.Addr, key ssh.PublicKey) error {
 			if got := ssh.FingerprintSHA256(key); got != want {
-				return fmt.Errorf("отпечаток ключа хоста не совпал: получен %s, ожидался %s", got, want)
+				return fmt.Errorf(
+					"отпечаток ключа хоста не совпал: сервер предъявил %s (%s), ожидался %s — "+
+						"возможно, отпечаток снят с ключа другого типа",
+					got, key.Type(), want)
 			}
 			return nil
-		}, nil
+		}
+		return check, nil, nil
 	}
 
 	// Otherwise an ssh-keyscan line, with or without the leading host field.
@@ -84,9 +96,9 @@ func parseHostKey(raw string) (ssh.HostKeyCallback, error) {
 	}
 	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(raw))
 	if err != nil {
-		return nil, fmt.Errorf("ART_SFTP_HOST_KEY не разобран: %w", err)
+		return nil, nil, fmt.Errorf("ART_SFTP_HOST_KEY не разобран: %w", err)
 	}
-	return ssh.FixedHostKey(key), nil
+	return ssh.FixedHostKey(key), []string{key.Type()}, nil
 }
 
 func (s *sftpStore) full(rel string) string { return path.Join(s.root, rel) }

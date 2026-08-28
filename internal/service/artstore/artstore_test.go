@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -154,13 +155,40 @@ func TestDisabledWithoutDriverOrBase(t *testing.T) {
 func TestHostKeyIsRequired(t *testing.T) {
 	// Password auth without a pinned host key would hand the password to
 	// whatever answers, so the driver must refuse to even dial.
-	if _, err := parseHostKey(""); err == nil {
+	if _, _, err := parseHostKey(""); err == nil {
 		t.Fatal("an empty host key must be rejected")
 	}
-	if _, err := parseHostKey("SHA256:abcdef"); err != nil {
+	if _, _, err := parseHostKey("SHA256:abcdef"); err != nil {
 		t.Errorf("a fingerprint should be accepted: %v", err)
 	}
-	if _, err := parseHostKey("not a key"); err == nil {
+	if _, _, err := parseHostKey("not a key"); err == nil {
 		t.Error("garbage must be rejected")
+	}
+}
+
+// A pinned key must also be the key that gets negotiated. Go prefers ed25519
+// last, so without asking for the pinned type a server offering rsa and ecdsa
+// too would present a different key and the connection would fail as a
+// mismatch — which reads like an attack rather than a configuration detail.
+func TestHostKeyPinsItsOwnAlgorithm(t *testing.T) {
+	const line = "api.example.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINWBMDJ/Ugt3iiUbsdluGzFqVAl6Snjzky5oOLfdztXO"
+
+	_, algos, err := parseHostKey(line)
+	if err != nil {
+		t.Fatalf("keyscan line should parse: %v", err)
+	}
+	if len(algos) != 1 || algos[0] != "ssh-ed25519" {
+		t.Errorf("host key algorithms = %v, want [ssh-ed25519]", algos)
+	}
+
+	// Without the host field it must behave identically.
+	_, algos, err = parseHostKey(strings.SplitN(line, " ", 2)[1])
+	if err != nil || len(algos) != 1 || algos[0] != "ssh-ed25519" {
+		t.Errorf("bare key line = %v, %v", algos, err)
+	}
+
+	// A fingerprint cannot name a type, so nothing is restricted.
+	if _, algos, _ := parseHostKey("SHA256:abcdef"); algos != nil {
+		t.Errorf("a fingerprint should not restrict algorithms, got %v", algos)
 	}
 }
