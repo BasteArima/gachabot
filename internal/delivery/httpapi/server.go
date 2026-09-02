@@ -51,6 +51,9 @@ func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.Gacha
 func (s *Server) Start() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
+	// Must run before routing: inside a Discord Activity every path may arrive
+	// with the /.proxy prefix.
+	r.Use(stripProxyPrefix)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -58,6 +61,10 @@ func (s *Server) Start() {
 		AllowCredentials: false,
 		MaxAge:           300,
 	}))
+
+	// Probe assets for diagnosing Discord's proxy from inside an Activity.
+	r.Get("/probe/tiny.js", s.handleProbeAsset)
+	r.Get("/probe/large.js", s.handleProbeAsset)
 
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/auth/telegram", s.handleAuthTelegram)
