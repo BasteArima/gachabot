@@ -67,6 +67,11 @@ func (s *Server) Start() {
 	r.Get("/probe/large.js", s.handleProbeAsset)
 
 	r.Route("/api", func(r chi.Router) {
+		// Temporary, unauthenticated: the Activity has no session before its
+		// bundle loads, which is exactly what is being diagnosed.
+		r.Post("/probe", s.handleProbeReport)
+		r.Get("/probe", s.handleProbeRead)
+
 		r.Post("/auth/telegram", s.handleAuthTelegram)
 		r.Post("/auth/discord", s.handleAuthDiscord)
 
@@ -168,6 +173,9 @@ func (s *Server) mountStatic(r chi.Router) {
 			fs.ServeHTTP(w, req)
 			return
 		}
+		// The shell carries the hashed asset urls, so a stale copy pins the app
+		// to an old build — and Discord's proxy caches aggressively.
+		w.Header().Set("Cache-Control", "no-store, must-revalidate")
 		http.ServeFile(w, req, filepath.Join(dir, "index.html"))
 	})
 }
