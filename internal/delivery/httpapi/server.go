@@ -76,6 +76,7 @@ func (s *Server) Start() {
 		r.Post("/probe", s.handleProbeReport)
 		r.Get("/probe", s.handleProbeRead)
 
+		r.Get("/config", s.handleConfig)
 		r.Post("/auth/telegram", s.handleAuthTelegram)
 		r.Post("/auth/discord", s.handleAuthDiscord)
 

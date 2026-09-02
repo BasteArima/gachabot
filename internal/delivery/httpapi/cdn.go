@@ -39,32 +39,51 @@ func (s *Server) handleCDN(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// Refused outright rather than forwarded: a redirect would hand the climb to
+	// the art host, and its idea of the path is not ours to guess.
+	if strings.Contains(rest, "..") {
+		http.NotFound(w, r)
+		return
+	}
 
-	if s.art != nil && s.art.Enabled() {
+	// Own file first, redirect second. Only a Discord Activity has to reach the
+	// art host, and it never asks this server — its proxy mapping goes there
+	// directly. Everyone else is a browser, which this server can serve
+	// perfectly well, so serving locally when the file is here removes a whole
+	// failure mode: a publish that did not land would otherwise point every
+	// client at a file the art host does not have, breaking the app everywhere
+	// rather than only inside Discord.
+	if full, ok := s.localCDNFile(rest); ok {
+		http.ServeFile(w, r, full)
+		return
+	}
+
+	// Not ours — card art, or an asset this deployment does not carry. Knowing
+	// where those are served from is enough to send the caller there.
+	if s.art != nil && s.art.PublicBase() != "" {
 		// 302 rather than 301: the art host is a deployment detail, and a
-		// permanent redirect would be cached by clients long after it changed.
+		// permanent redirect would be cached long after it changed.
 		http.Redirect(w, r, s.art.PublicBase()+rest, http.StatusFound)
 		return
 	}
+	http.NotFound(w, r)
+}
 
-	// No art host: serve the file from the local build. "/cdn/app/assets/x.js"
-	// is "<static>/assets/x.js" — the /app prefix only exists remotely, to keep
-	// the app's files apart from the card art in the same root.
-	if s.cfg.StaticDir == "" {
-		http.NotFound(w, r)
-		return
+// localCDNFile maps "/app/assets/x.js" onto "<static>/assets/x.js" — the /app
+// prefix exists only on the art host, to keep the app's files apart from the
+// card art sharing that root — and reports whether it is actually there.
+func (s *Server) localCDNFile(rest string) (string, bool) {
+	if s.cfg.StaticDir == "" || !strings.HasPrefix(rest, "/app/") {
+		return "", false
 	}
-	local := strings.TrimPrefix(rest, "/app")
-	full := filepath.Join(s.cfg.StaticDir, filepath.Clean(local))
+	full := filepath.Join(s.cfg.StaticDir, filepath.Clean(strings.TrimPrefix(rest, "/app")))
 	if relPath, err := filepath.Rel(s.cfg.StaticDir, full); err != nil || strings.HasPrefix(relPath, "..") {
-		http.NotFound(w, r)
-		return
+		return "", false
 	}
 	if st, err := os.Stat(full); err != nil || st.IsDir() {
-		http.NotFound(w, r)
-		return
+		return "", false
 	}
-	http.ServeFile(w, r, full)
+	return full, true
 }
 
 // PublishAssets copies the built asset files to the art host, skipping the ones
@@ -89,4 +108,16 @@ func PublishAssets(art *artstore.Service, staticDir string) {
 		return
 	}
 	log.Printf("[CDN] выложено на %s: новых %d, уже было %d", art.PublicBase()+"/"+assetsRemote, uploaded, skipped)
+}
+
+// GET /api/config — the handful of deployment facts the frontend needs before it
+// can render. Public: it holds no secrets, and the art host has to be known
+// before the first card image is drawn, which happens on some screens before a
+// session exists.
+func (s *Server) handleConfig(w http.ResponseWriter, _ *http.Request) {
+	base := ""
+	if s.art != nil {
+		base = s.art.PublicBase()
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"artBase": base})
 }
