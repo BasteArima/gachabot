@@ -67,7 +67,14 @@ func (s *Server) handleProbeReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	probeLog.Lock()
-	probeLog.reports = append(probeLog.reports, rep)
+	// The probe posts after every step, so each report supersedes the previous
+	// one from the same run: keep the newest rather than a stack of near copies.
+	if n := len(probeLog.reports); n > 0 &&
+		probeLog.reports[n-1].Href == rep.Href && probeLog.reports[n-1].Build == rep.Build {
+		probeLog.reports[n-1] = rep
+	} else {
+		probeLog.reports = append(probeLog.reports, rep)
+	}
 	if len(probeLog.reports) > probeMaxReports {
 		probeLog.reports = probeLog.reports[len(probeLog.reports)-probeMaxReports:]
 	}
