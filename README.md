@@ -95,6 +95,9 @@ cp .env.example .env
 | `WEB_APP_URL` | – | public HTTPS URL of the web app |
 | `REQUIRE_18_PLUS_CONFIRM` / `COOLDOWN_HOURS` / `ENABLE_DUPLICATES` | – | gameplay toggles |
 | `VITE_TG_BOT_USERNAME` / `VITE_DISCORD_CLIENT_ID` | – | **build-time** web vars (login buttons) |
+| `ART_PUBLIC_BASE` | – | url of the host that serves card art and the app's own files ([see below](#-where-the-content-lives)) |
+| `ART_SFTP_HOST` / `ART_SFTP_USER` / `ART_SFTP_PASSWORD` / `ART_SFTP_ROOT` / `ART_SFTP_HOST_KEY` | – | how the panel writes new art to that host over SFTP |
+| `ART_LOCAL_DIR` | – | write to a local directory instead of SFTP (development, or a single-host setup) |
 
 ### 3. Run
 ```bash
@@ -111,6 +114,29 @@ Manager) in front, forwarding your domain to the bot container on `:8080`, then 
 
 > **Advanced / production** (prebuilt image from GHCR + Portainer, DB-safe migration):
 > see [docs/deploy.md](docs/deploy.md).
+
+## 🖼 Where the content lives
+
+Card art is **not** kept in this repository or in the container. Cards store a full
+url, so the images are served by whatever host you point them at, and the admin
+panel writes new art there over SFTP (or to a local directory).
+
+Nothing is hardcoded: the host comes from `ART_PUBLIC_BASE`, and leaving the
+`ART_*` variables unset simply disables uploads — the panel says so instead of
+failing.
+
+The app's **own** static files follow the same path. They are addressed under
+`/cdn/app/…` and, when an art host is configured, published to it on startup and
+served from there; the backend redirects browsers to it, and a Discord Activity
+reaches it through a `/cdn` proxy path mapping in the Developer Portal. With no
+art host configured the backend serves those files itself, so a plain
+`docker compose up` needs none of this.
+
+Why split them out at all: the machine this was built on could not deliver
+responses much over 27 KB to some networks — Telegram stopped loading card art,
+and a Discord Activity never received the JS bundle — while the same bytes from a
+second host arrived fine. If your server has no such problem, leave the `ART_*`
+variables empty and everything is served from one place.
 
 ## 🗺 Roadmap
 
