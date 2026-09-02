@@ -3,6 +3,8 @@ package httpapi
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,10 +40,12 @@ func stripProxyPrefix(next http.Handler) http.Handler {
 }
 
 // Probe assets answer questions from inside a Discord Activity, where there are
-// no developer tools. The first round established that the path shape does not
-// matter and the size does: 1 KB arrives, ~100 KB and up does not. These serve a
-// ladder of sizes, and optionally gzip the response, to find where the ceiling
-// is and whether it counts transferred or decoded bytes.
+// no developer tools. Two rounds have narrowed it down: the path shape does not
+// matter, and what breaks is the number of bytes on the wire — 8 KB arrives,
+// 32 KB does not, while 400 KB that gzip squeezed to 481 bytes arrives fine.
+//
+// So the padding can be made incompressible on request: only then is the wire
+// size known for certain, whatever compresses the response along the way.
 const probeMaxSize = 2 << 20
 
 func (s *Server) handleProbeAsset(w http.ResponseWriter, r *http.Request) {
@@ -62,8 +66,17 @@ func (s *Server) handleProbeAsset(w http.ResponseWriter, r *http.Request) {
 	head := "/* gachabot proxy probe, " + strconv.Itoa(size) + " bytes */\n"
 	body := make([]byte, size)
 	copy(body, head)
-	for i := len(head); i < size; i++ {
-		body[i] = '.'
+	if r.URL.Query().Get("rand") == "1" {
+		// Random base64 defeats compression anywhere along the path, so the wire
+		// size is exactly the size being tested — which is the thing that broke.
+		raw := make([]byte, size)
+		if _, err := rand.Read(raw); err == nil {
+			copy(body[len(head):], base64.StdEncoding.EncodeToString(raw))
+		}
+	} else {
+		for i := len(head); i < size; i++ {
+			body[i] = '.'
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
