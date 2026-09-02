@@ -65,6 +65,7 @@ func (s *Server) Start() {
 	// Probe assets for diagnosing Discord's proxy from inside an Activity.
 	r.Get("/probe/tiny.js", s.handleProbeAsset)
 	r.Get("/probe/large.js", s.handleProbeAsset)
+	r.Get("/probe/asset.js", s.handleProbeAsset)
 
 	r.Route("/api", func(r chi.Router) {
 		// Temporary, unauthenticated: the Activity has no session before its

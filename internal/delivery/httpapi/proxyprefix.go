@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"bytes"
+	"compress/gzip"
 	"net/http"
 	"strconv"
 	"strings"
@@ -35,23 +37,28 @@ func stripProxyPrefix(next http.Handler) http.Handler {
 	})
 }
 
-// Probe assets exist to answer one question from inside a Discord Activity,
-// where no developer tools are available: does Discord's proxy break on the path
-// shape (/assets vs /.proxy/assets) or on the response size? They are served
-// from memory and are harmless anywhere else.
-const (
-	probeTinyBytes  = 1 << 10
-	probeLargeBytes = 400 << 10
-)
+// Probe assets answer questions from inside a Discord Activity, where there are
+// no developer tools. The first round established that the path shape does not
+// matter and the size does: 1 KB arrives, ~100 KB and up does not. These serve a
+// ladder of sizes, and optionally gzip the response, to find where the ceiling
+// is and whether it counts transferred or decoded bytes.
+const probeMaxSize = 2 << 20
 
 func (s *Server) handleProbeAsset(w http.ResponseWriter, r *http.Request) {
-	size := probeTinyBytes
+	size := 1 << 10
 	if strings.Contains(r.URL.Path, "large") {
-		size = probeLargeBytes
+		size = 400 << 10
+	}
+	if q := r.URL.Query().Get("size"); q != "" {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 && n <= probeMaxSize {
+			size = n
+		}
 	}
 
-	// Valid JavaScript of a known length: a comment padded to the target size,
-	// so a truncated or mangled body is obvious from the byte count alone.
+	// Valid JavaScript of a known length: a comment padded to the target size, so
+	// a truncated or mangled body is obvious from the byte count alone. The body
+	// is deliberately repetitive, which is also what makes the gzip case a fair
+	// test of "does compressing it help".
 	head := "/* gachabot proxy probe, " + strconv.Itoa(size) + " bytes */\n"
 	body := make([]byte, size)
 	copy(body, head)
@@ -61,6 +68,21 @@ func (s *Server) handleProbeAsset(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+
+	if r.URL.Query().Get("gz") == "1" && strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		_, _ = zw.Write(body)
+		_ = zw.Close()
+
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Vary", "Accept-Encoding")
+		w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(buf.Bytes())
+		return
+	}
+
 	w.Header().Set("Content-Length", strconv.Itoa(size))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
