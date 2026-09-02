@@ -55,6 +55,9 @@ func main() {
 	artguessService := artguess.New(repo, rdb, gachaService, cfg.Telegram.Token)
 	broadcastService := broadcast.New(repo)
 	artStore := artstore.New(artstore.Config(cfg.Art))
+	// Push the built assets to the art host in the background: this server cannot
+	// deliver them to some networks, Discord's among them. See httpapi/cdn.go.
+	go httpapi.PublishAssets(artStore, cfg.HTTP.StaticDir)
 
 	// API-only (local development): serve just the HTTP API. Bots and schedulers
 	// stay down so a dev instance can't steal the production bot's long-poll

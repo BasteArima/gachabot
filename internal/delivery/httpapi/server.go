@@ -62,6 +62,9 @@ func (s *Server) Start() {
 		MaxAge:           300,
 	}))
 
+	// Static files live on the art host; see cdn.go for why.
+	r.Get("/cdn/*", s.handleCDN)
+
 	// Probe assets for diagnosing Discord's proxy from inside an Activity.
 	r.Get("/probe/tiny.js", s.handleProbeAsset)
 	r.Get("/probe/large.js", s.handleProbeAsset)

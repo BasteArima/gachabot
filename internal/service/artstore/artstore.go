@@ -11,7 +11,9 @@ package artstore
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -173,6 +175,63 @@ func (s *Service) Existing(folder, slug string) ([]string, error) {
 		}
 	}
 	return found, nil
+}
+
+// SyncDir copies every file under localDir to the store under remotePrefix,
+// skipping what is already there. One connection serves the whole walk.
+//
+// It exists because the app's own static files have to be served from the art
+// host: the home server the service runs on cannot deliver responses much over
+// 27 KB to some networks — Telegram hit this with card art, Discord hits it with
+// the bundle — while the art host delivers them fine. Asset names carry a
+// content hash, so "already there" means "identical", and a redeploy only
+// uploads what actually changed.
+func (s *Service) SyncDir(localDir, remotePrefix string) (uploaded, skipped int, err error) {
+	if !s.Enabled() {
+		return 0, 0, ErrDisabled
+	}
+	entries, err := os.ReadDir(localDir)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	d, err := s.newDriver()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer d.close()
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		// The names come off the local disk, but they still end up in a remote
+		// path: anything that could climb out of the prefix is refused.
+		if name == "" || strings.ContainsAny(name, `/\`) || strings.HasPrefix(name, ".") {
+			continue
+		}
+		rel := path.Join(remotePrefix, name)
+
+		exists, err := d.exists(rel)
+		if err != nil {
+			return uploaded, skipped, err
+		}
+		if exists {
+			skipped++
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(localDir, name))
+		if err != nil {
+			return uploaded, skipped, err
+		}
+		if err := d.put(rel, data); err != nil {
+			return uploaded, skipped, fmt.Errorf("%s: %w", rel, err)
+		}
+		uploaded++
+	}
+	return uploaded, skipped, nil
 }
 
 // Put writes the frameless and framed files for one card. Both are written or
