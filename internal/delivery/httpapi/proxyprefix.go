@@ -1,8 +1,6 @@
 package httpapi
 
 import (
-	"bytes"
-	"compress/gzip"
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
@@ -81,20 +79,6 @@ func (s *Server) handleProbeAsset(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-
-	if r.URL.Query().Get("gz") == "1" && strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		var buf bytes.Buffer
-		zw := gzip.NewWriter(&buf)
-		_, _ = zw.Write(body)
-		_ = zw.Close()
-
-		w.Header().Set("Content-Encoding", "gzip")
-		w.Header().Set("Vary", "Accept-Encoding")
-		w.Header().Set("Content-Length", strconv.Itoa(buf.Len()))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(buf.Bytes())
-		return
-	}
 
 	w.Header().Set("Content-Length", strconv.Itoa(size))
 	w.WriteHeader(http.StatusOK)

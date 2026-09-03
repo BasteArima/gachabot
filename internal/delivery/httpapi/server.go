@@ -51,6 +51,12 @@ func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.Gacha
 func (s *Server) Start() {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
+	// Compress here rather than leaving it to the reverse proxy. Responses have
+	// to fit under what the network in front of this server can actually deliver
+	// — a card catalogue is 23 KB of JSON and the ceiling is around 27 KB — and
+	// that is too important to depend on a proxy setting nobody remembers.
+	// Already-encoded responses are passed through untouched.
+	r.Use(middleware.Compress(5))
 	// Must run before routing: inside a Discord Activity every path may arrive
 	// with the /.proxy prefix.
 	r.Use(stripProxyPrefix)

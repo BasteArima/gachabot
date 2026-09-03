@@ -26,7 +26,9 @@ const (
 	keyBoardImgPrefix = "artguess:boardimg:" // +date -> blurred board image with caption
 	srcTTL            = 7 * 24 * time.Hour
 	maxBlur           = 14.0 // gaussian sigma at the most-hidden level
-	minPixels         = 16   // smallest pixelation grid (level 0)
+	webMaxWidth       = 420  // what the in-game image is downscaled to before encoding
+	webJPEGQuality    = 70
+	minPixels         = 16 // smallest pixelation grid (level 0)
 )
 
 var imgClient = &http.Client{Timeout: 15 * time.Second}
@@ -73,8 +75,16 @@ func (s *Service) ImageData(ctx context.Context, uid int64, reqLevel int) ([]byt
 	}
 
 	out := renderLevel(img, reqLevel, cfg.MaxAttempts)
+	// Delivered at a fraction of the card size on purpose. The screen shows it
+	// about 400 px wide, the image is pixelated and blurred anyway, and the
+	// server this is fetched from cannot reliably deliver much over 27 KB to
+	// some networks — a full-size frame simply never arrived inside a Discord
+	// Activity, leaving "loading art" on screen forever.
+	if out.Bounds().Dx() > webMaxWidth {
+		out = imaging.Resize(out, webMaxWidth, 0, imaging.Lanczos)
+	}
 	var buf bytes.Buffer
-	if err := imaging.Encode(&buf, out, imaging.JPEG, imaging.JPEGQuality(82)); err != nil {
+	if err := imaging.Encode(&buf, out, imaging.JPEG, imaging.JPEGQuality(webJPEGQuality)); err != nil {
 		return nil, err
 	}
 	_ = s.rdb.Set(ctx, imgKey, buf.Bytes(), dayTTL).Err()
