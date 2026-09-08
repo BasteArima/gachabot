@@ -71,17 +71,7 @@ func (s *Server) Start() {
 	// Static files live on the art host; see cdn.go for why.
 	r.Get("/cdn/*", s.handleCDN)
 
-	// Probe assets for diagnosing Discord's proxy from inside an Activity.
-	r.Get("/probe/tiny.js", s.handleProbeAsset)
-	r.Get("/probe/large.js", s.handleProbeAsset)
-	r.Get("/probe/asset.js", s.handleProbeAsset)
-
 	r.Route("/api", func(r chi.Router) {
-		// Temporary, unauthenticated: the Activity has no session before its
-		// bundle loads, which is exactly what is being diagnosed.
-		r.Post("/probe", s.handleProbeReport)
-		r.Get("/probe", s.handleProbeRead)
-
 		r.Get("/config", s.handleConfig)
 		r.Post("/auth/telegram", s.handleAuthTelegram)
 		r.Post("/auth/discord", s.handleAuthDiscord)
