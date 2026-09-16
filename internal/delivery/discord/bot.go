@@ -7,6 +7,7 @@ import (
 	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 	"log"
+	"sync/atomic"
 
 	"gachabot/internal/i18n"
 	"gachabot/internal/repository"
@@ -33,6 +34,9 @@ type Bot struct {
 	webAppURL      string
 	adminID        int64 // service owner's Discord user id (owner-only commands)
 	NotifyAdmin    func(text string, imageURL string)
+
+	gw          gatewayWatch
+	commandsSet atomic.Bool
 }
 
 func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, loc *i18n.Localizer, lp LinkProvider, webAppURL string, adminID int64, notifyAdmin func(string, string)) (*Bot, error) {
@@ -68,11 +72,17 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 	return b, nil
 }
 
+// Start connects to the gateway and registers the slash commands. A failed first
+// connect is not final: the gateway watchdog keeps trying, and registers the
+// commands once it gets through.
 func (b *Bot) Start() error {
+	b.watchGateway()
+
 	err := b.session.Open()
 	if err != nil {
 		return err
 	}
+	b.gatewayUp()
 	log.Println("[DISCORD] The bot has been successfully connected to the gateway!")
 
 	b.setupCommands()
@@ -80,6 +90,7 @@ func (b *Bot) Start() error {
 }
 
 func (b *Bot) setupCommands() {
+	b.commandsSet.Store(true)
 	commands := []*discordgo.ApplicationCommand{
 		{
 			Name:        "roll",

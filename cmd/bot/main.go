@@ -102,7 +102,7 @@ func main() {
 		broadcastService.RegisterSender(broadcast.PlatformDiscord, dsBot)
 
 		if err := dsBot.Start(); err != nil {
-			log.Printf("failed to start discord bot: %v", err)
+			log.Printf("failed to start discord bot: %v (will keep retrying in the background)", err)
 		} else {
 			log.Println("Discord bot started successfully")
 		}
