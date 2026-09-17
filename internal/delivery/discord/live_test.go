@@ -105,7 +105,7 @@ func TestLiveSeasonEmbeds(t *testing.T) {
 		msg, err := b.session.ChannelMessageSendComplex(channel, &discordgo.MessageSend{
 			Embeds: []*discordgo.MessageEmbed{embed},
 			Components: []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-				discordgo.Button{Label: "Мои трофеи", Style: discordgo.SecondaryButton, CustomID: trophyData(0, userID), Emoji: &discordgo.ComponentEmoji{Name: "🏆"}},
+				discordgo.Button{Label: "Мои трофеи", Style: discordgo.SecondaryButton, CustomID: trophyData(0, userID, false), Emoji: &discordgo.ComponentEmoji{Name: "🏆"}},
 				b.launchAppButton(),
 			}}},
 		})
@@ -116,7 +116,7 @@ func TestLiveSeasonEmbeds(t *testing.T) {
 	})
 
 	t.Run("trophy shelf with its buttons", func(t *testing.T) {
-		embed, components, err := b.shelfView(userID, "Тестер")
+		embed, components, err := b.shelfView(userID, "Тестер", true)
 		if err != nil {
 			t.Fatalf("полка не собралась: %v", err)
 		}

@@ -45,7 +45,7 @@ func (b *Bot) handleSeason(s *discordgo.Session, i *discordgo.InteractionCreate,
 
 	components := []discordgo.MessageComponent{discordgo.ActionsRow{
 		Components: []discordgo.MessageComponent{
-			discordgo.Button{Label: "Мои трофеи", Style: discordgo.SecondaryButton, CustomID: trophyData(0, dbUser.ID), Emoji: &discordgo.ComponentEmoji{Name: "🏆"}},
+			discordgo.Button{Label: "Мои трофеи", Style: discordgo.SecondaryButton, CustomID: trophyData(0, dbUser.ID, false), Emoji: &discordgo.ComponentEmoji{Name: "🏆"}},
 			b.launchAppButton(),
 		},
 	}}
@@ -54,7 +54,7 @@ func (b *Bot) handleSeason(s *discordgo.Session, i *discordgo.InteractionCreate,
 }
 
 func (b *Bot) handleTrophies(s *discordgo.Session, i *discordgo.InteractionCreate, dbUser *models.User, name string) {
-	embed, components, err := b.shelfView(dbUser.ID, name)
+	embed, components, err := b.shelfView(dbUser.ID, name, false)
 	if err != nil {
 		b.respond(s, i, "Не получилось прочитать трофеи, попробуй позже.")
 		return
@@ -65,7 +65,7 @@ func (b *Bot) handleTrophies(s *discordgo.Session, i *discordgo.InteractionCreat
 // handleTrophyComponent switches the message between the shelf and one medal.
 // CustomID is "trophy:<seasonNumber>", where 0 is the shelf itself.
 func (b *Bot) handleTrophyComponent(s *discordgo.Session, i *discordgo.InteractionCreate, dbUser *models.User, name, raw string) {
-	number, owner := parseTrophyData(raw)
+	number, owner, fromProfile := parseTrophyData(raw)
 
 	// A channel message is shared, so a button press from someone else must not
 	// redraw it as their shelf.
@@ -75,7 +75,7 @@ func (b *Bot) handleTrophyComponent(s *discordgo.Session, i *discordgo.Interacti
 	}
 
 	if number == 0 {
-		embed, components, err := b.shelfView(dbUser.ID, name)
+		embed, components, err := b.shelfView(dbUser.ID, name, fromProfile)
 		if err != nil {
 			return
 		}
@@ -94,7 +94,7 @@ func (b *Bot) handleTrophyComponent(s *discordgo.Session, i *discordgo.Interacti
 		embed := &discordgo.MessageEmbed{Description: season.TrophyText(t), Color: trophyColor}
 		components := []discordgo.MessageComponent{discordgo.ActionsRow{
 			Components: []discordgo.MessageComponent{
-				discordgo.Button{Label: "Все трофеи", Style: discordgo.SecondaryButton, CustomID: trophyData(0, dbUser.ID)},
+				discordgo.Button{Label: "Все трофеи", Style: discordgo.SecondaryButton, CustomID: trophyData(0, dbUser.ID, fromProfile)},
 				b.launchAppButton(),
 			},
 		}}
@@ -103,8 +103,9 @@ func (b *Bot) handleTrophyComponent(s *discordgo.Session, i *discordgo.Interacti
 	}
 }
 
-// shelfView builds the shelf embed: the medals as fields, one button each.
-func (b *Bot) shelfView(userID int64, name string) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
+// shelfView builds the shelf embed: the medals as fields, one button each, and
+// — when the player came from their profile — a way back to it.
+func (b *Bot) shelfView(userID int64, name string, fromProfile bool) (*discordgo.MessageEmbed, []discordgo.MessageComponent, error) {
 	trophies, _, err := b.season.Trophies(userID)
 	if err != nil {
 		log.Printf("[SEASON] не удалось прочитать трофеи игрока %d: %v", userID, err)
@@ -150,8 +151,16 @@ func (b *Bot) shelfView(userID int64, name string) (*discordgo.MessageEmbed, []d
 		buttons = append(buttons, discordgo.Button{
 			Label:    fmt.Sprintf("Сезон %d", t.SeasonNumber),
 			Style:    discordgo.SecondaryButton,
-			CustomID: trophyData(t.SeasonNumber, userID),
+			CustomID: trophyData(t.SeasonNumber, userID, fromProfile),
 			Emoji:    &discordgo.ComponentEmoji{Name: tierEmojiName(t.Tier)},
+		})
+	}
+	if fromProfile {
+		buttons = append(buttons, discordgo.Button{
+			Label:    "Профиль",
+			Style:    discordgo.SecondaryButton,
+			CustomID: "back_to_profile",
+			Emoji:    &discordgo.ComponentEmoji{Name: "🔙"},
 		})
 	}
 	buttons = append(buttons, b.launchAppButton())
@@ -211,18 +220,27 @@ func isComponent(i *discordgo.InteractionCreate) bool {
 	return i.Type == discordgo.InteractionMessageComponent
 }
 
-// trophyData packs "trophy:<season>:<ownerID>" into a component id.
-func trophyData(seasonNumber int, ownerID int64) string {
-	return fmt.Sprintf("%s%d:%d", trophyPrefix, seasonNumber, ownerID)
+// trophyData packs "trophy:<season>:<ownerID>:<fromProfile>" into a component
+// id: which medal, whose shelf, and whether a profile is behind it — which
+// decides if the shelf offers a way back to it.
+func trophyData(seasonNumber int, ownerID int64, fromProfile bool) string {
+	flag := 0
+	if fromProfile {
+		flag = 1
+	}
+	return fmt.Sprintf("%s%d:%d:%d", trophyPrefix, seasonNumber, ownerID, flag)
 }
 
-func parseTrophyData(raw string) (seasonNumber int, ownerID int64) {
+func parseTrophyData(raw string) (seasonNumber int, ownerID int64, fromProfile bool) {
 	parts := strings.Split(strings.TrimPrefix(raw, trophyPrefix), ":")
 	seasonNumber, _ = strconv.Atoi(parts[0])
 	if len(parts) > 1 {
 		ownerID, _ = strconv.ParseInt(parts[1], 10, 64)
 	}
-	return seasonNumber, ownerID
+	if len(parts) > 2 {
+		fromProfile = parts[2] == "1"
+	}
+	return seasonNumber, ownerID, fromProfile
 }
 
 // tierEmojiName is the bare emoji for a button, without the count: a button

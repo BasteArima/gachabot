@@ -131,6 +131,12 @@ func (b *Bot) getProfileData(user *models.User, lang string) (*discordgo.Message
 					Emoji:    &discordgo.ComponentEmoji{Name: "📚"},
 				},
 				discordgo.Button{
+					Label:    "Трофеи",
+					Style:    discordgo.SecondaryButton,
+					CustomID: trophyData(0, user.ID, true),
+					Emoji:    &discordgo.ComponentEmoji{Name: "🏆"},
+				},
+				discordgo.Button{
 					Label:    b.loc.Translate(lang, "btn_profile_suggest"),
 					Style:    discordgo.SecondaryButton,
 					CustomID: "suggest_start",
