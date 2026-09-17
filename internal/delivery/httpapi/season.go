@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"net/http"
-	"time"
 
 	"gachabot/internal/service/season"
 )
@@ -31,7 +30,7 @@ func (s *Server) handleSeason(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	elapsed, _ := s.season.Days()
-	s.decorate(rows)
+	s.season.Decorate(rows)
 
 	uid := userIDFrom(r)
 	var me *season.Row
@@ -60,7 +59,7 @@ func (s *Server) handleSeason(w http.ResponseWriter, r *http.Request) {
 			"title":         cur.Title,
 			"endsAt":        dateOrEmpty(cur.EndsAt),
 			"days":          elapsed,
-			"daysLeft":      daysLeft(cur.EndsAt),
+			"daysLeft":      s.season.DaysLeft(),
 			"minActiveDays": minActive,
 			"players":       countQualified(rows),
 		},
@@ -78,22 +77,4 @@ func countQualified(rows []season.Row) int {
 		}
 	}
 	return n
-}
-
-// daysLeft counts whole days to the target date, or -1 when no date is set —
-// the season then runs until it is finished by hand, and the app shows no
-// countdown rather than a made-up one.
-func daysLeft(endsAt *time.Time) int {
-	if endsAt == nil {
-		return -1
-	}
-	now := time.Now().In(msk)
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, msk)
-	end := endsAt.In(msk)
-	endDay := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, msk)
-	d := int(endDay.Sub(today).Hours() / 24)
-	if d < 0 {
-		return 0
-	}
-	return d
 }

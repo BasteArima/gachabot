@@ -60,6 +60,9 @@ func (b *Bot) HandleProfile(ctx tele.Context) error {
 		rows = append(rows, menu.Row(btnMySets))
 	}
 
+	btnTrophies := menu.Data("🏆 Трофеи", "profile_trophies")
+	rows = append(rows, menu.Row(btnTrophies))
+
 	btnSuggest := menu.Data(b.loc.Translate(lang, "btn_profile_suggest"), "suggest_start")
 	btnBack := menu.Data(b.loc.Translate(lang, "btn_back_to_start"), "start_menu")
 

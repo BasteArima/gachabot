@@ -8,6 +8,7 @@ import (
 	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/season"
 	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 	"log"
@@ -27,6 +28,7 @@ type Bot struct {
 	suggestService *suggest.SuggestService
 	spawnService   *spawn.SpawnService
 	artguess       *artguess.Service
+	season         *season.Service
 	adminID        int64
 	adminChatID    int64
 	backupChatID   int64
@@ -35,7 +37,7 @@ type Bot struct {
 	startBannerURL string
 }
 
-func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
+func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, sv *season.Service, loc *i18n.Localizer, cfg config.TelegramConfig) (*Bot, error) {
 	pref := tele.Settings{
 		Token:  cfg.Token,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
@@ -56,6 +58,7 @@ func NewBot(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaSer
 		suggestService: ss,
 		spawnService:   sp,
 		artguess:       ag,
+		season:         sv,
 		adminID:        cfg.AdminID,
 		// Telegram supergroup IDs are negative; env stores the positive part.
 		adminChatID:    -cfg.SuggestsGroupID,
@@ -86,6 +89,12 @@ func (b *Bot) setupRoutes() {
 	// TOP
 	//b.bot.Handle("/top", b.HandleLocalTop) // local chat top
 	b.bot.Handle("/top", b.HandleGlobalTop)
+
+	// Seasons
+	b.bot.Handle("/season", b.HandleSeason)
+	b.bot.Handle("/trophies", b.HandleTrophies)
+	b.bot.Handle("trophy", b.HandleTrophyCallback)
+	b.bot.Handle("profile_trophies", b.HandleProfileTrophies)
 	b.bot.Handle("\ftop_btn", b.HandleTopCallback)
 
 	// Help & locale

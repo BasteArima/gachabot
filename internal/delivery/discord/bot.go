@@ -4,6 +4,7 @@ import (
 	"gachabot/internal/service/artguess"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/season"
 	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 	"log"
@@ -29,6 +30,7 @@ type Bot struct {
 	suggestService *suggest.SuggestService
 	spawnService   *spawn.SpawnService
 	artguess       *artguess.Service
+	season         *season.Service
 	lp             LinkProvider
 	rdb            *redis.Client
 	webAppURL      string
@@ -39,7 +41,7 @@ type Bot struct {
 	commandsSet atomic.Bool
 }
 
-func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, loc *i18n.Localizer, lp LinkProvider, webAppURL string, adminID int64, notifyAdmin func(string, string)) (*Bot, error) {
+func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, ds *duel.DuelService, ss *suggest.SuggestService, sp *spawn.SpawnService, ag *artguess.Service, sv *season.Service, loc *i18n.Localizer, lp LinkProvider, webAppURL string, adminID int64, notifyAdmin func(string, string)) (*Bot, error) {
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -57,6 +59,7 @@ func NewBot(token string, repo *repository.PostgresRepo, rdb *redis.Client, gs *
 		suggestService: ss,
 		spawnService:   sp,
 		artguess:       ag,
+		season:         sv,
 		lp:             lp,
 		webAppURL:      webAppURL,
 		adminID:        adminID,
@@ -143,6 +146,20 @@ func (b *Bot) setupCommands() {
 			Description: "Global leaderboard",
 			DescriptionLocalizations: &map[discordgo.Locale]string{
 				discordgo.Russian: "Мировой топ",
+			},
+		},
+		{
+			Name:        "season",
+			Description: "Season standings",
+			DescriptionLocalizations: &map[discordgo.Locale]string{
+				discordgo.Russian: "Счёт текущего сезона",
+			},
+		},
+		{
+			Name:        "trophies",
+			Description: "Your season medals",
+			DescriptionLocalizations: &map[discordgo.Locale]string{
+				discordgo.Russian: "Твои медали за сезоны",
 			},
 		},
 		{

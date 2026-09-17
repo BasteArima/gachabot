@@ -66,6 +66,10 @@ func (b *Bot) HandleInteraction(s *discordgo.Session, i *discordgo.InteractionCr
 		b.handleClaimCommand(s, i, dbUser, lang)
 	case "spawnnow":
 		b.handleSpawnNow(s, i, lang)
+	case "season":
+		b.handleSeason(s, i, dbUser)
+	case "trophies":
+		b.handleTrophies(s, i, dbUser, interactionName(i))
 	}
 }
 
@@ -84,6 +88,11 @@ func (b *Bot) HandleComponentInteraction(s *discordgo.Session, i *discordgo.Inte
 	lang := dbUser.LanguageCode
 	if lang == "" {
 		lang = "ru"
+	}
+
+	if strings.HasPrefix(data.CustomID, trophyPrefix) {
+		b.handleTrophyComponent(s, i, dbUser, interactionName(i), data.CustomID)
+		return
 	}
 
 	if data.CustomID == "roll_again" {
@@ -414,4 +423,24 @@ func (b *Bot) HandleMessageCreate(s *discordgo.Session, m *discordgo.MessageCrea
 
 		s.ChannelMessageSend(m.ChannelID, b.loc.Translate(lang, "suggest_done"))
 	}
+}
+
+// interactionName is the display name to put on a trophy shelf: what Discord
+// shows for this user in this server.
+func interactionName(i *discordgo.InteractionCreate) string {
+	if i.Member != nil {
+		if i.Member.Nick != "" {
+			return i.Member.Nick
+		}
+		if i.Member.User != nil {
+			return i.Member.User.GlobalName
+		}
+	}
+	if i.User != nil {
+		if i.User.GlobalName != "" {
+			return i.User.GlobalName
+		}
+		return i.User.Username
+	}
+	return "Игрок"
 }

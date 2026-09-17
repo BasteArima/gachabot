@@ -84,7 +84,7 @@ func main() {
 		log.Fatalf("failed to load telegram localization: %v", err)
 	}
 
-	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, spawnService, artguessService, tgLoc, cfg.Telegram)
+	tgBot, err := telegram.NewBot(repo, rdb, gachaService, duelService, suggestService, spawnService, artguessService, seasonService, tgLoc, cfg.Telegram)
 	if err != nil {
 		log.Fatalf("failed to create telegram bot: %v", err)
 	}
@@ -98,7 +98,7 @@ func main() {
 			log.Fatalf("failed to load discord localization: %v", err)
 		}
 
-		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, artguessService, discordLoc, tgBot, cfg.HTTP.WebAppURL, cfg.Discord.AdminID, tgBot.NotifyAdmin)
+		dsBot, err := discord.NewBot(cfg.Discord.Token, repo, rdb, gachaService, duelService, suggestService, spawnService, artguessService, seasonService, discordLoc, tgBot, cfg.HTTP.WebAppURL, cfg.Discord.AdminID, tgBot.NotifyAdmin)
 		if err != nil {
 			log.Fatalf("failed to create discord bot: %v", err)
 		}

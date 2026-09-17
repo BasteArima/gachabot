@@ -3,8 +3,6 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
-
-	"gachabot/internal/service/season"
 )
 
 // GET /api/trophies — the caller's own shelf: the medals they hold, the badge
@@ -41,32 +39,6 @@ func (s *Server) handleTrophies(w http.ResponseWriter, r *http.Request) {
 		out["current"] = map[string]any{"number": cur.Number, "title": cur.Title}
 	}
 	writeJSON(w, http.StatusOK, out)
-}
-
-// decorate fills in the career bits of a board: the badge beside each nickname
-// and the crown of the reigning champion.
-func (s *Server) decorate(rows []season.Row) {
-	if len(rows) == 0 {
-		return
-	}
-	ids := make([]int64, 0, len(rows))
-	for _, r := range rows {
-		ids = append(ids, r.UserID)
-	}
-	badges, err := s.season.Badges(ids)
-	if err != nil {
-		// A missing badge costs the board nothing; a failed board costs the
-		// player the standings.
-		return
-	}
-	champ := s.season.ReigningChampion()
-	for i := range rows {
-		if b, ok := badges[rows[i].UserID]; ok {
-			badge := b
-			rows[i].Badge = &badge
-		}
-		rows[i].Crown = champ != 0 && rows[i].UserID == champ
-	}
 }
 
 // intQuery reads a small positive number from the query string, or 0.

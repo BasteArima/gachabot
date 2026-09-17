@@ -71,14 +71,14 @@ func (s *Service) Preview(minActiveOverride int) ([]Row, int, error) {
 //
 // It is deliberately not automatic. The owner presses the button after looking
 // at the preview, because handing out medals cannot be undone.
-func (s *Service) Finish(minActiveOverride int) (int, error) {
+func (s *Service) Finish(minActiveOverride int) ([]Row, error) {
 	cur := s.Current()
 	if cur == nil {
-		return 0, ErrNoSeason
+		return nil, ErrNoSeason
 	}
 	rows, _, err := s.Preview(minActiveOverride)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	results := make([]models.SeasonResult, 0, len(rows))
@@ -101,7 +101,7 @@ func (s *Service) Finish(minActiveOverride int) (int, error) {
 			Players:    players,
 		})
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 		results = append(results, models.SeasonResult{
 			UserID: r.UserID,
@@ -113,13 +113,13 @@ func (s *Service) Finish(minActiveOverride int) (int, error) {
 	}
 
 	if err := s.repo.FinishSeason(cur.ID, results); err != nil {
-		return 0, err
+		return nil, err
 	}
 	log.Printf("[SEASON] сезон %d завершён, выдано медалей: %d", cur.Number, len(results))
 	if err := s.reload(); err != nil {
-		return len(results), err
+		return rows, err
 	}
-	return len(results), nil
+	return rows, nil
 }
 
 // Trophies returns a player's shelf: their medals, plus the finished seasons
@@ -205,4 +205,48 @@ func (s *Service) ReigningChampion() int64 {
 		return 0
 	}
 	return uid
+}
+
+// DaysLeft counts whole days to the target date, or -1 when none is set: the
+// season then runs until it is finished by hand, and the interfaces show no
+// countdown rather than inventing one.
+func (s *Service) DaysLeft() int {
+	cur := s.Current()
+	if cur == nil || cur.EndsAt == nil {
+		return -1
+	}
+	end := cur.EndsAt.In(s.loc)
+	endDay := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, s.loc)
+	d := int(endDay.Sub(s.today()).Hours() / 24)
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
+// Decorate fills in the career bits of a board — the badge beside each nickname
+// and the reigning champion's crown. Failure is silent on purpose: a missing
+// badge costs the board nothing, while a failed board costs the player the
+// standings.
+func (s *Service) Decorate(rows []Row) {
+	if len(rows) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.UserID)
+	}
+	badges, err := s.Badges(ids)
+	if err != nil {
+		log.Printf("[SEASON] значки не прочитаны: %v", err)
+		return
+	}
+	champ := s.ReigningChampion()
+	for i := range rows {
+		if bdg, ok := badges[rows[i].UserID]; ok {
+			badge := bdg
+			rows[i].Badge = &badge
+		}
+		rows[i].Crown = champ != 0 && rows[i].UserID == champ
+	}
 }

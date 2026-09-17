@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -239,6 +240,7 @@ func (s *Server) handleAdminSeasonFinish(w http.ResponseWriter, r *http.Request)
 		StartNext  bool   `json:"startNext"`
 		NextTitle  string `json:"nextTitle"`
 		NextEndsAt string `json:"nextEndsAt"`
+		Announce   bool   `json:"announce"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&in); err != nil {
 		writeErr(w, http.StatusBadRequest, "плохой json")
@@ -250,7 +252,8 @@ func (s *Server) handleAdminSeasonFinish(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	awarded, err := s.season.Finish(in.MinActive)
+	finished := s.season.Current()
+	rows, err := s.season.Finish(in.MinActive)
 	if err != nil {
 		if errors.Is(err, season.ErrNoSeason) {
 			writeErr(w, http.StatusNotFound, err.Error())
@@ -259,6 +262,13 @@ func (s *Server) handleAdminSeasonFinish(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusInternalServerError, "не удалось завершить сезон")
 		return
 	}
+	awarded := 0
+	for _, r := range rows {
+		if r.Qualified {
+			awarded++
+		}
+	}
+
 	// The season is already closed; a failure to open the next one is worth
 	// reporting but must not read as "nothing happened".
 	started := false
@@ -273,5 +283,22 @@ func (s *Server) handleAdminSeasonFinish(w http.ResponseWriter, r *http.Request)
 		}
 		started = true
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"awarded": awarded, "started": started})
+
+	// Announced after the fact, never before: the medals are already handed out,
+	// so a failed announcement is worth a line in the log and nothing more.
+	announced := 0
+	if in.Announce && finished != nil {
+		next, nextDate := 0, (*time.Time)(nil)
+		if cur := s.season.Current(); cur != nil {
+			next, nextDate = cur.Number, cur.EndsAt
+		}
+		text := season.FinishText(finished.Number, finished.Title, rows, next, nextDate)
+		if rep, err := s.broadcast.Send(text, nil, false); err != nil {
+			log.Printf("[SEASON] итоги сезона не разосланы: %v", err)
+		} else {
+			announced = rep.Delivered
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"awarded": awarded, "started": started, "announced": announced})
 }
