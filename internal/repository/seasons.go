@@ -125,7 +125,7 @@ func (r *PostgresRepo) AddSeasonCard(seasonID int, userID int64, cardID, points 
 	_, err := r.db.Exec(`
 		INSERT INTO season_stats (season_id, user_id, card_points, cards_count,
 		                          best_drop_card_id, best_drop_points, best_drop_at)
-		VALUES ($1, $2, $3, 1, $4, $3, NOW())
+		VALUES ($1, $2, $3::bigint, 1, $4, $3::integer, NOW())
 		ON CONFLICT (season_id, user_id) DO UPDATE
 		SET card_points = season_stats.card_points + EXCLUDED.card_points,
 		    cards_count = season_stats.cards_count + 1,
