@@ -21,6 +21,7 @@ import (
 	"gachabot/internal/service/broadcast"
 	"gachabot/internal/service/duel"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/season"
 	"gachabot/internal/service/spawn"
 	"gachabot/internal/service/suggest"
 
@@ -49,10 +50,14 @@ func main() {
 
 	repo := repository.NewPostgresRepo(db)
 	gachaService := gacha.NewGachaService(repo, rdb, cfg.Telegram.AdminID, cfg.Game.CooldownDuration, cfg.Game.DuplicatesEnabled, cfg.Game.CraftEnabled)
+	seasonService := season.New(repo)
+	// Rolls, crafts and spawn rewards report what players earn to the season
+	// scoreboard; with no season running it counts nothing.
+	gachaService.UseSeason(seasonService)
 	duelService := duel.NewDuelService(repo, rdb)
 	suggestService := suggest.NewSuggestService(repo, rdb)
 	spawnService := spawn.NewSpawnService(repo, rdb, gachaService)
-	artguessService := artguess.New(repo, rdb, gachaService, cfg.Telegram.Token)
+	artguessService := artguess.New(repo, rdb, gachaService, seasonService, cfg.Telegram.Token)
 	broadcastService := broadcast.New(repo)
 	artStore := artstore.New(artstore.Config(cfg.Art))
 	// Push the built assets to the art host in the background: this server cannot
@@ -64,7 +69,7 @@ func main() {
 	// updates or post spawns / Art Guess boards into real chats.
 	if cfg.HTTP.APIOnly {
 		log.Println("[DEV] HTTP_ONLY=true — starting the API only (no bots, no schedulers)")
-		webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, artStore, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
+		webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, seasonService, broadcastService, artStore, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
 		webServer.Start()
 
 		quit := make(chan os.Signal, 1)
@@ -121,7 +126,7 @@ func main() {
 	spawnService.Start()
 	artguessService.Start()
 
-	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, broadcastService, artStore, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
+	webServer := httpapi.NewServer(repo, rdb, gachaService, spawnService, artguessService, seasonService, broadcastService, artStore, cfg.Telegram.Token, cfg.Telegram.AdminID, cfg.HTTP, cfg.Discord, cfg.Game, cfg.Telegram.Require18Plus)
 	webServer.Start()
 
 	quit := make(chan os.Signal, 1)

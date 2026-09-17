@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -205,4 +206,34 @@ type DuelRequest struct {
 	TargetName     string `json:"target_name"`
 	Amount         int    `json:"amount"`
 	IsFair         bool   `json:"is_fair"`
+}
+
+// Season is one run of the resettable scoreboard. EndsAt is a target shown as a
+// countdown, not a deadline: seasons are finished by hand from the admin panel.
+type Season struct {
+	ID         int
+	Number     int
+	Title      string
+	StartedAt  time.Time
+	EndsAt     *time.Time
+	FinishedAt *time.Time
+	Config     json.RawMessage
+}
+
+// Running reports whether this season is the one currently counting.
+func (s *Season) Running() bool { return s != nil && s.FinishedAt == nil }
+
+// SeasonStat is one player's progress in a season, joined with the names the
+// boards display.
+type SeasonStat struct {
+	UserID         int64
+	Name           string
+	CoinsEarned    int64
+	CardPoints     int64
+	CardsCount     int
+	ActiveDays     int
+	BestStreak     int
+	BestDropCardID sql.NullInt64
+	BestDropName   string
+	BestDropAt     sql.NullTime
 }

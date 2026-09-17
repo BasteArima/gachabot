@@ -15,6 +15,7 @@ import (
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/season"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -32,6 +33,7 @@ type Service struct {
 	repo         *repository.PostgresRepo
 	rdb          *redis.Client
 	gacha        *gacha.GachaService
+	season       *season.Service
 	loc          *time.Location
 	secret       string                 // HMAC key for deep links (the bot token)
 	broadcasters map[string]Broadcaster // platform -> delivery, for chat posts
@@ -41,11 +43,12 @@ type Service struct {
 	lastPingDate string
 }
 
-func New(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, secret string) *Service {
+func New(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sv *season.Service, secret string) *Service {
 	return &Service{
 		repo:         repo,
 		rdb:          rdb,
 		gacha:        gs,
+		season:       sv,
 		loc:          time.FixedZone("MSK", 3*60*60),
 		secret:       secret,
 		broadcasters: make(map[string]Broadcaster),
@@ -292,6 +295,10 @@ func (s *Service) Guess(ctx context.Context, uid int64, cardID int, launch strin
 			p.Reward = coinReward(cfg, len(p.Guesses))
 			if err := s.repo.AddBalance(uid, p.Reward); err != nil {
 				return nil, err
+			}
+			if s.season != nil {
+				s.season.RecordCoins(uid, p.Reward)
+				s.season.RecordActivity(uid, 0)
 			}
 			if cfg.GrantStreak {
 				if _, _, err := s.gacha.ApplyDailyStreak(uid); err != nil {

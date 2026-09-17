@@ -8,6 +8,7 @@ import (
 
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
+	"gachabot/internal/service/season"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -28,7 +29,15 @@ type GachaService struct {
 	craftEnabled      bool
 	// adminBypass is read on every roll and written from the admin panel.
 	adminBypass atomic.Bool
+	// season counts what players earn while a season runs. Set after
+	// construction (the season service is built later in the wiring) and nil
+	// when seasons are not in use, so every call site checks it.
+	season *season.Service
 }
+
+// UseSeason attaches the season scoreboard. Rolls, crafts and spawn rewards
+// report to it; bookkeeping failures there never fail the action itself.
+func (s *GachaService) UseSeason(sv *season.Service) { s.season = sv }
 
 func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID int64, cooldown time.Duration, duplicatesEnabled, craftEnabled bool) *GachaService {
 	loc := time.FixedZone("MSK", 3*60*60)

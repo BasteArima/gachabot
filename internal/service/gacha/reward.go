@@ -21,6 +21,11 @@ func (s *GachaService) ApplyDailyStreak(internalUserID int64) (int, bool, error)
 			return 0, false, fmt.Errorf("failed to update streak: %w", err)
 		}
 	}
+	// Every mechanic that keeps the streak alive is a day played, so this is the
+	// one place that marks season activity for all of them.
+	if s.season != nil {
+		s.season.RecordActivity(internalUserID, newStreak)
+	}
 	return newStreak, updated, nil
 }
 
@@ -65,6 +70,9 @@ func (s *GachaService) GrantCardReward(internalUserID int64, card *models.Card, 
 	if reward.Coins != 0 {
 		if err := s.repo.AddBalance(internalUserID, reward.Coins); err != nil {
 			return nil, fmt.Errorf("failed to add balance: %w", err)
+		}
+		if s.season != nil {
+			s.season.RecordCoins(internalUserID, reward.Coins)
 		}
 	}
 	return reward, nil

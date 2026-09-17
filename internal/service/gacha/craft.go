@@ -82,9 +82,11 @@ func (s *GachaService) CraftCard(internalUserID int64) (*models.RollResult, erro
 			result.CardAssembled = true
 			_ = s.repo.ClearFragments(internalUserID, card.ID)
 			_ = s.repo.AddCardToInventory(internalUserID, card.ID)
+			s.recordSeasonCard(internalUserID, card.RarityID, card.ID)
 		}
 	} else {
 		_ = s.repo.AddCardToInventory(internalUserID, card.ID)
+		s.recordSeasonCard(internalUserID, card.RarityID, card.ID)
 	}
 
 	// Logic of collecting collections

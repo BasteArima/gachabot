@@ -18,6 +18,7 @@ import (
 	"gachabot/internal/service/artstore"
 	"gachabot/internal/service/broadcast"
 	"gachabot/internal/service/gacha"
+	"gachabot/internal/service/season"
 	"gachabot/internal/service/spawn"
 
 	"github.com/go-chi/chi/v5"
@@ -32,6 +33,7 @@ type Server struct {
 	gacha     *gacha.GachaService
 	spawn     *spawn.SpawnService
 	artguess  *artguess.Service
+	season    *season.Service
 	broadcast *broadcast.Service
 	art       *artstore.Service
 	botToken  string
@@ -43,8 +45,8 @@ type Server struct {
 	require18Plus bool
 }
 
-func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, bc *broadcast.Service, art *artstore.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig, game config.GameConfig, require18Plus bool) *Server {
-	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, broadcast: bc, art: art, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord, game: game, require18Plus: require18Plus}
+func NewServer(repo *repository.PostgresRepo, rdb *redis.Client, gs *gacha.GachaService, sp *spawn.SpawnService, ag *artguess.Service, sv *season.Service, bc *broadcast.Service, art *artstore.Service, botToken string, adminID int64, cfg config.HTTPConfig, discord config.DiscordConfig, game config.GameConfig, require18Plus bool) *Server {
+	return &Server{repo: repo, rdb: rdb, gacha: gs, spawn: sp, artguess: ag, season: sv, broadcast: bc, art: art, botToken: botToken, adminID: adminID, cfg: cfg, discord: discord, game: game, require18Plus: require18Plus}
 }
 
 // Start builds the router and serves in a background goroutine.
@@ -98,6 +100,11 @@ func (s *Server) Start() {
 				r.Get("/admin/overview", s.handleAdminOverview)
 				r.Get("/admin/settings", s.handleAdminSettings)
 				r.Put("/admin/settings", s.handlePutAdminSettings)
+
+				r.Get("/admin/season", s.handleAdminSeason)
+				r.Post("/admin/season", s.handleAdminSeasonStart)
+				r.Put("/admin/season", s.handleAdminSeasonUpdate)
+				r.Post("/admin/season/restart", s.handleAdminSeasonRestart)
 				r.Get("/admin/spawn-config", s.handleGetSpawnConfig)
 				r.Put("/admin/spawn-config", s.handlePutSpawnConfig)
 				r.Get("/admin/artguess-config", s.handleGetArtGuessConfig)

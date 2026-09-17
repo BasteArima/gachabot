@@ -93,6 +93,11 @@ func (s *GachaService) RollCard(internalUserID int64) (*models.RollResult, error
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
 
+	if s.season != nil {
+		s.season.RecordActivity(internalUserID, newStreak)
+		s.season.RecordCoins(internalUserID, result.Reward)
+	}
+
 	return result, nil
 }
 
@@ -222,11 +227,21 @@ func (s *GachaService) processCardDrop(internalUserID int64, card *models.Card, 
 			result.CardAssembled = true
 			_ = s.repo.ClearFragments(internalUserID, card.ID)
 			_ = s.repo.AddCardToInventory(internalUserID, card.ID)
+			s.recordSeasonCard(internalUserID, rarity.ID, card.ID)
 		}
 	} else {
 		_ = s.repo.AddCardToInventory(internalUserID, card.ID)
+		s.recordSeasonCard(internalUserID, rarity.ID, card.ID)
 	}
 	return nil
+}
+
+// recordSeasonCard reports a card that actually landed in the inventory. A
+// fragment is not a card, so only the assembled one is counted.
+func (s *GachaService) recordSeasonCard(userID int64, rarityID, cardID int) {
+	if s.season != nil {
+		s.season.RecordCard(userID, rarityID, cardID)
+	}
 }
 
 func (s *GachaService) processSetCompletion(userID int64, card *models.Card, result *models.RollResult) {
