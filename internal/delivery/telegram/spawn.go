@@ -67,7 +67,7 @@ func (b *Bot) HandleSpawnClaim(ctx tele.Context) error {
 
 	switch res.Outcome {
 	case spawn.OutcomeWon:
-		b.announceSpawnClaim(res.Meta, spawnDisplayName(tgUser), res)
+		b.announceSpawnClaim(res.Meta, b.badgedName(dbUser.ID, spawnDisplayName(tgUser)), res)
 		return ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "spawn_toast_won", i18n.Args{"coins": res.Reward.Coins})})
 	case spawn.OutcomeTaken:
 		return ctx.Respond(&tele.CallbackResponse{Text: b.loc.Translate(lang, "spawn_toast_taken"), ShowAlert: true})
@@ -104,7 +104,7 @@ func (b *Bot) HandleClaimCommand(ctx tele.Context) error {
 
 	switch res.Outcome {
 	case spawn.OutcomeWon:
-		b.announceSpawnClaim(res.Meta, spawnDisplayName(tgUser), res)
+		b.announceSpawnClaim(res.Meta, b.badgedName(dbUser.ID, spawnDisplayName(tgUser)), res)
 		return nil
 	case spawn.OutcomeTaken:
 		return ctx.Send(b.loc.Translate(lang, "spawn_toast_taken"))

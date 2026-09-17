@@ -12,6 +12,7 @@ import (
 	"log"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gachabot/internal/models"
@@ -113,6 +114,10 @@ type Service struct {
 	mu      sync.RWMutex
 	current *models.Season
 	cfg     Config
+
+	// champion is read on every drop message and changes only when a season is
+	// awarded, so it is cached rather than queried per roll.
+	champion atomic.Int64
 }
 
 // New loads the running season, if there is one. A missing season is not an
@@ -141,6 +146,13 @@ func (s *Service) reload() error {
 	s.mu.Lock()
 	s.current, s.cfg = cur, cfg
 	s.mu.Unlock()
+
+	champ, err := s.repo.ReigningChampion()
+	if err != nil {
+		log.Printf("[SEASON] действующий чемпион не определён: %v", err)
+	} else {
+		s.champion.Store(champ)
+	}
 	return nil
 }
 

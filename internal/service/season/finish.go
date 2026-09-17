@@ -198,13 +198,12 @@ func bestBadge(byTier map[string]int) models.Badge {
 
 // ReigningChampion is who wears the crown right now: the winner of the last
 // season that finished. It is 0 until a season has been awarded.
+//
+// Served from the cache filled on every reload — this is read on each drop
+// message in a chat, and it only changes when a season is awarded, which
+// reloads anyway.
 func (s *Service) ReigningChampion() int64 {
-	uid, err := s.repo.ReigningChampion()
-	if err != nil {
-		log.Printf("[SEASON] не удалось определить действующего чемпиона: %v", err)
-		return 0
-	}
-	return uid
+	return s.champion.Load()
 }
 
 // DaysLeft counts whole days to the target date, or -1 when none is set: the
@@ -249,4 +248,22 @@ func (s *Service) Decorate(rows []Row) {
 		}
 		rows[i].Crown = champ != 0 && rows[i].UserID == champ
 	}
+}
+
+// BadgeOf is the career mark for one player: their best medal as text, and
+// whether they currently wear the crown. Delivery layers compose it with the
+// name themselves, since each platform formats names its own way.
+//
+// Errors are swallowed to a log line: a drop message must never fail because a
+// decoration could not be read.
+func (s *Service) BadgeOf(userID int64) (badge string, crown bool) {
+	badges, err := s.Badges([]int64{userID})
+	if err != nil {
+		log.Printf("[SEASON] значок игрока %d не прочитан: %v", userID, err)
+		return "", false
+	}
+	if b, ok := badges[userID]; ok {
+		badge = BadgeText(b.Tier, b.Count)
+	}
+	return badge, s.ReigningChampion() == userID
 }

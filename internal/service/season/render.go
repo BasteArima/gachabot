@@ -238,3 +238,17 @@ func pluralPoints(n int) string  { return plural(n, "балл", "балла", "�
 func pluralPlayers(n int) string { return plural(n, "игрок", "игрока", "игроков") }
 
 func pluralCardPoints(n int) string { return plural(n, "очко", "очка", "очков") }
+
+// NameWithBadge composes the line that names a player in a message: their best
+// medal, the name, and the crown if they are the reigning champion. Callers
+// escape the name first if their platform needs it — the formatting differs,
+// the order of the parts does not.
+func NameWithBadge(badge string, crown bool, name string) string {
+	if badge != "" {
+		name = badge + " " + name
+	}
+	if crown {
+		name += " \U0001F451"
+	}
+	return name
+}

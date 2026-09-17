@@ -158,6 +158,28 @@ func (b *Bot) shelfView(userID int64, name string) (*discordgo.MessageEmbed, []d
 	return embed, []discordgo.MessageComponent{discordgo.ActionsRow{Components: buttons}}, nil
 }
 
+// badgedName prefixes a player's name with their medal, for messages that name
+// the player rather than merely answer them — a caught spawn, in front of the
+// whole channel.
+func (b *Bot) badgedName(userID int64, name string) string {
+	badge, crown := b.season.BadgeOf(userID)
+	return season.NameWithBadge(badge, crown, name)
+}
+
+// dropAuthor is the byline on a card someone just pulled: their best medal,
+// their name, and the crown if they hold it. Only in a server — in a DM the
+// player knows who rolled, and the line would repeat on every card.
+func (b *Bot) dropAuthor(userID int64, name, guildID string) *discordgo.MessageEmbedAuthor {
+	if guildID == "" {
+		return nil
+	}
+	line := b.badgedName(userID, name)
+	if line == name {
+		return nil // nothing earned yet — no byline rather than a bare name
+	}
+	return &discordgo.MessageEmbedAuthor{Name: line}
+}
+
 // launchAppButton opens the embedded Activity, handled by the existing
 // "launch_app" component route.
 func (b *Bot) launchAppButton() discordgo.Button {

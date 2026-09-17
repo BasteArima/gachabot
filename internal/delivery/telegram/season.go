@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"html"
 	"log"
 	"strconv"
 	"strings"
@@ -200,6 +201,38 @@ func (b *Bot) editView(ctx tele.Context, text string, markup *tele.ReplyMarkup) 
 		return err
 	}
 	return nil
+}
+
+// dropBadge is the line that goes above a card someone just pulled: their best
+// medal, their name, and the crown if they are the reigning champion.
+//
+// Only in groups. In a private chat the player knows perfectly well who rolled,
+// and the line would be noise on every single card; in a group it is the whole
+// point — everyone sees who pulled the mythic and what they have won before.
+//
+// The name is escaped: roll captions are sent as HTML, and a nickname with "<"
+// would otherwise break the message.
+func (b *Bot) dropBadge(userID int64, user *tele.User, chat *tele.Chat) string {
+	if !isGroup(chat) {
+		return ""
+	}
+	badge, crown := b.season.BadgeOf(userID)
+	if badge == "" && !crown {
+		return ""
+	}
+	line := badge + " <b>" + html.EscapeString(displayName(user)) + "</b>"
+	if crown {
+		line += " 👑"
+	}
+	return line + "\n"
+}
+
+// badgedName prefixes a player's name with their medal, for messages that name
+// the player rather than merely answer them — a caught spawn, where the whole
+// chat is watching who took it. The name is escaped: those messages are HTML.
+func (b *Bot) badgedName(userID int64, name string) string {
+	badge, crown := b.season.BadgeOf(userID)
+	return season.NameWithBadge(badge, crown, html.EscapeString(name))
 }
 
 // appURL opens the Mini App on a given screen — the deep link the app reads on

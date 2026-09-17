@@ -51,6 +51,7 @@ func (b *Bot) handleRoll(s *discordgo.Session, i *discordgo.InteractionCreate, u
 		Description: desc,
 		Image:       &discordgo.MessageEmbedImage{URL: cardart.Framed(result.Card.ImageURL)},
 		Color:       0x00ff00,
+		Author:      b.dropAuthor(user.ID, interactionName(i), i.GuildID),
 	}
 
 	// "Open app" launches the embedded Discord Activity (handled via a

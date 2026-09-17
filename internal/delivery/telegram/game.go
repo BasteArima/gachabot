@@ -368,7 +368,7 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 
 	if result.AllCollected {
 		msg := b.loc.Translate(lang, "roll_all_collected", i18n.Args{"reward": result.Reward, "days": result.StreakDays})
-		return ctx.Send(msg, tele.ModeHTML)
+		return ctx.Send(b.dropBadge(dbUser.ID, tgUser, ctx.Chat())+msg, tele.ModeHTML)
 	}
 
 	var caption string
@@ -381,6 +381,8 @@ func (b *Bot) HandleRoll(ctx tele.Context) error {
 	} else {
 		caption = b.loc.Translate(lang, "roll_success", i18n.Args{"name": result.Card.Name, "rarity": b.loc.Rarity(lang, result.RarityName), "power": result.Card.PowerLevel, "reward": result.Reward})
 	}
+
+	caption = b.dropBadge(dbUser.ID, tgUser, ctx.Chat()) + caption
 
 	dynamicURL := fmt.Sprintf("%s?v=%d", cardart.Framed(result.Card.ImageURL), time.Now().Unix())
 	photo := &tele.Photo{

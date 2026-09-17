@@ -126,3 +126,19 @@ func TestTrophyTextKeepsTheFrozenNumbers(t *testing.T) {
 		}
 	}
 }
+
+func TestNameWithBadgeOrdersTheParts(t *testing.T) {
+	if got := NameWithBadge("🥇²", true, "Baste"); got != "🥇² Baste 👑" {
+		t.Errorf("медаль перед именем, корона после: %q", got)
+	}
+	if got := NameWithBadge("", false, "Новичок"); got != "Новичок" {
+		t.Errorf("без медалей имя не украшается: %q", got)
+	}
+	if got := NameWithBadge("", true, "Чемпион"); got != "Чемпион 👑" {
+		t.Errorf("корона может быть и без значка: %q", got)
+	}
+	// The name is escaped by the caller, and the composition must not touch it.
+	if got := NameWithBadge("🎖", false, "&lt;b&gt;"); got != "🎖 &lt;b&gt;" {
+		t.Errorf("экранированное имя должно дойти целым: %q", got)
+	}
+}

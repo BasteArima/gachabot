@@ -76,7 +76,7 @@ func (b *Bot) handleSpawnClaimComponent(s *discordgo.Session, i *discordgo.Inter
 			},
 		})
 		// ...and announce the winner + reward in a separate text message (no image).
-		if _, err := s.ChannelMessageSend(i.ChannelID, b.spawnClaimedText(discordDisplayName(i), res)); err != nil {
+		if _, err := s.ChannelMessageSend(i.ChannelID, b.spawnClaimedText(b.badgedName(dbUser.ID, discordDisplayName(i)), res)); err != nil {
 			log.Printf("[DS spawn] announce send failed: %v", err)
 		}
 	case spawn.OutcomeTaken:
