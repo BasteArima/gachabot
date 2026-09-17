@@ -86,6 +86,7 @@ func (s *Server) Start() {
 			r.Get("/daily-hub", s.handleDailyHub)
 			r.Get("/leaderboard", s.handleLeaderboard)
 			r.Get("/cards", s.handleCards)
+			r.Get("/season", s.handleSeason)
 			r.Post("/actions/roll", s.handleRoll)
 			r.Post("/actions/craft", s.handleCraft)
 
