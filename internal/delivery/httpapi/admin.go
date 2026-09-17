@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 )
@@ -45,7 +46,28 @@ func (s *Server) handleAdminSettings(w http.ResponseWriter, _ *http.Request) {
 		"require18Plus":     s.require18Plus,
 		"webAppURL":         s.cfg.WebAppURL,
 		"discordConfigured": s.discord.ClientID != "",
+
+		"adminCooldownBypass": s.gacha.AdminCooldownBypass(),
 	})
+}
+
+// PUT /api/admin/settings — the settings that can be changed without a redeploy.
+// Everything else on that screen comes from env vars and stays read-only.
+func (s *Server) handlePutAdminSettings(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		AdminCooldownBypass *bool `json:"adminCooldownBypass"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "плохой json")
+		return
+	}
+	if in.AdminCooldownBypass != nil {
+		if err := s.gacha.SetAdminCooldownBypass(*in.AdminCooldownBypass); err != nil {
+			writeErr(w, http.StatusInternalServerError, "не удалось сохранить настройку")
+			return
+		}
+	}
+	s.handleAdminSettings(w, r)
 }
 
 // GET /api/admin/spawn-config — current spawn config as JSON.

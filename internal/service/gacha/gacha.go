@@ -1,12 +1,22 @@
 package gacha
 
 import (
+	"encoding/json"
+	"log"
+	"sync/atomic"
+	"time"
+
 	"gachabot/internal/models"
 	"gachabot/internal/repository"
-	"time"
 
 	"github.com/redis/go-redis/v9"
 )
+
+// adminCooldownBypassKey stores the owner's "roll without waiting" switch. It
+// lives in bot_settings rather than an env var because it gets flipped for a
+// single test and flipped straight back, and a redeploy each way is too slow —
+// and because the owner also wants to compete on equal terms between tests.
+const adminCooldownBypassKey = "admin_cooldown_bypass"
 
 type GachaService struct {
 	repo              *repository.PostgresRepo
@@ -16,11 +26,13 @@ type GachaService struct {
 	cooldownHours     time.Duration
 	duplicatesEnabled bool
 	craftEnabled      bool
+	// adminBypass is read on every roll and written from the admin panel.
+	adminBypass atomic.Bool
 }
 
 func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID int64, cooldown time.Duration, duplicatesEnabled, craftEnabled bool) *GachaService {
 	loc := time.FixedZone("MSK", 3*60*60)
-	return &GachaService{
+	s := &GachaService{
 		repo:              repo,
 		rdb:               rdb,
 		loc:               loc,
@@ -29,6 +41,38 @@ func NewGachaService(repo *repository.PostgresRepo, rdb *redis.Client, adminID i
 		duplicatesEnabled: duplicatesEnabled,
 		craftEnabled:      craftEnabled,
 	}
+	// Default on: that is how the bot has always behaved, so an upgrade changes
+	// nothing until the switch is actually thrown.
+	s.adminBypass.Store(true)
+	raw, err := repo.GetSetting(adminCooldownBypassKey)
+	if err != nil {
+		log.Printf("[GACHA] не удалось прочитать %s: %v (оставляю обход включённым)", adminCooldownBypassKey, err)
+	} else if len(raw) > 0 {
+		var on bool
+		if json.Unmarshal(raw, &on) == nil {
+			s.adminBypass.Store(on)
+		}
+	}
+	return s
+}
+
+// AdminCooldownBypass reports whether the owner currently rolls without waiting.
+func (s *GachaService) AdminCooldownBypass() bool {
+	return s.adminBypass.Load()
+}
+
+// SetAdminCooldownBypass persists the switch and applies it immediately — no
+// restart, so a test can be run and the owner put back on equal footing.
+func (s *GachaService) SetAdminCooldownBypass(on bool) error {
+	raw, err := json.Marshal(on)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SetSetting(adminCooldownBypassKey, raw); err != nil {
+		return err
+	}
+	s.adminBypass.Store(on)
+	return nil
 }
 
 // DuplicatesEnabled reports whether new duplicate cards can drop.

@@ -162,7 +162,7 @@ func (s *GachaService) checkCooldown(userDb *models.User) (bool, string) {
 
 	timePassed := time.Since(userDb.LastRollTime.Time)
 
-	bypassCooldown := userDb.TelegramID.Valid && userDb.TelegramID.Int64 == s.adminID
+	bypassCooldown := s.adminBypass.Load() && userDb.TelegramID.Valid && userDb.TelegramID.Int64 == s.adminID
 
 	if timePassed < s.cooldownHours && !bypassCooldown {
 		timeLeft := s.cooldownHours - timePassed

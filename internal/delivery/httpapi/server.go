@@ -97,6 +97,7 @@ func (s *Server) Start() {
 				r.Use(s.auditMiddleware)
 				r.Get("/admin/overview", s.handleAdminOverview)
 				r.Get("/admin/settings", s.handleAdminSettings)
+				r.Put("/admin/settings", s.handlePutAdminSettings)
 				r.Get("/admin/spawn-config", s.handleGetSpawnConfig)
 				r.Put("/admin/spawn-config", s.handlePutSpawnConfig)
 				r.Get("/admin/artguess-config", s.handleGetArtGuessConfig)
