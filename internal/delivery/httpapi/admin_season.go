@@ -201,3 +201,77 @@ func dateOrEmpty(t *time.Time) string {
 	}
 	return t.In(msk).Format("2006-01-02")
 }
+
+// GET /api/admin/season/preview — who would get what if the season ended now.
+// Optional ?minActive=N tries a different activity minimum without saving it,
+// which is the question the owner actually asks before awarding: does this
+// threshold include the people who played, and exclude the ones who didn't.
+func (s *Server) handleAdminSeasonPreview(w http.ResponseWriter, r *http.Request) {
+	rows, minActive, err := s.season.Preview(intQuery(r, "minActive"))
+	if err != nil {
+		if errors.Is(err, season.ErrNoSeason) {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "не удалось посчитать итоги")
+		return
+	}
+
+	counts := map[string]int{}
+	for _, row := range rows {
+		if row.Tier != "" {
+			counts[row.Tier]++
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"rows":      rows,
+		"minActive": minActive,
+		"counts":    counts,
+	})
+}
+
+// POST /api/admin/season/finish — award the medals and close the season.
+// Irreversible, which is why nothing here happens on a timer: the owner looks at
+// the preview first and then presses the button.
+func (s *Server) handleAdminSeasonFinish(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		MinActive  int    `json:"minActive"`
+		StartNext  bool   `json:"startNext"`
+		NextTitle  string `json:"nextTitle"`
+		NextEndsAt string `json:"nextEndsAt"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&in); err != nil {
+		writeErr(w, http.StatusBadRequest, "плохой json")
+		return
+	}
+	nextEnds, err := parseEndsAt(in.NextEndsAt)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	awarded, err := s.season.Finish(in.MinActive)
+	if err != nil {
+		if errors.Is(err, season.ErrNoSeason) {
+			writeErr(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "не удалось завершить сезон")
+		return
+	}
+	// The season is already closed; a failure to open the next one is worth
+	// reporting but must not read as "nothing happened".
+	started := false
+	if in.StartNext {
+		if _, err := s.season.Start(in.NextTitle, nextEnds); err != nil {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"awarded": awarded,
+				"started": false,
+				"warning": "сезон завершён и медали выданы, но новый сезон не начался — начни его вручную",
+			})
+			return
+		}
+		started = true
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"awarded": awarded, "started": started})
+}

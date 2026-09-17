@@ -87,6 +87,7 @@ func (s *Server) Start() {
 			r.Get("/leaderboard", s.handleLeaderboard)
 			r.Get("/cards", s.handleCards)
 			r.Get("/season", s.handleSeason)
+			r.Get("/trophies", s.handleTrophies)
 			r.Post("/actions/roll", s.handleRoll)
 			r.Post("/actions/craft", s.handleCraft)
 
@@ -106,6 +107,8 @@ func (s *Server) Start() {
 				r.Post("/admin/season", s.handleAdminSeasonStart)
 				r.Put("/admin/season", s.handleAdminSeasonUpdate)
 				r.Post("/admin/season/restart", s.handleAdminSeasonRestart)
+				r.Get("/admin/season/preview", s.handleAdminSeasonPreview)
+				r.Post("/admin/season/finish", s.handleAdminSeasonFinish)
 				r.Get("/admin/spawn-config", s.handleGetSpawnConfig)
 				r.Put("/admin/spawn-config", s.handlePutSpawnConfig)
 				r.Get("/admin/artguess-config", s.handleGetArtGuessConfig)

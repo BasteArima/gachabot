@@ -37,6 +37,11 @@ type Row struct {
 	Qualified  bool          `json:"qualified"`
 	CardsCount int           `json:"cardsCount"`
 	BestDrop   string        `json:"bestDrop"`
+	// Career, not this season: the best medal this player ever earned, and the
+	// crown of the reigning champion. Filled in by the delivery layer, which
+	// knows whether the caller is allowed to see the board at all.
+	Badge *models.Badge `json:"badge,omitempty"`
+	Crown bool          `json:"crown,omitempty"`
 }
 
 // Goal is what a player is next working towards: either the activity minimum

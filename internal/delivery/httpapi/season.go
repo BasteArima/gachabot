@@ -31,6 +31,7 @@ func (s *Server) handleSeason(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	elapsed, _ := s.season.Days()
+	s.decorate(rows)
 
 	uid := userIDFrom(r)
 	var me *season.Row

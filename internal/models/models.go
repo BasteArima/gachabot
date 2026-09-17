@@ -237,3 +237,26 @@ type SeasonStat struct {
 	BestDropName   string
 	BestDropAt     sql.NullTime
 }
+
+// SeasonResult is one player's finished season: the numbers as they stood when
+// medals were handed out. Kept apart from the live counters because a trophy
+// read years later must not change when anything is recounted.
+type SeasonResult struct {
+	SeasonID     int
+	SeasonNumber int
+	SeasonTitle  string
+	StartedAt    time.Time
+	FinishedAt   time.Time
+	UserID       int64
+	Place        int
+	Points       int
+	Tier         string
+	Detail       json.RawMessage
+}
+
+// Badge is what sits next to a nickname: the best medal a player has ever
+// earned, and how many times they earned it.
+type Badge struct {
+	Tier  string `json:"tier"`
+	Count int    `json:"count"`
+}

@@ -158,3 +158,31 @@ func TestNextGoalCountsDaysThenPoints(t *testing.T) {
 		t.Errorf("лидеру уже некуда расти: %+v", g)
 	}
 }
+
+func TestBadgeShowsTheBestMedalAndItsCount(t *testing.T) {
+	// Two championships and a pile of lesser medals: the badge is the two, not
+	// the pile.
+	got := bestBadge(map[string]int{
+		TierChampion:    2,
+		TierSilver:      1,
+		TierElite:       4,
+		TierParticipant: 7,
+	})
+
+	if got.Tier != TierChampion || got.Count != 2 {
+		t.Errorf("ожидался чемпион ×2, вышло %s ×%d", got.Tier, got.Count)
+	}
+}
+
+func TestBadgeOfSomeoneWhoOnlyTookPart(t *testing.T) {
+	got := bestBadge(map[string]int{TierParticipant: 5})
+	if got.Tier != TierParticipant || got.Count != 5 {
+		t.Errorf("ожидался участник ×5, вышло %s ×%d", got.Tier, got.Count)
+	}
+}
+
+func TestNoMedalsMeansNoBadge(t *testing.T) {
+	if got := bestBadge(map[string]int{}); got.Tier != "" {
+		t.Errorf("без медалей значка быть не должно, а вышло %q", got.Tier)
+	}
+}
